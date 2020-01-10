@@ -20,9 +20,11 @@ import (
  * 交易数据结构
  */
 type AccountLog struct {
+    TxType      string         // 交易类型
     From        string         // 支出方
     To          string         // 接收方
     Amount      int            // 金额
+    Operate     int            // 支出方: 0,  接收方: 1
 }
 
 // 接受到的交易请求，仅供测试使用
@@ -31,6 +33,8 @@ type TxArg struct {
     Sender     string   `json:"sender"`
     Receiver   string   `json:"receiver"`
     Content    string   `json:"content"`
+    TxSignature string  `json:"txSignature"`
+    Operate     int     `json:"operate"`
 }
 
 // 实例化交易
@@ -49,9 +53,15 @@ func (accountLog * AccountLog) Check() bool {
     from := accountLog.From
     to := accountLog.To
     amount := accountLog.Amount
+    if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
+        return true
+    }
     if amount <= 0 {
         logger.Error("金额应大于0")
         return false
+    }
+    if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
+        return true
     }
 
     balanceToStr := _getState([]byte(to))
@@ -80,21 +90,28 @@ func (accountLog * AccountLog) Check() bool {
 
 // 更新状态
 func (accountLog * AccountLog) Save() {
+    if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
+        return
+    }
     // 支出
-    if len(accountLog.From) != 0 {
-        balanceFrom := _byte2digit(_getState([]byte(accountLog.From)))
-        balanceFrom -= accountLog.Amount
-        _setState([]byte(accountLog.From), _digit2byte(balanceFrom))
+    if accountLog.TxType != "relaytx" || accountLog.Operate == 0 {
+        if len(accountLog.From) != 0 {
+            balanceFrom := _byte2digit(_getState([]byte(accountLog.From)))
+            balanceFrom -= accountLog.Amount
+            _setState([]byte(accountLog.From), _digit2byte(balanceFrom))
+        }
     }
     // 收入
     var balanceTo int
-    if len(accountLog.From) != 0 {
-        balanceTo = _byte2digit(_getState([]byte(accountLog.To)))
-        balanceTo += accountLog.Amount
-    } else {
-        balanceTo = accountLog.Amount
+    if accountLog.TxType != "relaytx" || accountLog.Operate == 1 {
+        if len(accountLog.From) != 0 {
+            balanceTo = _byte2digit(_getState([]byte(accountLog.To)))
+            balanceTo += accountLog.Amount
+        } else {
+            balanceTo = accountLog.Amount
+        }
+        _setState([]byte(accountLog.To), _digit2byte(balanceTo))
     }
-    _setState([]byte(accountLog.To), _digit2byte(balanceTo))
     logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
 }
 
@@ -133,7 +150,20 @@ func _setState(key []byte, val []byte) {
 
 // 解析交易
 func _parseTx(tx []byte) *AccountLog{
-    args := strings.Split(string(tx), "_")
+    accountLog := new(AccountLog)
+
+    txArgs := new(TxArg)
+    err := json.Unmarshal(tx, txArgs)
+    if err != nil {
+        logger.Error("交易解析失败")
+        return nil
+    }
+    if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
+        accountLog.TxType = txArgs.TxType
+        fmt.Println("交易放行: " + txArgs.TxType)
+        return accountLog
+    }
+    args := strings.Split(string(txArgs.Content), "_")
     fmt.Println(args)
     if len(args) != 3 {
         logger.Error("参数个数错误")
@@ -145,10 +175,11 @@ func _parseTx(tx []byte) *AccountLog{
         logger.Error("解析失败，金额应为整数")
         return nil
     }
-    accountLog := new(AccountLog)
     accountLog.From = args[0]
     accountLog.To = args[1]
     accountLog.Amount = amount
+    accountLog.Operate = txArgs.Operate
+    accountLog.TxType = txArgs.TxType
     return accountLog
 }
 
