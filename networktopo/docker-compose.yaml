@@ -1,0 +1,50 @@
+version: 2
+services:
+  TopoANode1:
+    image: 10.77.70.142:5000/tenderminttopo:v0.4
+    container_name: TopoANode1
+    hostname: TopoANode1
+    tty: true
+    volumes: ['/home/centos/networktopo/TopoANode1:/tendermint']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=eb6662ffb03b2a917e8a411948b4f87d06fd2e84@TTANode3:26656,9b90b9a315067dfb39d197d6c3baffcaa5e1cc94@TTANode2:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore ']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode1]
+  TopoANode2:
+    image: 10.77.70.142:5000/tenderminttopo:v0.4
+    container_name: TopoANode2
+    hostname: TopoANode2
+    tty: true
+    volumes: ['/home/centos/networktopo/TopoANode2:/tendermint']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=a6d4883cdf17578f8231eaf099e029be17547c4c@TTANode1:26656,35940130912ca07bf1ddcfad4b0a6a5f5a007c8b@TTANode4:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore ']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode2]
+  TopoANode3:
+    image: 10.77.70.142:5000/tenderminttopo:v0.4
+    container_name: TopoANode3
+    hostname: TopoANode3
+    tty: true
+    volumes: ['/home/centos/networktopo/TopoANode3:/tendermint']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=a6d4883cdf17578f8231eaf099e029be17547c4c@TTANode1:26656,35940130912ca07bf1ddcfad4b0a6a5f5a007c8b@TTANode4:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore ']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode3]
+  TopoANode4:
+    image: 10.77.70.142:5000/tenderminttopo:v0.4
+    container_name: TopoANode4
+    hostname: TopoANode4
+    tty: true
+    volumes: ['/home/centos/networktopo/TopoANode4:/tendermint']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=eb6662ffb03b2a917e8a411948b4f87d06fd2e84@TTANode3:26656,9b90b9a315067dfb39d197d6c3baffcaa5e1cc94@TTANode2:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore ']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode4]

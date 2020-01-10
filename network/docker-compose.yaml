@@ -1,0 +1,175 @@
+version: 2
+services:
+  TTANode1:
+    image: 10.77.70.142:5000/tendermint:v0.4
+    container_name: TTANode1
+    hostname: TTANode1
+    tty: true
+    volumes: ['/home/centos/NFS500/network/TTANode1/config:/tendermint/config']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=7badcf16f8db33705bebc1b13b7684966456633d@TTANode3:26656,29fa9f124173d3bf0f41606c31e0bd49e18eb40b@TTANode2:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode1]
+  TTANode2:
+    image: 10.77.70.142:5000/tendermint:v0.4
+    container_name: TTANode2
+    hostname: TTANode2
+    tty: true
+    volumes: ['/home/centos/NFS500/network/TTANode2/config:/tendermint/config']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=cc498d17608537f23af50f6f173a58cc96425459@TTANode1:26656,15c870c15e9320d8822ee31bce737f61531a540c@TTANode4:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode2]
+  TTANode3:
+    image: 10.77.70.142:5000/tendermint:v0.4
+    container_name: TTANode3
+    hostname: TTANode3
+    tty: true
+    volumes: ['/home/centos/NFS500/network/TTANode3/config:/tendermint/config']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=cc498d17608537f23af50f6f173a58cc96425459@TTANode1:26656,15c870c15e9320d8822ee31bce737f61531a540c@TTANode4:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode3]
+  TTANode4:
+    image: 10.77.70.142:5000/tendermint:v0.4
+    container_name: TTANode4
+    hostname: TTANode4
+    tty: true
+    volumes: ['/home/centos/NFS500/network/TTANode4/config:/tendermint/config']
+    environment: [TASKID=A]
+    entrypoint: [sh, -c, 'tendermint node --p2p.persistent_peers=7badcf16f8db33705bebc1b13b7684966456633d@TTANode3:26656,29fa9f124173d3bf0f41606c31e0bd49e18eb40b@TTANode2:26656
+        --moniker=`hostname` --proxy_app=persistent_kvstore']
+    networks:
+      tendermintnet1:
+        aliases: [ttAnode4]
+  etcd1:
+    container_name: etcd1
+    image: 10.77.70.142:5000/etcd:v3.3.10
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - TZ=CST-8
+      - LANG=zh_CN.UTF-8
+    networks:
+      tendermintnet1:
+        aliases:
+          - etcd1
+    command: /usr/local/bin/etcd
+      -name etcd1
+      -advertise-client-urls http://etcd1:2379
+      -listen-client-urls http://0.0.0.0:2379
+      -initial-advertise-peer-urls http://etcd1:2380
+      -listen-peer-urls http://0.0.0.0:2380
+      -initial-cluster-token docker-etcd
+      -initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380,etcd4=http://etcd4:2380
+      -initial-cluster-state new
+    volumes:
+      - "/usr/share/ca-certificates/:/etc/ssl/certs"
+      # - "/data/config/etcd/ca-certificates/:/etc/ssl/certs"
+    labels:
+      - project.source=
+      - project.extra=public-image
+      - project.depends=
+      - project.owner=LHZ
+
+  etcd2:
+    container_name: etcd2
+    image: 10.77.70.142:5000/etcd:v3.3.10
+    ports:
+      - "3379:2379"
+      - "3380:2380"
+    environment:
+      - TZ=CST-8
+      - LANG=zh_CN.UTF-8
+    networks:
+      tendermintnet1:
+        aliases:
+          - etcd2
+    command: /usr/local/bin/etcd
+      -name etcd2
+      -advertise-client-urls http://etcd2:2379
+      -listen-client-urls http://0.0.0.0:2379
+      -initial-advertise-peer-urls http://etcd2:2380
+      -listen-peer-urls http://0.0.0.0:2380
+      -initial-cluster-token docker-etcd
+      -initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380,etcd4=http://etcd4:2380
+      -initial-cluster-state new
+    volumes:
+      - "/usr/share/ca-certificates/:/etc/ssl/certs"
+      # - "/data/config/etcd/ca-certificates/:/etc/ssl/certs"
+    labels:
+      - project.source=
+      - project.extra=public-image
+      - project.depends=
+      - project.owner=LHZ
+  etcd3:
+    container_name: etcd3
+    image: 10.77.70.142:5000/etcd:v3.3.10
+    ports:
+      - "4379:2379"
+      - "4380:2380"
+    environment:
+      - TZ=CST-8
+      - LANG=zh_CN.UTF-8
+    networks:
+      tendermintnet1:
+        aliases:
+          - etcd3
+    command: /usr/local/bin/etcd
+      -name etcd3
+      -advertise-client-urls http://etcd3:2379
+      -listen-client-urls http://0.0.0.0:2379
+      -initial-advertise-peer-urls http://etcd3:2380
+      -listen-peer-urls http://0.0.0.0:2380
+      -initial-cluster-token docker-etcd
+      -initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380,etcd4=http://etcd4:2380
+      -initial-cluster-state new
+    volumes:
+      - "/usr/share/ca-certificates/:/etc/ssl/certs"
+      # - "/data/config/etcd/ca-certificates/:/etc/ssl/certs"
+    labels:
+      - project.source=
+      - project.extra=public-image
+      - project.depends=
+      - project.owner=LHZ
+  etcd4:
+    container_name: etcd4
+    image: 10.77.70.142:5000/etcd:v3.3.10
+    ports:
+      - "5379:2379"
+      - "5380:2380"
+    environment:
+      - TZ=CST-8
+      - LANG=zh_CN.UTF-8
+    networks:
+      tendermintnet1:
+        aliases:
+          - etcd4
+    command: /usr/local/bin/etcd
+      -name etcd4
+      -advertise-client-urls http://etcd4:2379
+      -listen-client-urls http://0.0.0.0:2379
+      -initial-advertise-peer-urls http://etcd4:2380
+      -listen-peer-urls http://0.0.0.0:2380
+      -initial-cluster-token docker-etcd
+      -initial-cluster etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380,etcd4=http://etcd4:2380
+      -initial-cluster-state new
+    volumes:
+      - "/usr/share/ca-certificates/:/etc/ssl/certs"
+      # - "/data/config/etcd/ca-certificates/:/etc/ssl/certs"
+    labels:
+      - project.source=
+      - project.extra=public-image
+      - project.depends=
+      - project.owner=LHZ
+
+networks:
+  tendermintnet1:
+    driver: host
