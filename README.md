@@ -1,180 +1,44 @@
-# Tendermint
+# Sharding Blockchain
+高性能区块链分片系统，在保证交易安全性的前提下实现横向扩容，显著提高系统TPS。
 
-更新内容说明
------------
+## 内容
++ 设计并实现跨片共识协议
++ Leader定期更替协议
++ 跨片共识系统的安全性
++ 大规模实验压力测试
 
-1、leader由随机数触发更换（state/execution.go  updateState函数中  
-2、leader更换后会在etcd中更新新leader的ip和端口（PS：新产生的leader后的下一个区块会由第三个节点发放，但是只产生这一个区块后，就会一直由新leader接管）  
-3、新的leader产生后，会从区块数据库中回滚没处理完的rtx交易，并且发布一个checkpoint交易记录（这条tx会出现“Timed out waiting for tx to be included in a block”的错误日志，可能没被成功写入）   
-4、只有leader会执行applyblcok中的blockExec.CheckRelayTxs(block)函数   
-blockExec.CheckRelayTxs(block)实现的主要功能：  
-CheckCommitedBlock部分  
-1、检测即将被commit的区块中tx的Txtype是否是relaytx，如果是则发送给相应的reciver区块,并且加入leader节点的内存数据库中   
-2、检测即将被commit的区块中tx的Txtype是否是addtx，如果是，则需要将内存数据库中对应relaytx删除掉   
-UpdateRelaytxDB()部分   
-3、更新内存中的relaytx数据库的状态，如果有rtx已经过了20个区块还没有被确认，需要重新发送一次。也可能是对方区块已接收，返回addtx时候丢失，这种情况开可以根据发送时候返回的日志，如果是“Error on broadcastTxCommit: Tx already exists in cache”，则将内存数据库中对应relaytx删除掉   
-发送checkpoint部分   
-4、每20个，更新一次checkpoint。从内存数据库中拿到所有的tx，转化成tx格式（用sender写发送时候区块高度）   
+## 创新
++ 保证交易的最终一致性
++ 用ETCD维护分片间的通信
++ 记录每个跨片交易，收到最终确认消息后再删除
++ 增加检查点区块，加快leader更换时的跨片交易记录恢复
 
+## 开发
+### Tx格式
+```javascript
+{
+    "Txtype"         // string, 交易类型
+    "Sender"         // string, 发送方分片
+    "Receiver"       // string, 接收方分片
+    "ID"             // [sha256.Size]byte, 未知
+    "Content"        // string, 交易内容，16进制编码
+    "TxSignature"    // string, 交易签名，16进制编码
+}
+```  
 
+### 交易内容格式说明
++ content格式： {sender} _ {receiver} _ {amount}   
++ content的交易由三部分组成：转出方、转入方、金额，其中转出方和转入方是来ecdsa公钥的string形式  
 
-[Byzantine-Fault Tolerant](https://en.wikipedia.org/wiki/Byzantine_fault_tolerance)
-[State Machines](https://en.wikipedia.org/wiki/State_machine_replication).
-Or [Blockchain](https://en.wikipedia.org/wiki/Blockchain_(database)), for short.
+### ECDSA的坐标与string转换
+转换方法遵循asn1(Abstract Syntax Notation One)格式  
+> golang官方包 encoding/asn1
 
-[![version](https://img.shields.io/github/tag/tendermint/tendermint.svg)](https://github.com/tendermint/tendermint/releases/latest)
-[![API Reference](
-https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/68747470733a2f2f676f646f632e6f72672f6769746875622e636f6d2f676f6c616e672f6764646f3f7374617475732e737667
-)](https://godoc.org/github.com/tendermint/tendermint)
-[![Go version](https://img.shields.io/badge/go-1.12.0-blue.svg)](https://github.com/moovweb/gvm)
-[![riot.im](https://img.shields.io/badge/riot.im-JOIN%20CHAT-green.svg)](https://riot.im/app/#/room/#tendermint:matrix.org)
-[![license](https://img.shields.io/github/license/tendermint/tendermint.svg)](https://github.com/tendermint/tendermint/blob/master/LICENSE)
-[![](https://tokei.rs/b1/github/tendermint/tendermint?category=lines)](https://github.com/tendermint/tendermint)
-
-
-Branch    | Tests | Coverage
-----------|-------|----------
-master    | [![CircleCI](https://circleci.com/gh/tendermint/tendermint/tree/master.svg?style=shield)](https://circleci.com/gh/tendermint/tendermint/tree/master) | [![codecov](https://codecov.io/gh/tendermint/tendermint/branch/master/graph/badge.svg)](https://codecov.io/gh/tendermint/tendermint)
-develop   | [![CircleCI](https://circleci.com/gh/tendermint/tendermint/tree/develop.svg?style=shield)](https://circleci.com/gh/tendermint/tendermint/tree/develop) | [![codecov](https://codecov.io/gh/tendermint/tendermint/branch/develop/graph/badge.svg)](https://codecov.io/gh/tendermint/tendermint)
-
-Tendermint Core is Byzantine Fault Tolerant (BFT) middleware that takes a state transition machine - written in any programming language -
-and securely replicates it on many machines.
-
-For protocol details, see [the specification](/docs/spec).
-
-For detailed analysis of the consensus protocol, including safety and liveness proofs,
-see our recent paper, "[The latest gossip on BFT consensus](https://arxiv.org/abs/1807.04938)".
-
-## A Note on Production Readiness
-
-While Tendermint is being used in production in private, permissioned
-environments, we are still working actively to harden and audit it in preparation
-for use in public blockchains, such as the [Cosmos Network](https://cosmos.network/).
-We are also still making breaking changes to the protocol and the APIs.
-Thus, we tag the releases as *alpha software*.
-
-In any case, if you intend to run Tendermint in production,
-please [contact us](mailto:partners@tendermint.com) and [join the chat](https://riot.im/app/#/room/#tendermint:matrix.org).
-
-## Security
-
-To report a security vulnerability, see our [bug bounty
-program](https://hackerone.com/tendermint)
-
-For examples of the kinds of bugs we're looking for, see [SECURITY.md](SECURITY.md)
-
-## Minimum requirements
-
-Requirement|Notes
----|---
-Go version | Go1.11.4 or higher
-
-## Documentation
-
-Complete documentation can be found on the [website](https://tendermint.com/docs/).
-
-### Install
-
-See the [install instructions](/docs/introduction/install.md)
-
-### Quick Start
-
-- [Single node](/docs/introduction/quick-start.md)
-- [Local cluster using docker-compose](/docs/networks/docker-compose.md)
-- [Remote cluster using terraform and ansible](/docs/networks/terraform-and-ansible.md)
-- [Join the Cosmos testnet](https://cosmos.network/testnet)
-
-## Contributing
-
-Please abide by the [Code of Conduct](CODE_OF_CONDUCT.md) in all interactions,
-and the [contributing guidelines](CONTRIBUTING.md) when submitting code.
-
-Join the larger community on the [forum](https://forum.cosmos.network/) and the [chat](https://riot.im/app/#/room/#tendermint:matrix.org).
-
-To learn more about the structure of the software, watch the [Developer
-Sessions](https://www.youtube.com/playlist?list=PLdQIb0qr3pnBbG5ZG-0gr3zM86_s8Rpqv)
-and read some [Architectural
-Decision Records](https://github.com/tendermint/tendermint/tree/master/docs/architecture).
-
-Learn more by reading the code and comparing it to the
-[specification](https://github.com/tendermint/tendermint/tree/develop/docs/spec).
-
-## Versioning
-
-### Semantic Versioning
-
-Tendermint uses [Semantic Versioning](http://semver.org/) to determine when and how the version changes.
-According to SemVer, anything in the public API can change at any time before version 1.0.0
-
-To provide some stability to Tendermint users in these 0.X.X days, the MINOR version is used
-to signal breaking changes across a subset of the total public API. This subset includes all
-interfaces exposed to other processes (cli, rpc, p2p, etc.), but does not
-include the in-process Go APIs.
-
-That said, breaking changes in the following packages will be documented in the
-CHANGELOG even if they don't lead to MINOR version bumps:
-
-- crypto
-- types
-- rpc/client
-- config
-- node
-- libs
-  - bech32
-  - common
-  - db
-  - errors
-  - log
-
-Exported objects in these packages that are not covered by the versioning scheme
-are explicitly marked by `// UNSTABLE` in their go doc comment and may change at any
-time without notice. Functions, types, and values in any other package may also change at any time.
-
-### Upgrades
-
-In an effort to avoid accumulating technical debt prior to 1.0.0,
-we do not guarantee that breaking changes (ie. bumps in the MINOR version)
-will work with existing tendermint blockchains. In these cases you will
-have to start a new blockchain, or write something custom to get the old
-data into the new chain.
-
-However, any bump in the PATCH version should be compatible with existing histories
-(if not please open an [issue](https://github.com/tendermint/tendermint/issues)).
-
-For more information on upgrading, see [UPGRADING.md](./UPGRADING.md)
-
-## Resources
-
-### Tendermint Core
-
-For details about the blockchain data structures and the p2p protocols, see the
-[Tendermint specification](/docs/spec).
-
-For details on using the software, see the [documentation](/docs/) which is also
-hosted at: https://tendermint.com/docs/
-
-### Tools
-
-Benchmarking and monitoring is provided by `tm-bench` and `tm-monitor`, respectively.
-Their code is found [here](/tools) and these binaries need to be built seperately.
-Additional documentation is found [here](/docs/tools).
-
-### Sub-projects
-
-* [Amino](http://github.com/tendermint/go-amino), reflection-based proto3, with
-  interfaces
-* [IAVL](http://github.com/tendermint/iavl), Merkleized IAVL+ Tree implementation
-
-### Applications
-
-* [Cosmos SDK](http://github.com/cosmos/cosmos-sdk); a cryptocurrency application framework
-* [Ethermint](http://github.com/cosmos/ethermint); Ethereum on Tendermint
-* [Many more](https://tendermint.com/ecosystem)
-
-### Research
-
-* [The latest gossip on BFT consensus](https://arxiv.org/abs/1807.04938)
-* [Master's Thesis on Tendermint](https://atrium.lib.uoguelph.ca/xmlui/handle/10214/9769)
-* [Original Whitepaper](https://tendermint.com/static/docs/tendermint.pdf)
-* [Blog](https://blog.cosmos.network/tendermint/home)
-
+将坐标ecdsaCoordinate直接marshal为byte数据，然后再将byte数据按16进制编码转换为string类型  
+ecdsa的坐标结构：  
+```golang
+type struct ecdsaCoordinate{
+    X, Y *big.Int
+}
+```  
+（ps：ecdsa的签名结果也是一个坐标，其中的R对应ecdsaCoordinate.X，S对应ecdsaCoordinate.Y）
