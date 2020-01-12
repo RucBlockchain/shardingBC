@@ -54,7 +54,6 @@ func writeDefaultConfigFile(configFilePath string) {
 // WriteConfigFile renders config using the template and writes it to configFilePath.
 func WriteConfigFile(configFilePath string, config *Config) {
 	var buffer bytes.Buffer
-	fmt.Println("我读取了配置！！！！！！！！！！！！！！！！！！！！！！")
 	if err := configTemplate.Execute(&buffer, config); err != nil {
 		panic(err)
 	}

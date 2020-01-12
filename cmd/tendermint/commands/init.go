@@ -53,9 +53,7 @@ func initFilesWithConfig(config *cfg.Config) error {
 	genFile := config.GenesisFile()
 	if cmn.FileExists(genFile) {
 		logger.Info("Found genesis file", "path", genFile)
-		fmt.Println("找到创世文件")
 	} else {
-		fmt.Println("没有找到创世文件")
 		genDoc := types.GenesisDoc{
 			ChainID:         fmt.Sprintf("test-chain-%v", cmn.RandStr(6)),
 			GenesisTime:     tmtime.Now(),
