@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	crand "crypto/rand"
 	"flag"
 	"fmt"
+
 	//"github.com/gorilla/websocket"
 	"os"
 	"strings"
@@ -18,8 +22,10 @@ import (
 
 var logger = log.NewNopLogger()
 
+type plist []*ecdsa.PrivateKey
+
 func main() {
- 
+
 	//durationInt表示持续时间
 	//txsRate 发送交易个数
 	//connections表示链接的个数
@@ -28,9 +34,9 @@ func main() {
 	//outputFormat 输出格式
 	//shard 分片
 	//broadcastTxmethod 传播方法
-	//allshard 全分片 
+	//allshard 全分片
 	//relayrate 跨片比例
-	var durationInt, txsRate, connections, txSize,relayrate int
+	var durationInt, txsRate, connections, txSize, relayrate int
 	var verbose bool
 	var outputFormat, broadcastTxMethod, allshard string
 	//var shard
@@ -110,19 +116,20 @@ Examples:
 	logger.Info("Latest block height", "h", initialHeight)
 	//开始创建client,发送交易
 	var transacters []*transacter
+	allSahrd := strings.Split(allshard, ",")
 	transacters = startTransacters(
 		endpoints,
 		connections,
 		txsRate,
 		txSize,
 		//shard,
-		allshard,		
+		allSahrd,
 		relayrate,
 		"broadcast_tx_"+broadcastTxMethod)
 
 	// Stop upon receiving SIGTERM or CTRL-C.
 	//创建各个分片的账户并写入文件中
-	
+
 	cmn.TrapSignal(logger, func() {
 		for _, t := range transacters {
 			t.Stop()
@@ -182,22 +189,56 @@ func countCrashes(crashes []bool) int {
 	return count
 }
 
+func createCount(allshard []string) []plist {
+
+	var count []plist
+	for i := 0; i < len(allshard); i++ {
+		var pl plist
+		for j := 0; j < 10; j++ {
+			priv, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
+			pl = append(pl, priv)
+		}
+		count = append(count, pl)
+	}
+	return count
+}
+
 func startTransacters(
 	endpoints []string,
 	connections,
 	txsRate int,
 	txSize int,
 	//shard string,
-	allshard string,
+	allshard []string,
 	relayrate int,
 	broadcastTxMethod string) []*transacter {
 	transacters := make([]*transacter, len(endpoints))
 
+	count := createCount(allshard)
+	iwg := sync.WaitGroup{}
+	iwg.Add(len(endpoints))
+	for i, e := range endpoints {
+		shard := allshard[i]
+		flag := 0
+		t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
+		t.SetLogger(logger)
+		go func(i int) {
+			defer iwg.Done()
+			if err := t.Start(); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			transacters[i] = t
+		}(i)
+	}
+	iwg.Wait()
+
 	wg := sync.WaitGroup{}
 	wg.Add(len(endpoints))
 	for i, e := range endpoints {
-		shard :=allshard[i]
-		t := newTransacter(e, connections, txsRate, txSize, shard,allshard, relayrate,broadcastTxMethod)
+		shard := allshard[i]
+		flag := 1
+		t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
 		t.SetLogger(logger)
 		go func(i int) {
 			defer wg.Done()

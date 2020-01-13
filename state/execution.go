@@ -268,6 +268,7 @@ func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) ([]tp.TX,
 				continue
 			} else if t.Txtype == "relaytx" {
 				if t.Sender == block.Shard {
+					t.Operate = 1
 					sendtxs = append(sendtxs, t)
 					blockExec.Add2RelaytxDB(t)
 				} else if t.Receiver == block.Shard {
@@ -317,7 +318,6 @@ func (blockExec *BlockExecutor) SendRelayTxs( /*line *myline.Line,*/ txs []tp.TX
 		flag := int(txs[i].Receiver[0]) - 65
 		shard_send[flag] = append(shard_send[flag], txs[i])
 	}
-	fmt.Println("SendRelayTxs1")
 	var tx_package []tp.TX
 	//begin := time.Now()
 	for i := 0; i < len(shard_send); i++ {
@@ -420,6 +420,7 @@ func (blockExec *BlockExecutor) SendAddedRelayTxs( /*line *myline.Line,*/ txs []
 	for i := 0; i < len(txs); i++ {
 		flag := int(txs[i].Receiver[0]) - 65
 		txs[i].Txtype = "addtx"
+		txs[i].Operate = 1
 		shard_send[flag] = append(shard_send[flag], txs[i])
 	}
 	var tx_package []tp.TX

@@ -71,7 +71,7 @@ func (accountLog * AccountLog) Check() bool {
         logger.Error("支出方账户不存在")
         return false
     }
-    if len(from) != 0 && balanceToStr == nil {
+    if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
         logger.Error("接收方账户不存在")
         return false
     }
@@ -154,6 +154,7 @@ func _parseTx(tx []byte) *AccountLog{
 
     txArgs := new(TxArg)
     err := json.Unmarshal(tx, txArgs)
+    logger.Error("交易内容: " + string(tx))
     if err != nil {
         logger.Error("交易解析失败")
         return nil

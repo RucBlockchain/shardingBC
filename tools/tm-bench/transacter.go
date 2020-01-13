@@ -7,10 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/md5"
 	crand "crypto/rand"
 	"encoding/asn1"
@@ -41,8 +39,6 @@ const (
 	pingPeriod = (30 * 9 / 10) * time.Second
 )
 
-type plist []*ecdsa.PrivateKey
-
 type transacter struct {
 	Target            string
 	Rate              int
@@ -50,9 +46,10 @@ type transacter struct {
 	Connections       int
 	BroadcastTxMethod string
 	shard             string
-	allshard          string
+	allshard          []string
 	relayrate         int
 	count             []plist
+	flag              int
 
 	conns       []*websocket.Conn
 	connsBroken []bool
@@ -63,7 +60,7 @@ type transacter struct {
 	logger log.Logger
 }
 
-func newTransacter(target string, connections, rate int, size int, shard string, allshard string, relayrate int, broadcastTxMethod string) *transacter {
+func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count []plist, flag int, broadcastTxMethod string) *transacter {
 	return &transacter{
 		Target:            target,
 		Rate:              rate,
@@ -73,6 +70,8 @@ func newTransacter(target string, connections, rate int, size int, shard string,
 		shard:             shard,
 		allshard:          allshard,
 		relayrate:         relayrate,
+		count:             count,
+		flag:              flag,
 		conns:             make([]*websocket.Conn, connections),
 		connsBroken:       make([]bool, connections),
 		logger:            log.NewNopLogger(),
@@ -97,21 +96,11 @@ func (t *transacter) Start() error {
 		}
 		t.conns[i] = c
 	}
-	//创建账户
-	t.createCount()
-	//初始化账户
-	t.startingWg.Add(t.Connections)
-	t.endingWg.Add(2 * t.Connections)
-	for i := 0; i < t.Connections; i++ {
-		go t.sendLoop(i, 0)
-		go t.receiveLoop(i)
-	}
-	t.startingWg.Wait()
 
 	t.startingWg.Add(t.Connections)
 	t.endingWg.Add(2 * t.Connections)
 	for i := 0; i < t.Connections; i++ {
-		go t.sendLoop(i, 1)
+		go t.sendLoop(i, t.flag)
 		go t.receiveLoop(i)
 	}
 	t.startingWg.Wait()
@@ -182,8 +171,7 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 		txsTicker.Stop()
 		t.endingWg.Done()
 	}()
-	allShard := strings.Split(t.allshard, ",")
-	send_shard := deleteSlice(allShard, t.shard)
+	send_shard := deleteSlice(t.allshard, t.shard)
 
 	for {
 		select {
@@ -204,9 +192,9 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 					if i >= 100 {
 						break //初始化100个账户
 					}
-					ntx = generateTx(send_shard,i)
+					ntx = t.generateTx(t.shard, i)
 				} else {
-					ntx = updateTx(txNumber, send_shard, t.shard, t.relayrate)
+					ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate)
 				}
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
 
@@ -310,20 +298,11 @@ func pub2string(pub ecdsa.PublicKey) string {
 	return hex.EncodeToString(b)
 }
 
-func (t *transacter) createCount() {
-	for i := 0; i < len(t.allshard); i++ {
-		var pl plist
-		for j := 0; j < 100; j++ {
-			priv, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
-			pl = append(pl, priv)
-		}
-		t.count = append(t.count, pl)
-	}
-}
-func (t *transacter) createinitTxContent(shard string, i int) (string, stirng) {
-	index := int(shard) - 65
-	shardcound := t.count[index]
-	priv, _ := shardcound[i]
+func (t *transacter) createinitTxContent(shard string, i int) (string, string) {
+	toint, _ := strconv.ParseInt(shard, 32, 64)
+	index := toint - 10
+	shardcount := t.count[index]
+	priv := shardcount[i]
 	pub_s := priv.PublicKey
 	tx_content := "_" + pub2string(pub_s) + "_10000"
 	sig := "sig"
@@ -331,16 +310,18 @@ func (t *transacter) createinitTxContent(shard string, i int) (string, stirng) {
 
 }
 
-func(t *transacter)  createRelayTxContent(shard_s string, shard_r string) (string, string) {
+func (t *transacter) createRelayTxContent(shard_s string, shard_r string) (string, string) {
 	source := rand.NewSource(time.Now().Unix())
 	newrand := rand.New(source)
 	num := newrand.Intn(100)
-	sendshard := t.count[(int(shard_s)-65)]
-	priv, _ := sendshard[ newrand.Intn(100)]
+	toint, _ := strconv.ParseInt(shard_s, 32, 64)
+	sendshard := t.count[(toint - 10)]
+	priv := sendshard[newrand.Intn(2)]
 	pub_s := priv.PublicKey
 
-	receiveshard := t.count[(int(shard_r)-65)]
-	priv_r, _ := receiveshard[newrand.Intn(100)]
+	toint2, _ := strconv.ParseInt(shard_r, 32, 64)
+	receiveshard := t.count[(toint2 - 10)]
+	priv_r := receiveshard[newrand.Intn(2)]
 	pub_r := priv_r.PublicKey
 
 	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num)
@@ -350,15 +331,17 @@ func(t *transacter)  createRelayTxContent(shard_s string, shard_r string) (strin
 
 }
 
-func(t *transacter)  createLocalTxContent(shard string,) (string, string) {
+func (t *transacter) createLocalTxContent(shard string) (string, string) {
 	source := rand.NewSource(time.Now().Unix())
 	newrand := rand.New(source)
 	num := newrand.Intn(100)
-	shard := t.count[(int(shard)-65)]
-	priv, _ := shard[ newrand.Intn(100)]
+
+	toint, _ := strconv.ParseInt(shard, 32, 64)
+	shardcount := t.count[(toint - 10)]
+	priv := shardcount[newrand.Intn(2)]
 	pub_s := priv.PublicKey
 
-	priv_r, _ := shard[ newrand.Intn(100)]
+	priv_r := shardcount[newrand.Intn(2)]
 	pub_r := priv_r.PublicKey
 
 	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num)
@@ -366,20 +349,11 @@ func(t *transacter)  createLocalTxContent(shard string,) (string, string) {
 	sig := bigint2str(*tr, *ts)
 	return tx_content, sig
 
-}
-
-func (t *transacter) initTx(shard string) (string, string) {
-
-	priv_r, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
-	pub_r := priv_r.PublicKey
-	tx_content := "_" + pub2string(pub_r) + "_" + "10000"
-	sig := "sig"
-	return tx_content, sig
 }
 
 //TX考虑当前分片中实际账户
-func generateTx(shard string) []byte {
-	content, sig := initTx()
+func (t *transacter) generateTx(shard string, index int) []byte {
+	content, sig := t.createinitTxContent(shard, index)
 	tx := &tp.TX{
 		Txtype:      "init",
 		Sender:      shard,
@@ -390,17 +364,16 @@ func generateTx(shard string) []byte {
 		Operate:     0}
 	res, _ := json.Marshal(tx)
 
-	return restx
+	return res
 }
 
 // warning, mutates input byte slice
-func updateTx(txNumber int, send_shard []string, shard string, rate int) []byte {
+func (t *transacter) updateTx(txNumber int, send_shard []string, shard string, rate int) []byte {
 
-	
 	var res []byte
 	if txNumber%rate != 0 {
 		step := len(send_shard)
-		content, sig := createRelayTxContent(shard, send_shard[txNumber%step])
+		content, sig := t.createRelayTxContent(shard, send_shard[txNumber%step])
 		tx := &tp.TX{
 			Txtype:      "relaytx",
 			Sender:      shard,
@@ -411,7 +384,7 @@ func updateTx(txNumber int, send_shard []string, shard string, rate int) []byte 
 			Operate:     0}
 		res, _ = json.Marshal(tx)
 	} else {
-		content, sig := createLocalTxContent(shard)
+		content, sig := t.createLocalTxContent(shard)
 		tx := &tp.TX{
 			Txtype:      "tx",
 			Sender:      "",

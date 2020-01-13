@@ -18,14 +18,17 @@ const (
 )
 
 /*
-tx的交易形式有三种：
+Tx的type有五种种：
 类型是string
 普通tx：
-	tx=内容
+	tx
 跨片tx：
-	relayTx,A,B=内容
-	addTx,A,B = 内容
-	checkpoint=
+	relaytx
+	addtx
+检查点tx：
+	checkpoint
+初始化tx:
+	init
 
 content内容g格式
 {sender}_{receiver}_{amount)
@@ -55,6 +58,7 @@ type TX struct {
 	ID          [sha256.Size]byte
 	Content     string
 	TxSignature string
+	Operate     int
 }
 
 //这格式只在relay tx相关的内容中使用

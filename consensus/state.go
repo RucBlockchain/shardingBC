@@ -35,7 +35,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	sm "github.com/tendermint/tendermint/state"
 	"github.com/tendermint/tendermint/types"
-	useetcd "github.com/tendermint/tendermint/useetcd"
+	// useetcd "github.com/tendermint/tendermint/useetcd"
 )
 
 var flag_conn = false
@@ -962,8 +962,8 @@ func (cs *ConsensusState) sendLeaderToEtcd(address []byte) {
 
 	if cs.isProposer(address) {
 
-		e := useetcd.NewEtcd()
-		e.Update(getShard(), getIp())
+		// e := useetcd.NewEtcd()
+		// e.Update(getShard(), getIp())
 		myline.Judge_leader = true
 	}
 }
