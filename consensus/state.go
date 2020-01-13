@@ -1122,6 +1122,24 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 		return
 	}
 
+	cs.Logger.Debug(fmt.Sprintf("(%v/%v). Current: %v/%v/%v start verify the signature os txs", height, round, cs.Height, cs.Round, cs.Step))
+	// validate Tx signature
+	for txid, tx := range (cs.ProposalBlock.Txs) {
+		logger.Debug("validate tx========, id: %d, content: %s", txid, tx.String())
+		tx_tmp, err := tp.NewTX(tx)
+		if err != nil {
+			logger.Debug("valite failed, err: ", err)
+			continue
+		}
+		if res := tx_tmp.VerifySig(); res == false {
+			logger.Error("signature is wrong")
+			// 签名验证错误，直接返回
+			cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{})
+			return
+		}
+		logger.Debug("validate tx========, id: %d, content: %s varify success。", txid, tx.String())
+	}
+
 	// Prevote cs.ProposalBlock
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
@@ -1480,6 +1498,7 @@ func (cs *ConsensusState) isLeader() (flag bool) {
 	flag = cs.isProposer(address)
 	return flag
 }
+
 /*
 func (cs *ConsensusState) reactorViaCheckpoint(height int64) {
 

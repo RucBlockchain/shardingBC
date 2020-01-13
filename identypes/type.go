@@ -72,6 +72,12 @@ func NewTX(data []byte) (*TX, error) {
 }
 
 func (tx *TX) VerifySig() bool {
+	// 只有addTx & relayTx才需要验证交易签名
+	if tx.Txtype != "addTx" && tx.Txtype != "relayTx" {
+		fmt.Println("该交易类型检查， txtype: ", tx.Txtype)
+		return true
+	}
+
 	// 从content中提取出公钥信息
 	pub, err := Content2PubKey(tx.Content)
 
