@@ -1124,26 +1124,30 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 
 	cs.Logger.Debug(fmt.Sprintf("(%v/%v). Current: %v/%v/%v start verify the signature os txs", height, round, cs.Height, cs.Round, cs.Step))
 	// validate Tx signature
+	t := time.Now()
 	for txid, tx := range (cs.ProposalBlock.Txs) {
 		logger.Debug("validate tx========, id: %d, content: %s", txid, tx.String())
 		tx_tmp, err := tp.NewTX(tx)
 		if err != nil {
-			logger.Debug("valite failed, err: ", err)
+			// cs.Logger.Debug("valite failed, err: ", err)
 			continue
 		}
 		if res := tx_tmp.VerifySig(); res == false {
-			logger.Error("signature is wrong")
+			cs.Logger.Error("signature is wrong, tx index: ", txid)
+			fmt.Println("signature is wrong, tx index: ", txid)
+			
 			// 签名验证错误，直接返回
 			cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{})
+			fmt.Println("1verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
 			return
 		}
-		logger.Debug("validate tx========, id: %d, content: %s varify success。", txid, tx.String())
+		// cs.Logger.Debug("validate tx========, id: %d, content: %s varify success。",txid,tx.String())
 	}
-
+	fmt.Println("verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
 	// Prevote cs.ProposalBlock
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
-	logger.Info("enterPrevote: ProposalBlock is valid")
+	cs.Logger.Info("enterPrevote: ProposalBlock is valid")
 	cs.signAddVote(types.PrevoteType, cs.ProposalBlock.Hash(), cs.ProposalBlockParts.Header())
 }
 
@@ -1897,7 +1901,7 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 				if t.Txtype == "checkpoint" {
 					allTxs := cs.blockExec.GetAllTxs()
 					added = compareRelaylist(t, allTxs)
-					fmt.Println("added_____________", added)
+				
 					//如果是checkpoint，检查是否一致
 					break
 				}

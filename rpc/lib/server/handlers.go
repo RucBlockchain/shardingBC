@@ -867,13 +867,17 @@ func (wsc *wsConnection) readRoutine() {
 				//fmt.Println("处理",count,"条交易")
 				count=0
 			}else{
+				var pack_info json.RawMessage
+				pack_info = request.Params
+				var tx1 identypes.TX
+				err := json.Unmarshal(pack_info,&tx1)
 				time_start := time.Now()
 				rpcFunc := wsc.funcMap[request.Method]
 
 				//fmt.Println("调用了什么？？？",request.Method)
 				if rpcFunc == nil {
 					wsc.WriteRPCResponse(types.RPCMethodNotFoundError(request.ID))
-					fmt.Println("返回错误信息15",err)
+			
 					continue
 				}
 
@@ -883,7 +887,6 @@ func (wsc *wsConnection) readRoutine() {
 					fnArgs, err := jsonParamsToArgs(rpcFunc, wsc.cdc, request.Params)
 					if err != nil {
 						wsc.WriteRPCResponse(types.RPCInternalError(request.ID, errors.Wrap(err, "Error converting json params to arguments")))
-						fmt.Println("返回错误信息12",err)
 						continue
 					}
 					args = append(args, fnArgs...)
@@ -891,12 +894,16 @@ func (wsc *wsConnection) readRoutine() {
 
 				returns := rpcFunc.f.Call(args)
 
-				// TODO: Need to encode args/returns to string if we want to log them
+				// TODO: Need to efncode args/returns to string if we want to log them
 				wsc.Logger.Info("WSJSONRPC", "method", request.Method)
 
 				result, err := unreflectResult(returns)
+				
+			
+			
 				//count++
 				//fmt.Println("处理了未跨片条",count,"交易")
+
 				if err != nil {
 					wsc.WriteRPCResponse(types.RPCInternalError(request.ID, err))
 					continue

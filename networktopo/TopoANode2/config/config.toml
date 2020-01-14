@@ -8,11 +8,7 @@
 proxy_app = "tcp://127.0.0.1:26658"
 
 # A custom human readable name for this node
-<<<<<<< HEAD:networktopo/TopoANode2/config/config.toml
-moniker = "9663bfc5ee4b"
-=======
-moniker = "0f87e7a0e821"
->>>>>>> zyj:network/node1/node13_data/config/config.toml
+moniker = "4510113827d9"
 
 # If this node is many blocks behind the tip of the chain, FastSync
 # allows them to catchup quickly by downloading blocks in parallel
@@ -40,7 +36,7 @@ genesis_file = "config/genesis.json"
 priv_validator_key_file = "config/priv_validator_key.json"
 
 # Path to the JSON file containing the last sign state of a validator
-priv_validator_state_file = "data/priv_validator_state.json"
+priv_validator_state_file = "config/priv_validator_state.json"
 
 # TCP or UNIX socket address for Tendermint to listen on for
 # connections from an external PrivValidator process
@@ -117,7 +113,7 @@ max_subscriptions_per_client = 5
 # WARNING: Using a value larger than 10s will result in increasing the
 # global HTTP write timeout, which applies to all connections and endpoints.
 # See https://github.com/tendermint/tendermint/issues/3435
-timeout_broadcast_tx_commit = "10s"
+timeout_broadcast_tx_commit = "20s"
 
 # The name of a file containing certificate that is used to create the HTTPS server.
 # If the certificate is signed by a certificate authority,
@@ -286,9 +282,9 @@ namespace = "tendermint"
 ##### reconfiguration configuration options #####
 [reconfiguration]
 #Shardcount
-shardcount = "8"
+shardcount = "1"
 #nodecount
-nodecount = "8"
+nodecount = "4"
 #movecount
 movecount = "4"
 ##### etcdConfig configuration options #####
@@ -298,4 +294,4 @@ etcdname = "TTANode2"
 #etcddir
 etcddir = "TTANode2"
 #etcdcluster
-etcdcluster = "TTANode1=http://TTANode1:2380,TTANode2=http://TTANode2:2380,TTANode3=http://TTANode3:2380,TTANode4=http://TTANode4:2380"
+etcdcluster = "TTANode1=http://TTANode1:2380,TTANode2=http://TTANode2:2380"

@@ -12,7 +12,6 @@ import (
     "github.com/tendermint/tendermint/libs/log"
     "strconv"
     "strings"
-    "fmt"
 )
 
 
@@ -57,7 +56,7 @@ func (accountLog * AccountLog) Check() bool {
         return true
     }
     if amount <= 0 {
-        logger.Error("金额应大于0")
+        // logger.Error("金额应大于0")
         return false
     }
     if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
@@ -68,22 +67,22 @@ func (accountLog * AccountLog) Check() bool {
     balanceFromStr := _getState([]byte(from))
 
     if len(from) != 0 && balanceFromStr == nil {
-        logger.Error("支出方账户不存在")
+        // logger.Error("支出方账户不存在")
         return false
     }
     if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
-        logger.Error("接收方账户不存在")
+        // logger.Error("接收方账户不存在")
         return false
     }
 
     if len(from) != 0 {
         balanceFrom := _byte2digit(balanceFromStr)
         if balanceFrom < amount {
-            logger.Error("余额不足")
+            // logger.Error("余额不足")
             return false
         }
     }
-    logger.Error("交易通过验证：" +  from + " -> " + to + "  " + strconv.Itoa(amount))
+    // logger.Error("交易通过验证：" +  from + " -> " + to + "  " + strconv.Itoa(amount))
     return true
 }
 
@@ -112,7 +111,7 @@ func (accountLog * AccountLog) Save() {
         }
         _setState([]byte(accountLog.To), _digit2byte(balanceTo))
     }
-    logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
+    // logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
 }
 
 
@@ -154,26 +153,26 @@ func _parseTx(tx []byte) *AccountLog{
 
     txArgs := new(TxArg)
     err := json.Unmarshal(tx, txArgs)
-    logger.Error("交易内容: " + string(tx))
+    // logger.Error("交易内容: " + string(tx))
     if err != nil {
-        logger.Error("交易解析失败")
+        // logger.Error("交易解析失败")
         return nil
     }
     if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
         accountLog.TxType = txArgs.TxType
-        fmt.Println("交易放行: " + txArgs.TxType)
+        // fmt.Println("交易放行: " + txArgs.TxType)
         return accountLog
     }
     args := strings.Split(string(txArgs.Content), "_")
-    fmt.Println(args)
+    // fmt.Println(args)
     if len(args) != 3 {
-        logger.Error("参数个数错误")
+        // logger.Error("参数个数错误")
         return nil
     }
 
     amount, err := strconv.Atoi(args[2])
     if err != nil {
-        logger.Error("解析失败，金额应为整数")
+        // logger.Error("解析失败，金额应为整数")
         return nil
     }
     accountLog.From = args[0]
@@ -187,7 +186,7 @@ func _parseTx(tx []byte) *AccountLog{
 func _parseTx2(tx []byte) *AccountLog {
     args := strings.Split(string(tx), "&")
     if len(args) != 3 {
-        logger.Error("参数个数错误")
+        // logger.Error("参数个数错误")
         return nil
     }
     froms := strings.Split(args[0], "=")
@@ -195,13 +194,13 @@ func _parseTx2(tx []byte) *AccountLog {
     amounts := strings.Split(args[2], "=")
 
     if froms[0] != "from" || tos[0] != "to" || amounts[0] != "amounts" {
-        logger.Error("参数名称错误")
+        // logger.Error("参数名称错误")
         return nil
     }
 
     amount, err := strconv.Atoi(amounts[1])
     if err != nil {
-        logger.Error("解析失败，金额应为整数")
+        // logger.Error("解析失败，金额应为整数")
         return nil
     }
     accountLog := new(AccountLog)
@@ -216,17 +215,17 @@ func _parseTx3(tx []byte) *AccountLog {
     var args []string
     err := json.Unmarshal(tx, args)
     if err != nil {
-        logger.Error("交易格式错误")
+        // logger.Error("交易格式错误")
         return nil
     }
     if len(args) != 3 {
-        logger.Error("参数个数错误")
+        // logger.Error("参数个数错误")
         return nil
     }
 
     amount, err := strconv.Atoi(args[2])
     if err != nil {
-        logger.Error("解析失败，金额应为整数")
+        // logger.Error("解析失败，金额应为整数")
         return nil
     }
     accountLog := new(AccountLog)

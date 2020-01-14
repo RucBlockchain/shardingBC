@@ -302,7 +302,6 @@ func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
 	return resendTxs
 }
 func (blockExec *BlockExecutor) GetAllTxs() []tp.TX {
-	fmt.Println("GetAllTxs")
 	cpTxs := blockExec.mempool.GetAllTxs()
 	return cpTxs
 }

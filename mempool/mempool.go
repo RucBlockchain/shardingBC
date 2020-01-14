@@ -21,6 +21,7 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
+	myclient"github.com/tendermint/tendermint/client"
 	//"github.com/tendermint/tendermint/state"
 )
 // PreCheckFunc is an optional filter executed before CheckTx and rejects
@@ -467,7 +468,16 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 				// but they can spam the same tx with little cost to them atm.
 			}
 		}
-
+		var retx *tp.TX
+		retx,_=tp.NewTX(tx)
+		retx.Txtype="addtx"
+		name := "TT"+retx.Sender+"Node2:26657"
+		tx_package:=[]tp.TX{}
+		tx_package=append(tx_package,*retx)
+		for i:=0;i<len(tx_package);i++{
+		client := *myclient.NewHTTP(name,"/websocket")
+		go client.BroadcastTxAsync(tx_package)
+		}
 		return ErrTxInCache
 	}
 	// END CACHE

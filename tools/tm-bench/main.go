@@ -156,17 +156,21 @@ Examples:
 	}
 	logger.Debug("Time all transacters stopped", "t", time.Now())
 	time.Sleep(time.Second * 10)
-	stats, err := calculateStatistics(
-		client,
-		initialHeight,
-		timeStart,
-		durationInt,
-	)
-	if err != nil {
-		printErrorAndExit(err.Error())
+	
+	for i, _ := range endpoints {
+		client  = tmrpc.NewHTTP(endpoints[i], "/websocket")
+		stats, err := calculateStatistics(
+			client,
+			initialHeight,
+			timeStart,
+			durationInt,
+		)
+		if err != nil {
+			printErrorAndExit(err.Error())
+		}
+		printStatistics(stats, outputFormat)
 	}
 
-	printStatistics(stats, outputFormat)
 
 }
 
@@ -194,7 +198,7 @@ func createCount(allshard []string) []plist {
 	var count []plist
 	for i := 0; i < len(allshard); i++ {
 		var pl plist
-		for j := 0; j < 10; j++ {
+		for j := 0; j < 100; j++ {
 			priv, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
 			pl = append(pl, priv)
 		}

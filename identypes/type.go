@@ -72,7 +72,7 @@ func NewTX(data []byte) (*TX, error) {
 }
 
 func (tx *TX) VerifySig() bool {
-	// 只有addTx & relayTx才需要验证交易签名
+	// 只有Tx & relayTx才需要验证交易签名
 	if tx.Txtype != "tx" && tx.Txtype != "relaytx" {
 		return true
 	}

@@ -5,9 +5,8 @@ import (
 	//	"encoding/binary"
 	//	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strconv"
-
+	"fmt"
 	"crypto/ecdsa"
 	"crypto/md5"
 	crand "crypto/rand"
@@ -162,7 +161,7 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 
 	logger := t.logger.With("addr", c.RemoteAddr())
 
-	var txNumber = 0
+	var txNumber = 1
 
 	pingsTicker := time.NewTicker(pingPeriod)
 	txsTicker := time.NewTicker(1 * time.Second)
@@ -302,7 +301,9 @@ func (t *transacter) createinitTxContent(shard string, i int) (string, string) {
 	toint, _ := strconv.ParseInt(shard, 32, 64)
 	index := toint - 10
 	shardcount := t.count[index]
+
 	priv := shardcount[i]
+
 	pub_s := priv.PublicKey
 	tx_content := "_" + pub2string(pub_s) + "_10000"
 	sig := "sig"
@@ -316,12 +317,12 @@ func (t *transacter) createRelayTxContent(shard_s string, shard_r string) (strin
 	num := newrand.Intn(100)
 	toint, _ := strconv.ParseInt(shard_s, 32, 64)
 	sendshard := t.count[(toint - 10)]
-	priv := sendshard[newrand.Intn(2)]
+	priv := sendshard[newrand.Intn(100)]
 	pub_s := priv.PublicKey
 
 	toint2, _ := strconv.ParseInt(shard_r, 32, 64)
 	receiveshard := t.count[(toint2 - 10)]
-	priv_r := receiveshard[newrand.Intn(2)]
+	priv_r := receiveshard[newrand.Intn(100)]
 	pub_r := priv_r.PublicKey
 
 	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num)
@@ -337,11 +338,12 @@ func (t *transacter) createLocalTxContent(shard string) (string, string) {
 	num := newrand.Intn(100)
 
 	toint, _ := strconv.ParseInt(shard, 32, 64)
+
 	shardcount := t.count[(toint - 10)]
-	priv := shardcount[newrand.Intn(2)]
+	priv := shardcount[newrand.Intn(100)]
 	pub_s := priv.PublicKey
 
-	priv_r := shardcount[newrand.Intn(2)]
+	priv_r := shardcount[newrand.Intn(100)]
 	pub_r := priv_r.PublicKey
 
 	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num)
@@ -371,7 +373,7 @@ func (t *transacter) generateTx(shard string, index int) []byte {
 func (t *transacter) updateTx(txNumber int, send_shard []string, shard string, rate int) []byte {
 
 	var res []byte
-	if txNumber%rate != 0 {
+	if txNumber%rate == 0 {
 		step := len(send_shard)
 		content, sig := t.createRelayTxContent(shard, send_shard[txNumber%step])
 		tx := &tp.TX{

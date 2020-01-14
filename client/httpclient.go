@@ -185,7 +185,27 @@ func (c *HTTP) broadcastTX(route string, tx []tp.TX)  {
 		data,_:=json.Marshal(tx[i])
 		result := new(ResultBroadcastTx)
 		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
-		
+		// fmt.Println(result.Log)
+		// if err != nil {
+		// 	f := fmt.Sprintf("%s", err)
+		// 	fmt.Println(f)
+		// 	if f=="Mempool is full"{
+		// 		continue
+		// 	}else if f=="Tx already exists in cache"{
+		// 		if tx[i].Txtype=="relaytx"{
+		// 			tx[i].Txtype="addtx"
+		// 			name := "TT"+tx[i].Sender+"Node2:26657"
+		// 			tx_package:=[]tp.TX{}
+		// 			tx_package=append(tx_package,tx[i])
+		// 			for i:=0;i<len(tx_package);i++{
+		// 			client := *NewHTTP(name,"/websocket")
+		// 			go client.BroadcastTxAsync(tx_package)
+		// 			}
+		// 		}
+		// 		continue
+		// 	}
+	
+		// }
 	}
 
 }
