@@ -269,8 +269,13 @@ func (mem *Mempool) RemoveRelaytxDB(tx  tp.TX){
 			break
 		}
 	}
-	
-	
+}
+func (mem *Mempool) RebuildRelay(txs []tp.TX){
+	var rtx []RTx
+	mem.rDB.relaytx = rtx
+	for i := 0; i < len(txs); i++{
+		mem.AddRelaytxDB(txs[i])
+	}
 }
 func (mem *Mempool) UpdaterDB()([]tp.TX){
 	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认

@@ -8,7 +8,7 @@
 proxy_app = "tcp://127.0.0.1:26658"
 
 # A custom human readable name for this node
-moniker = "3b840c1bfe78"
+moniker = "ab50019b2af0"
 
 # If this node is many blocks behind the tip of the chain, FastSync
 # allows them to catchup quickly by downloading blocks in parallel
@@ -294,4 +294,4 @@ etcdname = "TTANode3"
 #etcddir
 etcddir = "TTANode3"
 #etcdcluster
-etcdcluster = "TTANode1=http://TTANode1:2380,TTANode2=http://TTANode2:2380,TTANode3=http://TTANode3:2380,TTANode4=http://TTANode4:2380,TTANode5=http://TTANode5:2380,TTANode6=http://TTANode6:2380,TTANode7=http://TTANode7:2380,TTANode8=http://TTANode8:2380"
+etcdcluster = "TTANode1=http://TTANode1:2380,TTANode2=http://TTANode2:2380,TTANode3=http://TTANode3:2380,TTANode4=http://TTANode4:2380"

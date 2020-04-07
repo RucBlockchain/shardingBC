@@ -6,16 +6,15 @@ import (
 	"net"
 	"reflect"
 	"runtime/debug"
-	//"strings"
+	"strings"
 	"sync"
 	"time"
 
 	//	"io"
 	"encoding/hex"
 	"encoding/json"
-	//"strconv"
+	"strconv"
 
-	//	"strings"
 	"crypto/sha256"
 	"os"
 	"syscall"
@@ -1473,6 +1472,24 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	cs.scheduleRound0(&cs.RoundState)
 
 	//leader数据库不用再重建
+	//以下为重建relaylist的代码
+	if height %50 ==0 {
+		startTime := time.Now().UnixNano()
+		cpTxs := cs.CheckBlockTxInfo(height)
+		cs.blockExec.RebuildRelay(cpTxs)
+		endTime := time.Now().UnixNano()
+		//Milliseconds
+		fmt.Println("the rebuild time with checkpoint  is ",  float64((endTime - startTime) ))
+	}
+	if height %50 ==0 {
+		startTime := time.Now().UnixNano()
+		cpTxs := cs.CheckBlockTxInfoTra(height)
+		cs.blockExec.RebuildRelay(cpTxs)
+		endTime := time.Now().UnixNano()
+		fmt.Println("the rebuild time   is ",  float64((endTime - startTime)))
+	}
+
+
 	/*
 		if !cs.isEqual(lastLeaderAddress) {
 			if cs.isLeader() {
@@ -1512,7 +1529,7 @@ func (cs *ConsensusState) reactorViaCheckpoint(height int64) {
 	cptx := conver2cptx(cpTxs, height)
 	Sendcptx(cptx, 0) //TODO 改为一定要加入成功
 }
-
+*/
 //有checkpoint过程
 func (cs *ConsensusState) CheckBlockTxInfo(maxHeight int64) []tp.TX {
 	//input:最后一个区块高度
@@ -1541,7 +1558,7 @@ func (cs *ConsensusState) CheckBlockTxInfo(maxHeight int64) []tp.TX {
 				if t.Txtype == "relaytx" {
 
 					if t.Sender == tblock.Shard {
-						//如果是relaytx，并且是当前分片发起的，则加入到带确认数组
+						//如果是relaytx，并且是当前分片发起的，则加入到待确认数组
 						waitComTxs = append(waitComTxs, t)
 
 					}
@@ -1551,9 +1568,11 @@ func (cs *ConsensusState) CheckBlockTxInfo(maxHeight int64) []tp.TX {
 				} else if t.Txtype == "checkpoint" {
 					if flag {
 						lastCheckHeight, _ = strconv.ParseInt(t.Sender, 10, 64) //得到上一次检查点高度,保证只更新一次
+						fmt.Println("the lastCheckHeight is ",lastCheckHeight)
 						flag = false
 					}
 					content_tmp := strings.Split(t.Content, ";;")
+					fmt.Println("the content_temp length is ",len(content_tmp))
 					for j := 0; j < len(content_tmp); j++ {
 						var cpt tp.TX
 						json.Unmarshal([]byte(content_tmp[j]), &cpt)
@@ -1567,14 +1586,59 @@ func (cs *ConsensusState) CheckBlockTxInfo(maxHeight int64) []tp.TX {
 	}
 	var cpTxs []tp.TX
 	cpTxs = removeAddedTxs(waitComTxs, delTxs)
-	for _, tx := range cpTxs {
-		cs.blockExec.Add2RelaytxDB(tx)
-	}
+	// for _, tx := range cpTxs {
+	// 	cs.blockExec.Add2RelaytxDB(tx)
+	// }
 	return cpTxs
 	//返回所有未确认的tx，后续需要重新发送这些交易
 
 }
 
+//无checkpoint过程
+func (cs *ConsensusState) CheckBlockTxInfoTra(maxHeight int64) []tp.TX {
+	//input:最后一个区块高度
+	var tblock *types.Block
+	//从后往前遍历区块
+	var waitComTxs []tp.TX //待确认的tx数组
+	var delTxs []tp.TX     //待删除的tx
+	for i := maxHeight; i > 0 ; i-- {
+		tblock = cs.blockStore.LoadBlock(i) //TODO
+		//从最后一个区块开始遍历block数组
+		if tblock.Data.Txs != nil {
+			for i := 0; i < len(tblock.Data.Txs); i++ {
+				data := tblock.Data.Txs[i]
+				//遍历每个tblock中的TX
+
+				encodeStr := hex.EncodeToString(data)
+				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+
+				var t tp.TX
+				json.Unmarshal(temptx, &t)
+				if t.Txtype == "relaytx" {
+
+					if t.Sender == tblock.Shard {
+						//如果是relaytx，并且是当前分片发起的，则加入到待确认数组
+						waitComTxs = append(waitComTxs, t)
+					}
+				} else if t.Txtype == "addtx" {
+					//如果是addtx
+					delTxs = append(delTxs, t) //删除数组中对应的tx，用ID查找
+				} else {
+					continue
+				}
+			}
+		}
+	}
+	var cpTxs []tp.TX
+	cpTxs = removeAddedTxs(waitComTxs, delTxs)
+	// for _, tx := range cpTxs {
+	// 	cs.blockExec.Add2RelaytxDB(tx)
+	// }
+	return cpTxs
+	//返回所有未确认的tx，后续需要重新发送这些交易
+
+}
+/*
 func conver2cptx(cpTxs []tp.TX, height int64) tp.TX {
 
 	var content []string
@@ -1619,7 +1683,7 @@ func Sendtxs(cptxs []tp.TX) []tp.TX {
 	return cptxs
 
 }
-
+*/
 func removeAddedTxs(waitComTxs []tp.TX, delTxs []tp.TX) []tp.TX {
 	var cpTxs []tp.TX
 	flag := true
@@ -1663,7 +1727,7 @@ func Sendcptx(tx tp.TX, flag int) {
 	c.WriteJSON(rc)
 	myline.Flag_conn["Localhost"][0] = false
 }
-*/
+
 
 //-------------------------------------------------------------------------
 

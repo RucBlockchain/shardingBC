@@ -35,7 +35,7 @@ func getShard() string {
 }
 
 func Sendcptx(tx tp.TX, flag int) {
-	name := "TT" + getShard() + "Node2:26657"
+	name := "TT" + getShard() + "Node3:26657"
 	tx_package := []tp.TX{}
 	tx_package = append(tx_package, tx)
 	client := *myclient.NewHTTP(name, "/websocket")

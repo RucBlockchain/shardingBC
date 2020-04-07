@@ -24,6 +24,7 @@ type Mempool interface {
 
 	AddRelaytxDB(tx tp.TX)
 	RemoveRelaytxDB(tx tp.TX)
+	RebuildRelay(txs []tp.TX)
 	UpdaterDB() []tp.TX
 	GetAllTxs() []tp.TX
 
@@ -69,6 +70,7 @@ func (MockMempool) TxsAvailable() <-chan struct{} { return make(chan struct{}) }
 func (MockMempool) EnableTxsAvailable()           {}
 func (MockMempool) AddRelaytxDB(tx tp.TX){}
 func (MockMempool) RemoveRelaytxDB(tx tp.TX){}
+func (MockMempool) RebuildRelay(txs []tp.TX){}
 func (MockMempool) UpdaterDB() []tp.TX           {var str []tp.TX
 return str} 
 func (MockMempool) GetAllTxs() []tp.TX           {var str []tp.TX

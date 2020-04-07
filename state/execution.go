@@ -296,6 +296,9 @@ func (blockExec *BlockExecutor) RemoveFromRelaytxDB(tx tp.TX) {
 	//fmt.Println("RemoveFromRelaytxDB")
 	blockExec.mempool.RemoveRelaytxDB(tx)
 }
+func (blockExec *BlockExecutor) RebuildRelay(txs []tp.TX) {
+	blockExec.mempool.RebuildRelay(txs)
+}
 func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
 	fmt.Println("UpdateRelaytxDB")
 	resendTxs := blockExec.mempool.UpdaterDB()
@@ -305,6 +308,7 @@ func (blockExec *BlockExecutor) GetAllTxs() []tp.TX {
 	cpTxs := blockExec.mempool.GetAllTxs()
 	return cpTxs
 }
+
 
 func (blockExec *BlockExecutor) SendRelayTxs( /*line *myline.Line,*/ txs []tp.TX) {
 	fmt.Println("SendRelayTxs")
