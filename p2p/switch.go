@@ -65,11 +65,11 @@ type PeerFilterFunc func(IPeerSet, Peer) error
 // or more `Channels`.  So while sending outgoing messages is typically performed on the peer,
 // incoming messages are received on the reactor.
 type Switch struct {
-	cmn.BaseService	//继承基本服务，方便统一启动和停止
+	cmn.BaseService //继承基本服务，方便统一启动和停止
 
-	config       *config.P2PConfig //接收P2P的配置文件 所以说P2P的启动入口应该就是先启动Switch实例
+	config *config.P2PConfig //接收P2P的配置文件 所以说P2P的启动入口应该就是先启动Switch实例
 	// Reactor和通道之间的对应关系 也是通过这个传递给peer在往下传递到MConnecttion
-	reactors     map[string]Reactor
+	reactors map[string]Reactor
 
 	chDescs      []*conn.ChannelDescriptor
 	reactorsByCh map[byte]Reactor
@@ -427,7 +427,7 @@ func isPrivateAddr(err error) bool {
 // TODO: remove addrBook arg since it's now set on the switch
 func (sw *Switch) DialPeersAsync(addrBook AddrBook, peers []string, persistent bool) error {
 	netAddrs, errs := NewNetAddressStrings(peers)
-	//fmt.Println("要连接的节点",peers)
+	fmt.Println("要连接的节点", peers)
 	// only log errors, dial correct addresses
 	for _, err := range errs {
 		sw.Logger.Error("Error in peer's address", "err", err)
