@@ -1,6 +1,8 @@
 package blockchain
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -11,6 +13,7 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	myline "github.com/tendermint/tendermint/line"
 	"github.com/tendermint/tendermint/p2p"
+	ac "github.com/tendermint/tendermint/account"
 	sm "github.com/tendermint/tendermint/state"
 	"github.com/tendermint/tendermint/types"
 )
@@ -228,6 +231,29 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		}
 	case *bcBlockResponseMessage:
 		bcR.pool.AddBlock(src.ID(), msg.Block, len(msgBytes))
+		/**
+         * zyj
+         */
+		if sm.IsNewPeer && int(msg.Block.Height) % sm.SNAPSHOT_INTERVAL == 1 {
+			block := msg.Block
+			//bcR.Logger.Error("初始快照的下一个区块为", "tx:", json.Marshal(msg.Block.Txs))
+			if block != nil && block.Data != nil {
+				for i := 0; i < len(block.Data.Txs); i++ {
+					data := block.Data.Txs[i]
+					encodeStr := hex.EncodeToString(data)
+					temptx, _ := hex.DecodeString(encodeStr)        //得到真实的tx记录
+					bcR.Logger.Error("快照的下一个区块 ", "高度:", block.Height, "交易:", string(temptx))
+					// TODO: 如果是快照交易，将自身快照的hash与交易中hash进行对比
+
+					//var t account.TxArg
+					//json.Unmarshal(temptx, &t)
+
+				}
+			}
+			// zhayujie
+			// TODO 将自身快照的hash与交易中hash进行对比
+			sm.IsNewPeer = false
+		}
 	case *bcStatusRequestMessage:
 		// Send peer our state.
 		msgBytes := cdc.MustMarshalBinaryBare(&bcStatusResponseMessage{bcR.store.Height()})
@@ -238,6 +264,55 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 	case *bcStatusResponseMessage:
 		// Got a peer status. Unverified.
 		bcR.pool.SetPeerHeight(src.ID(), msg.Height)
+
+		/*
+         * @Author: zyj
+         * @Desc: 增加快照请求和响应的逻辑处理
+         * @Date: 19.12.07
+         */
+	case *bcSnapshotRequestMessage:
+		bcR.Logger.Error("收到快照请求! 现在发送快照")
+		// 获取所有状态集合
+		snapshot := ac.GetSnapshot()
+		snapShopMap, _ := json.Marshal(snapshot.Content)
+		src.TrySend(BlockchainChannel,
+			struct{ BlockchainMessage }{&bcSnapshotResponseMessage{snapshot.Version, snapShopMap}})
+		// TODO: 生成签名，对快照sha256后，私钥签名
+
+
+	case *bcSnapshotResponseMessage:
+		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
+		//bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v", msg.Version))
+
+		// TODO: 验签，使用发送方公钥进行验签。 text文本为快照内容sha256后
+		// 处理快照
+		myMap := make(map[string]string)
+		json.Unmarshal(msg.Content, &myMap)
+		count := 0
+		for k, v := range myMap {
+			// 快照写入
+			ac.SetState([]byte(k), []byte(v))
+			count++
+		}
+		bcR.Logger.Error(cmn.Fmt("快照写入完成, 长度为%v", count))
+		// 更新当前快照
+		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap})
+
+		// 更新当前区块高度为快照版本
+		if msg.Version > 0 && msg.Version < 0x7fffffff {
+			bcR.store.height = msg.Version     // just for test
+			// 更新pool中的高度为当前高度+1
+			bcR.pool.height = bcR.store.height + 1
+			bcR.initialState.LastBlockHeight = bcR.store.height
+			// 修改consensus模块中的区块高度
+			//cs := consensus.GetConsensusState()
+			//cs.Height = bcR.store.height
+		}
+
+		// 标记为新加入节点
+		ac.IsNewPeer = true
+		/* ---------- zyj change --------- */
+
 	default:
 		bcR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
 	}
@@ -273,6 +348,18 @@ func (bcR *BlockchainReactor) poolRoutine() {
 				if peer == nil {
 					continue
 				}
+				/*
+				 * @Author: zyj
+				 * @Desc: 增加快照请求发送逻辑，当requestsCh通道中高度为-1时触发
+				 * @Date: 19.11.24
+				 */
+				if request.Height == -1 {
+					bcR.Logger.Error(cmn.Fmt("现在发送同步快照请求: %v", request.PeerID))
+					msg := &bcSnapshotRequestMessage{}
+					peer.TrySend(BlockchainChannel, struct{ BlockchainMessage}{msg})
+					continue
+				}
+				/* ---------- zyj change --------- */
 				msgBytes := cdc.MustMarshalBinaryBare(&bcBlockRequestMessage{request.Height})
 				queued := peer.TrySend(BlockchainChannel, msgBytes)
 				if !queued {
@@ -301,6 +388,13 @@ FOR_LOOP:
 				"outbound", outbound, "inbound", inbound)
 			if bcR.pool.IsCaughtUp() {
 				bcR.Logger.Info("Time to switch to consensus reactor!", "height", height)
+				/*
+                 * @Author: zyj
+                 * @Desc: 更新高度，同步至consensus模块，否则会从高度1开始共识
+                 * @Date: 19.11.24
+                 */
+				state.LastBlockHeight = height - 1
+				// ------------------------------------
 				bcR.pool.Stop()
 				conR, ok := bcR.Switch.Reactor("CONSENSUS").(consensusReactor)
 				if ok {
@@ -411,6 +505,11 @@ type BlockchainMessage interface {
 	ValidateBasic() error
 }
 
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型注册
+ * @Date: 19.11.24
+ */
 func RegisterBlockchainMessages(cdc *amino.Codec) {
 	cdc.RegisterInterface((*BlockchainMessage)(nil), nil)
 	cdc.RegisterConcrete(&bcBlockRequestMessage{}, "tendermint/blockchain/BlockRequest", nil)
@@ -418,6 +517,8 @@ func RegisterBlockchainMessages(cdc *amino.Codec) {
 	cdc.RegisterConcrete(&bcNoBlockResponseMessage{}, "tendermint/blockchain/NoBlockResponse", nil)
 	cdc.RegisterConcrete(&bcStatusResponseMessage{}, "tendermint/blockchain/StatusResponse", nil)
 	cdc.RegisterConcrete(&bcStatusRequestMessage{}, "tendermint/blockchain/StatusRequest", nil)
+	cdc.RegisterConcrete(&bcSnapshotRequestMessage{}, "tendermint/blockchain/SnapshotRequest", nil)
+	cdc.RegisterConcrete(&bcSnapshotResponseMessage{}, "tendermint/blockchain/SnapshotResponse", nil)
 }
 
 func decodeMsg(bz []byte) (msg BlockchainMessage, err error) {
@@ -512,4 +613,28 @@ func (m *bcStatusResponseMessage) ValidateBasic() error {
 func (m *bcStatusResponseMessage) String() string {
 	return fmt.Sprintf("[bcStatusResponseMessage %v]", m.Height)
 }
+
+//-------------------------------------
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型定义
+ * @Date: 19.11.24
+ */
+type bcSnapshotRequestMessage struct {
+}
+
+func (m *bcSnapshotRequestMessage) String() string {
+	return fmt.Sprintf("[bcStatusResponseMessage %v]")
+}
+
+
+type bcSnapshotResponseMessage struct {
+	Version int64
+	Content []byte
+}
+
+func (m *bcSnapshotResponseMessage) String() string {
+	return fmt.Sprintf("[bcStatusResponseMessage %v]", m.Version)
+}
+
 
