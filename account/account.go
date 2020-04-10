@@ -16,7 +16,6 @@ import (
     "encoding/pem"
     "fmt"
     crand "crypto/rand"
-    cmn "github.com/tendermint/tendermint/libs/common"
     dbm "github.com/tendermint/tendermint/libs/db"
     "github.com/tendermint/tendermint/libs/log"
     "math/big"
@@ -183,7 +182,7 @@ func GenerateSnapshotFast(version int64) {
     snapshot.Version = version
 
     snapshotByte, _ := json.Marshal(snapshot)
-    logger.Error(cmn.Fmt("快照生成: %v", string(snapshotByte)))
+    logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
 
     // TODO: 增加签名
     hash := DoHash(string(snapshotByte))
@@ -214,6 +213,25 @@ func GetAllStates() (map[string]string) {
     //}
     return kvMaps
 }
+
+// 获取快照
+func GetSnapshot() Snapshot {
+    return snapshot
+}
+
+// 更新快照
+func SetSnapshot(newSnapshot Snapshot) {
+    snapshot = newSnapshot
+}
+
+// 更新状态
+func SetState(key []byte, val []byte) {
+    if db != nil {
+        //blockExec.db.SetSync(key, val);
+        db.Set(key, val)
+    }
+}
+
 
 /*
  * 静态函数和私有函数

@@ -138,17 +138,17 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
      * @Date: 19.01.04
      */
     currentHeight := block.Height - 1
-    if currentHeight > 0 && int(currentHeight) % SNAPSHOT_INTERVAL == 0 {
+    if currentHeight > 0 && int(currentHeight) % account.SNAPSHOT_INTERVAL == 0 {
         blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
         time.Sleep(time.Second * 5)
 
         // 快照生成v2.0
-        GenerateSnapshotFast(block.Height - 1)
+        account.GenerateSnapshotFast(block.Height - 1)
 
         // 在快照后一个区块内增加快照交易
-        snapshotTx := new(TxArg)
+        snapshotTx := new(account.TxArg)
         snapshotTx.TxType = "snapshots"
-        snapshotTx.Content = SnapshotHash
+        snapshotTx.Content = account.SnapshotHash
         snapshotTxByte, _ := json.Marshal(snapshotTx)
         block.Txs = append(block.Txs, snapshotTxByte)
         block.NumTxs += 1;

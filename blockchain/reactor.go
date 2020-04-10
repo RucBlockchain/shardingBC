@@ -234,10 +234,10 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		/**
          * zyj
          */
-		if sm.IsNewPeer && int(msg.Block.Height) % sm.SNAPSHOT_INTERVAL == 1 {
+		if ac.IsNewPeer && int(msg.Block.Height) % ac.SNAPSHOT_INTERVAL == 1 {
 			block := msg.Block
 			//bcR.Logger.Error("初始快照的下一个区块为", "tx:", json.Marshal(msg.Block.Txs))
-			if block != nil && block.Data != nil {
+			if block != nil {
 				for i := 0; i < len(block.Data.Txs); i++ {
 					data := block.Data.Txs[i]
 					encodeStr := hex.EncodeToString(data)
@@ -252,7 +252,7 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 			}
 			// zhayujie
 			// TODO 将自身快照的hash与交易中hash进行对比
-			sm.IsNewPeer = false
+			ac.IsNewPeer = false
 		}
 	case *bcStatusRequestMessage:
 		// Send peer our state.
@@ -275,14 +275,13 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		// 获取所有状态集合
 		snapshot := ac.GetSnapshot()
 		snapShopMap, _ := json.Marshal(snapshot.Content)
-		src.TrySend(BlockchainChannel,
-			struct{ BlockchainMessage }{&bcSnapshotResponseMessage{snapshot.Version, snapShopMap}})
+		msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotResponseMessage{snapshot.Version, snapShopMap})
+		src.TrySend(BlockchainChannel, msgBytes)
 		// TODO: 生成签名，对快照sha256后，私钥签名
 
 
 	case *bcSnapshotResponseMessage:
-		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
-		//bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v", msg.Version))
+		bcR.Logger.Error(fmt.Sprintf("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
 
 		// TODO: 验签，使用发送方公钥进行验签。 text文本为快照内容sha256后
 		// 处理快照
@@ -294,7 +293,7 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 			ac.SetState([]byte(k), []byte(v))
 			count++
 		}
-		bcR.Logger.Error(cmn.Fmt("快照写入完成, 长度为%v", count))
+		bcR.Logger.Error(fmt.Sprintf("快照写入完成, 长度为%v", count))
 		// 更新当前快照
 		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap})
 
@@ -354,9 +353,9 @@ func (bcR *BlockchainReactor) poolRoutine() {
 				 * @Date: 19.11.24
 				 */
 				if request.Height == -1 {
-					bcR.Logger.Error(cmn.Fmt("现在发送同步快照请求: %v", request.PeerID))
-					msg := &bcSnapshotRequestMessage{}
-					peer.TrySend(BlockchainChannel, struct{ BlockchainMessage}{msg})
+					bcR.Logger.Error(fmt.Sprintf("现在发送同步快照请求: %v", request.PeerID))
+					msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotRequestMessage{})
+					peer.TrySend(BlockchainChannel, msgBytes)
 					continue
 				}
 				/* ---------- zyj change --------- */
@@ -623,6 +622,11 @@ func (m *bcStatusResponseMessage) String() string {
 type bcSnapshotRequestMessage struct {
 }
 
+func (m *bcSnapshotRequestMessage) ValidateBasic() error {
+	return nil
+}
+
+
 func (m *bcSnapshotRequestMessage) String() string {
 	return fmt.Sprintf("[bcStatusResponseMessage %v]")
 }
@@ -631,6 +635,10 @@ func (m *bcSnapshotRequestMessage) String() string {
 type bcSnapshotResponseMessage struct {
 	Version int64
 	Content []byte
+}
+
+func (m *bcSnapshotResponseMessage) ValidateBasic() error {
+	return nil
 }
 
 func (m *bcSnapshotResponseMessage) String() string {

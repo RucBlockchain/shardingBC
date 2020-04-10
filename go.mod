@@ -72,6 +72,7 @@ require (
 	google.golang.org/grpc v1.26.0
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
+
 )
 
 replace github.com/coreos/go-systemd => github.com/coreos/go-systemd/v22 v22.0.0
