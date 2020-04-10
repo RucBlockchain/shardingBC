@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/tendermint/tendermint/account"
+    "github.com/gorilla/websocket"
+	account "github.com/tendermint/tendermint/account"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"net"
 	"time"
@@ -132,6 +132,28 @@ func (blockExec *BlockExecutor) ValidateBlock(state State, block *types.Block) e
 // from outside this package to process and commit an entire block.
 // It takes a blockID to avoid recomputing the parts hash.
 func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, blockID types.BlockID, block *types.Block, flag bool) (State, error) {
+    /*
+     * @Author: zyj
+     * @Desc: 周期性生成快照
+     * @Date: 19.01.04
+     */
+    currentHeight := block.Height - 1
+    if currentHeight > 0 && int(currentHeight) % SNAPSHOT_INTERVAL == 0 {
+        blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
+        time.Sleep(time.Second * 5)
+
+        // 快照生成v2.0
+        GenerateSnapshotFast(block.Height - 1)
+
+        // 在快照后一个区块内增加快照交易
+        snapshotTx := new(TxArg)
+        snapshotTx.TxType = "snapshots"
+        snapshotTx.Content = SnapshotHash
+        snapshotTxByte, _ := json.Marshal(snapshotTx)
+        block.Txs = append(block.Txs, snapshotTxByte)
+        block.NumTxs += 1;
+    }
+
 
 	if err := blockExec.ValidateBlock(state, block); err != nil {
 		return state, ErrInvalidBlock(err)

@@ -2,8 +2,8 @@ package account
 
 import (
 	"fmt"
-    dbm "github.com/tendermint/tmlibs/db"
-	"github.com/tendermint/tmlibs/log"
+    dbm "github.com/tendermint/tendermint/libs/db"
+    "github.com/tendermint/tendermint/libs/log"
 	"testing"
 )
 
