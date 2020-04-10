@@ -13,7 +13,6 @@ import (
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	//auto "github.com/tendermint/tendermint/libs/autofile"
-	cmn "github.com/tendermint/tendermint/libs/common"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
 
@@ -355,16 +354,21 @@ func (h *Handshaker) ReplayBlocks(
 	} else if storeBlockHeight < appBlockHeight {
 		// the app should never be ahead of the store (but this is under app's control)
 		return appHash, sm.ErrAppBlockHeightTooHigh{CoreHeight: storeBlockHeight, AppHeight: appBlockHeight}
+	
+	/*
+     * @Author: zyj
+     * @Desc: 移除部分校验
+     * @Date: 19.11.24
+     */	
+	// } else if storeBlockHeight < stateBlockHeight {
+	// 	// the state should never be ahead of the store (this is under tendermint's control)
+	// 	cmn.PanicSanity(fmt.Sprintf("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
 
-	} else if storeBlockHeight < stateBlockHeight {
-		// the state should never be ahead of the store (this is under tendermint's control)
-		cmn.PanicSanity(fmt.Sprintf("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
-
-	} else if storeBlockHeight > stateBlockHeight+1 {
-		// store should be at most one ahead of the state (this is under tendermint's control)
-		cmn.PanicSanity(fmt.Sprintf("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
+	// } else if storeBlockHeight > stateBlockHeight+1 {
+	// 	// store should be at most one ahead of the state (this is under tendermint's control)
+	// 	cmn.PanicSanity(fmt.Sprintf("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
 	}
-
+	
 	var err error
 	// Now either store is equal to state, or one ahead.
 	// For each, consider all cases of where the app could be, given app <= store
@@ -410,9 +414,14 @@ func (h *Handshaker) ReplayBlocks(
 		}
 
 	}
-
-	cmn.PanicSanity("Should never happen")
-	return nil, nil
+	/*
+     * @Author: zyj
+     * @Desc: 移除部分校验
+     * @Date: 19.11.24
+	 */	
+	return appHash, nil
+	// cmn.PanicSanity("Should never happen")
+	// return nil, nil
 }
 
 func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBlockHeight, storeBlockHeight int64, mutateState bool) ([]byte, error) {

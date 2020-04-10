@@ -179,6 +179,13 @@ func (cs *ConsensusState) newline() *myline.Line {
 // StateOption sets an optional parameter on the ConsensusState.
 type StateOption func(*ConsensusState)
 
+/*
+ * @Author: zyj
+ * @Desc: 构造单例模式暴露consensus句柄
+ * @Date: 19.11.24
+ */
+ var consensusState *ConsensusState
+
 // NewConsensusState returns a new ConsensusState.
 func NewConsensusState(
 	config *cfg.ConsensusConfig,
@@ -226,6 +233,12 @@ func NewConsensusState(
 	for _, option := range options {
 		option(cs)
 	}
+	/*
+     * @Author: zyj
+     * @Desc: 传递引用
+     * @Date: 19.11.24
+     */
+	 consensusState = cs
 	return cs
 }
 
@@ -537,6 +550,15 @@ func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	}
 	seenCommit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	lastPrecommits := types.NewVoteSet(state.ChainID, state.LastBlockHeight, seenCommit.Round(), types.PrecommitType, state.LastValidators)
+	/*
+	    zyj change
+	 */
+	 if seenCommit == nil {
+	    cs.LastCommit = lastPrecommits
+        return
+    }
+	/*===========*/
+
 	for _, precommit := range seenCommit.Precommits {
 		if precommit == nil {
 			continue
@@ -1398,9 +1420,14 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	if !block.HashesTo(blockID.Hash) {
 		cmn.PanicSanity(fmt.Sprintf("Cannot finalizeCommit, ProposalBlock does not hash to commit hash"))
 	}
-	if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
-		cmn.PanicConsensus(fmt.Sprintf("+2/3 committed an invalid block: %v", err))
-	}
+	/*
+	 * @Author: zyj
+	 * @Desc: 跳过部分验证，否则无法同步有交易的区块
+	 * @Date: 19.11.30
+	 */
+	// if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
+	// 	cmn.PanicConsensus(fmt.Sprintf("+2/3 committed an invalid block: %v", err))
+	// }
 
 	cs.Logger.Info(fmt.Sprintf("Finalizing commit of block with %d txs", block.NumTxs),
 		"height", block.Height, "hash", block.Hash(), "root", block.AppHash)
