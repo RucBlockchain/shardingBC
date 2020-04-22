@@ -95,6 +95,10 @@ func (tx *TX) VerifySig() bool {
 	return ecdsa.Verify(pub, tx.digest(), coor.X, coor.Y)
 }
 
+func (tx *TX) Digest() []byte {
+	return tx.digest()
+}
+
 // 摘要格式： {Content}
 // 如果有多个content则合并为一个string，中间没有sep - 潜在问题，没有明确使用string[]的原因
 // 然后进行md5加密

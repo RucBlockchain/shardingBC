@@ -1135,7 +1135,7 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 		if res := tx_tmp.VerifySig(); res == false {
 			cs.Logger.Error("signature is wrong, tx index: ", txid)
 			fmt.Println("signature is wrong, tx index: ", txid)
-			
+
 			// 签名验证错误，直接返回
 			cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{})
 			fmt.Println("1verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
@@ -1901,7 +1901,7 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 				if t.Txtype == "checkpoint" {
 					allTxs := cs.blockExec.GetAllTxs()
 					added = compareRelaylist(t, allTxs)
-				
+
 					//如果是checkpoint，检查是否一致
 					break
 				}
@@ -2050,6 +2050,24 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		Type:             type_,
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
 	}
+
+	if type_ == types.PrevoteType {
+		// prevote阶段对每条跨片交易生成签名
+		// 没有想好怎么处理这里的错误
+		err := cs.privValidator.SignCrossTXVote(cs.ProposalBlock.Txs, vote)
+
+		if err != nil {
+			cs.Logger.Error("generate cross traction signature error, ", err)
+		} else {
+			cs.Logger.Info("=============== crossTx Sig ===============")
+
+			for txId, sig := range vote.CrossTxSig {
+				cs.Logger.Info("txid: ", txId, "sig: ", sig)
+			}
+			cs.Logger.Info("=============== Sig End ===============")
+		}
+	}
+
 	err := cs.privValidator.SignVote(cs.state.ChainID, vote)
 	return vote, err
 }

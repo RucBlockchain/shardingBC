@@ -2,8 +2,10 @@ package types
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
 
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
@@ -16,6 +18,7 @@ type PrivValidator interface {
 
 	SignVote(chainID string, vote *Vote) error
 	SignProposal(chainID string, proposal *Proposal) error
+	SignCrossTXVote(txs Txs, vote *Vote) error // 为每一个跨片交易产生一个签名
 }
 
 //----------------------------------------
@@ -91,6 +94,34 @@ func (pv *MockPV) SignProposal(chainID string, proposal *Proposal) error {
 		return err
 	}
 	proposal.Signature = sig
+	return nil
+}
+
+// Implements PrivValidator.
+func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
+	var successNo, errorNo int
+	CTxSig := make(map[[sha256.Size]byte][]byte)
+	for _, txdata := range (txs) {
+		tx, err := identypes.NewTX(txdata)
+		if err != nil {
+			return err
+		}
+		if tx.Txtype != "relaytx" {
+			// 暂时只处理跨片交易的前半程，后半程的addtx没想好
+			continue
+		}
+
+		if sig, err := pv.privKey.Sign(tx.Digest()); err == nil {
+			CTxSig[tx.ID] = sig
+			successNo += 1
+		} else {
+			errorNo += 1
+		}
+	}
+
+	fmt.Printf("Sign cross traction,  success: %v, error: %v", successNo, errorNo)
+
+	vote.CrossTxSig = CTxSig
 	return nil
 }
 
