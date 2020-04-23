@@ -2,7 +2,6 @@ package privval
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"github.com/tendermint/tendermint/identypes"
@@ -256,7 +255,7 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 // Implements PrivValidator.
 func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 	var successNo, errorNo int
-	CTxSig := make(map[[sha256.Size]byte][]byte)
+	CTxSigs := make([]types.CrossSig, 0, len(txs))
 	for _, txdata := range (txs) {
 		tx, err := identypes.NewTX(txdata)
 		if err != nil {
@@ -268,16 +267,17 @@ func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 		}
 
 		if sig, err := pv.Key.PrivKey.Sign(tx.Digest()); err == nil {
-			CTxSig[tx.ID] = sig
+			csig := types.CrossSig{TxId: tx.ID, CrossTxSig: sig}
+			CTxSigs = append(CTxSigs, csig)
 			successNo += 1
 		} else {
 			errorNo += 1
 		}
 	}
 
-	fmt.Printf("Sign cross traction,  success: %v, error: %v", successNo, errorNo)
+	fmt.Printf("[filePV] Sign cross traction,  success: %v, error: %v", successNo, errorNo)
 
-	vote.CrossTxSig = CTxSig
+	copy(vote.CrossTxSigs, CTxSigs)
 	return nil
 }
 

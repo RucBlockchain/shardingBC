@@ -119,7 +119,7 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 		}
 	}
 
-	fmt.Printf("Sign cross traction,  success: %v, error: %v", successNo, errorNo)
+	fmt.Printf("[mockPV] Sign cross traction,  success: %v, error: %v", successNo, errorNo)
 	// log for debug
 	fmt.Println("=============== crossTx Sig ===============")
 
