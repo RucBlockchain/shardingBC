@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"github.com/tendermint/tendermint/identypes"
@@ -100,7 +99,7 @@ func (pv *MockPV) SignProposal(chainID string, proposal *Proposal) error {
 // Implements PrivValidator.
 func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 	var successNo, errorNo int
-	CTxSig := make(map[[sha256.Size]byte][]byte)
+	CTxSigs := make([]CrossSig, 0, len(txs))
 	for _, txdata := range (txs) {
 		tx, err := identypes.NewTX(txdata)
 		if err != nil {
@@ -112,7 +111,8 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 		}
 
 		if sig, err := pv.privKey.Sign(tx.Digest()); err == nil {
-			CTxSig[tx.ID] = sig
+			csig := CrossSig{TxId: tx.ID, CrossTxSig: sig}
+			CTxSigs = append(CTxSigs, csig)
 			successNo += 1
 		} else {
 			errorNo += 1
@@ -120,8 +120,15 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 	}
 
 	fmt.Printf("Sign cross traction,  success: %v, error: %v", successNo, errorNo)
+	// log for debug
+	fmt.Println("=============== crossTx Sig ===============")
 
-	vote.CrossTxSig = CTxSig
+	for _, csig := range CTxSigs {
+		fmt.Println("txid: ", csig.TxId, "sig: ", csig.CrossTxSig)
+	}
+	fmt.Println("=============== Sig End ===============")
+
+	copy(vote.CrossTxSigs, CTxSigs)
 	return nil
 }
 

@@ -2058,13 +2058,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 
 		if err != nil {
 			cs.Logger.Error("generate cross traction signature error, ", err)
-		} else {
-			cs.Logger.Info("=============== crossTx Sig ===============")
-
-			for txId, sig := range vote.CrossTxSig {
-				cs.Logger.Info("txid: ", txId, "sig: ", sig)
-			}
-			cs.Logger.Info("=============== Sig End ===============")
 		}
 	}
 
