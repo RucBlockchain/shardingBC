@@ -51,6 +51,9 @@ type EcdsaCoordinate struct {
 	X, Y *big.Int
 }
 
+// TODO
+// 重命名结构体，容易与types.Tx混淆
+// Txtype变更为使用enum类型
 type TX struct {
 	Txtype      string
 	Sender      string
@@ -59,9 +62,12 @@ type TX struct {
 	Content     string
 	TxSignature string
 	Operate     int
+
+	// 当交易类型为relayTX时有用，其余类型为空跳过即可
+	AggSigs AggregateSig
+	Height  int // 记录该条跨片交易被共识的区块高度
 }
 
-//这格式只在relay tx相关的内容中使用
 func NewTX(data []byte) (*TX, error) {
 	tx := new(TX)
 	err := json.Unmarshal(data, tx)
