@@ -9,41 +9,41 @@ package account
 import (
     "crypto/ecdsa"
     "crypto/elliptic"
+    crand "crypto/rand"
     "crypto/sha256"
     "crypto/x509"
     "encoding/hex"
     "encoding/json"
     "encoding/pem"
     "fmt"
-    crand "crypto/rand"
-    dbm "github.com/tendermint/tendermint/libs/db"
-    "github.com/tendermint/tendermint/libs/log"
     "math/big"
     "os"
     "strconv"
     "strings"
-)
 
+    dbm "github.com/tendermint/tendermint/libs/db"
+    "github.com/tendermint/tendermint/libs/log"
+)
 
 /*
  * 交易数据结构
  */
 type AccountLog struct {
-    TxType      string         // 交易类型
-    From        string         // 支出方
-    To          string         // 接收方
-    Amount      int            // 金额
-    Operate     int            // 支出方: 0,  接收方: 1
+    TxType  string // 交易类型
+    From    string // 支出方
+    To      string // 接收方
+    Amount  int    // 金额
+    Operate int    // 支出方: 0,  接收方: 1
 }
 
 // 接受到的交易请求，仅供测试使用
 type TxArg struct {
-    TxType     string   `json:"txType"`
-    Sender     string   `json:"sender"`
-    Receiver   string   `json:"receiver"`
-    Content    string   `json:"content"`
-    TxSignature string  `json:"txSignature"`
-    Operate     int     `json:"operate"`
+    TxType      string `json:"txType"`
+    Sender      string `json:"sender"`
+    Receiver    string `json:"receiver"`
+    Content     string `json:"content"`
+    TxSignature string `json:"txSignature"`
+    Operate     int    `json:"operate"`
 }
 
 // 实例化交易
@@ -61,8 +61,8 @@ func NewAccountLog(tx []byte) *AccountLog {
 
 // 快照数据结构
 type Snapshot struct {
-    Version     int64                   // 版本
-    Content     map[string]string       // 内容
+    Version int64             // 版本
+    Content map[string]string // 内容
 }
 
 /*
@@ -70,8 +70,10 @@ type Snapshot struct {
  */
 var db dbm.DB
 var logger log.Logger
+
 // 最新快照
 var snapshot Snapshot
+
 // 快照缓存
 var snapshotCache = make(map[string]int)
 
@@ -81,12 +83,13 @@ var IsNewPeer = true
 
 var SnapshotHash string
 
+var SnapshotVersion = "v3.0"
 
 /*
  * 成员函数
  */
 // 校验交易
-func (accountLog * AccountLog) Check() bool {
+func (accountLog *AccountLog) Check() bool {
     from := accountLog.From
     to := accountLog.To
     amount := accountLog.Amount
@@ -108,7 +111,7 @@ func (accountLog * AccountLog) Check() bool {
         // logger.Error("支出方账户不存在")
         return false
     }
-    if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
+    if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0) {
         // logger.Error("接收方账户不存在")
         return false
     }
@@ -124,9 +127,8 @@ func (accountLog * AccountLog) Check() bool {
     return true
 }
 
-
 // 更新状态
-func (accountLog * AccountLog) Save() {
+func (accountLog *AccountLog) Save() {
     if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
         return
     }
@@ -161,14 +163,35 @@ func GenerateSnapshot(version int64) {
     snapshot = newSnapshot
 }
 
-
-// 生成快照 v3.0版本
+// 生成快照 v2.0版本
 func GenerateSnapshotFast(version int64) {
     // 如果当前快照不存在，则初始化
     if snapshot.Content == nil {
         snapshot.Content = make(map[string]string)
     }
 
+    tempSnapshotCache := snapshotCache
+    // 清空缓存
+    snapshotCache = make(map[string]int)
+    // 当前快照内容
+
+    // 增量合并快照
+    for k, v := range tempSnapshotCache {
+        oldVal, _ := strconv.Atoi(snapshot.Content[k])
+        snapshot.Content[k] = strconv.Itoa(oldVal + v)
+    }
+    snapshot.Version = version
+
+    snapshotByte, _ := json.Marshal(snapshot)
+    logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
+}
+
+// 生成快照 v3.0版本
+func GenerateSnapshotWithSecurity(version int64) {
+    // 如果当前快照不存在，则初始化
+    if snapshot.Content == nil {
+        snapshot.Content = make(map[string]string)
+    }
     tempSnapshotCache := snapshotCache
     // 清空缓存
     snapshotCache = make(map[string]int)
@@ -191,7 +214,7 @@ func GenerateSnapshotFast(version int64) {
 }
 
 // 获取所有状态集合
-func GetAllStates() (map[string]string) {
+func GetAllStates() map[string]string {
     //n := 10000
     kvMaps := make(map[string]string)
     iter := db.Iterator([]byte("0"), []byte("z"))
@@ -232,7 +255,6 @@ func SetState(key []byte, val []byte) {
     }
 }
 
-
 /*
  * 静态函数和私有函数
  */
@@ -266,7 +288,7 @@ func _setState(key []byte, val []byte) {
 }
 
 // 解析交易
-func _parseTx(tx []byte) *AccountLog{
+func _parseTx(tx []byte) *AccountLog {
     accountLog := new(AccountLog)
 
     txArgs := new(TxArg)
@@ -354,10 +376,6 @@ func _parseTx3(tx []byte) *AccountLog {
     return accountLog
 }
 
-
-
-
-
 // 字节数组和数字转换
 func _byte2digit(digitByte []byte) int {
     digit, _ := strconv.Atoi(string(digitByte))
@@ -367,8 +385,6 @@ func _byte2digit(digitByte []byte) int {
 func _digit2byte(num int) []byte {
     return []byte(strconv.Itoa(num))
 }
-
-
 
 // Hash算法 sha256: 生成的16进制字符串长度为32，大小为256bit
 func DoHash(text string) string {
@@ -444,7 +460,7 @@ func Verify(rText []byte, sText []byte, text string, pubKeyPath string) bool {
 }
 
 // 生成ECDSA密钥对
-func GenerateKey(priKeyPath string, pubKeyPath string) error{
+func GenerateKey(priKeyPath string, pubKeyPath string) error {
     //使用ecdsa生成密钥对
     privateKey, err := ecdsa.GenerateKey(elliptic.P521(), crand.Reader)
     if err != nil {
@@ -493,4 +509,14 @@ func GenerateKey(priKeyPath string, pubKeyPath string) error{
         return err
     }
     return nil
+}
+
+/**
+ * 设置快照算法版本
+ */
+func SetSnapshotVersion(version string) {
+    if version == "v1.0" || version == "v2.0" || version == "v3.0" {
+        SnapshotVersion = version
+    }
+    fmt.Println("快照生成算法版本为: " + SnapshotVersion)
 }

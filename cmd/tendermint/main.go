@@ -6,12 +6,26 @@ import (
 
 	"github.com/tendermint/tendermint/libs/cli"
 
+	"github.com/tendermint/tendermint/account"
 	cmd "github.com/tendermint/tendermint/cmd/tendermint/commands"
 	cfg "github.com/tendermint/tendermint/config"
 	nm "github.com/tendermint/tendermint/node"
 )
 
 func main() {
+	/*
+	 * @Author: zyj
+	 * @Desc: 命令行参数解析
+	 * @Date: 20.04.25
+	 */
+	for idx, args := range os.Args {
+		// fmt.Println("参数"+strconv.Itoa(idx)+":", args)
+		if args == "--snapshot" && len(os.Args) > idx+1 {
+		    account.SetSnapshotVersion(os.Args[idx+1])
+			break
+		}
+	}
+
 	rootCmd := cmd.RootCmd
 	rootCmd.AddCommand(
 		cmd.GenValidatorCmd,
