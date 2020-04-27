@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
 	"time"
 
 	"github.com/tendermint/tendermint/crypto"
@@ -57,6 +58,9 @@ type Vote struct {
 	ValidatorAddress Address       `json:"validator_address"`
 	ValidatorIndex   int           `json:"validator_index"`
 	Signature        []byte        `json:"signature"`
+
+	// 在prevote阶段，当区块中包含跨片交易，则当前验证者对该交易生成一个新的签名
+	CrossTxSigs []identypes.VoteCrossTxSig `json:"cross_tx_sigs""` // [{TX_ID, signature}]
 }
 
 // CommitSig converts the Vote to a CommitSig.
