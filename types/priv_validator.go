@@ -99,7 +99,7 @@ func (pv *MockPV) SignProposal(chainID string, proposal *Proposal) error {
 // Implements PrivValidator.
 func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 	var successNo, errorNo int
-	CTxSigs := make([]CrossSig, 0, len(txs))
+	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
 	for _, txdata := range (txs) {
 		tx, err := identypes.NewTX(txdata)
 		if err != nil {
@@ -111,7 +111,7 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 		}
 
 		if sig, err := pv.privKey.Sign(tx.Digest()); err == nil {
-			csig := CrossSig{TxId: tx.ID, CrossTxSig: sig}
+			csig := identypes.VoteCrossTxSig{TxId: tx.ID, CrossTxSig: sig}
 			CTxSigs = append(CTxSigs, csig)
 			successNo += 1
 		} else {

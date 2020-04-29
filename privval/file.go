@@ -255,7 +255,7 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 // Implements PrivValidator.
 func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 	var successNo, errorNo int
-	CTxSigs := make([]types.CrossSig, 0, len(txs))
+	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
 	for _, txdata := range (txs) {
 		tx, err := identypes.NewTX(txdata)
 		if err != nil {
@@ -267,7 +267,7 @@ func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 		}
 
 		if sig, err := pv.Key.PrivKey.Sign(tx.Digest()); err == nil {
-			csig := types.CrossSig{TxId: tx.ID, CrossTxSig: sig}
+			csig := identypes.VoteCrossTxSig{TxId: tx.ID, CrossTxSig: sig}
 			CTxSigs = append(CTxSigs, csig)
 			successNo += 1
 		} else {
@@ -276,6 +276,14 @@ func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 	}
 
 	fmt.Printf("[filePV] Sign cross traction,  success: %v, error: %v", successNo, errorNo)
+
+	// log for debug
+	fmt.Println("=============== crossTx Sig ===============")
+
+	for _, csig := range CTxSigs {
+		fmt.Println("txid: ", csig.TxId, "sig: ", csig.CrossTxSig)
+	}
+	fmt.Println("=============== Sig End ===============")
 
 	copy(vote.CrossTxSigs, CTxSigs)
 	return nil

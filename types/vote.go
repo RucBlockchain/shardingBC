@@ -2,9 +2,9 @@ package types
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
 	"time"
 
 	"github.com/tendermint/tendermint/crypto"
@@ -47,12 +47,6 @@ func NewConflictingVoteError(val *Validator, voteA, voteB *Vote) *ErrVoteConflic
 // Address is hex bytes.
 type Address = crypto.Address
 
-// CrossSig represents a digital signature for each cross transaction
-type CrossSig struct {
-	TxId       [sha256.Size]byte `json:"tx_id"`
-	CrossTxSig []byte            `json:"cross_tx_sig"`
-}
-
 // Vote represents a prevote, precommit, or commit vote from validators for
 // consensus.
 type Vote struct {
@@ -64,7 +58,9 @@ type Vote struct {
 	ValidatorAddress Address       `json:"validator_address"`
 	ValidatorIndex   int           `json:"validator_index"`
 	Signature        []byte        `json:"signature"`
-	CrossTxSigs      []CrossSig    `json:cross_tx_Sigs` // [{TX_ID, signature}]
+
+	// 在prevote阶段，当区块中包含跨片交易，则当前验证者对该交易生成一个新的签名
+	CrossTxSigs []identypes.VoteCrossTxSig `json:"cross_tx_sigs""` // [{TX_ID, signature}]
 }
 
 // CommitSig converts the Vote to a CommitSig.

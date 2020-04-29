@@ -12,6 +12,11 @@ import (
 
 //-------------------------------------
 
+var (
+	ErrBLSSignature       = errors.New("Invalid BLS signature")
+	ErrAggregateSignature = errors.New("Error in BLS aggregate process")
+)
+
 var _ crypto.PrivKey = PrivKeyBLS{}
 
 const (
@@ -140,8 +145,31 @@ func AggragateVerify(asign []byte, msg [32]byte, pubkeys [][]byte) bool {
 	return aggsig.VerifyAggregateCommon(blspubkeys, msg, 0)
 }
 
+func AggragateSignature(sig []byte, aggSigByte [] byte) ([]byte, error) {
+	if aggSigByte == nil {
+		return sig, nil
+	}
+
+	// 就两个签名合并：原始的聚合签名，准备合并的签名
+	sigs_inner := make([]*ethbls.Signature, 0, 2)
+
+	if tmpsig, err := ethbls.SignatureFromBytes(aggSigByte); err == nil {
+		sigs_inner = append(sigs_inner, tmpsig)
+	} else {
+		return nil, ErrBLSSignature
+	}
+
+	if tmpsig, err := ethbls.SignatureFromBytes(sig); err == nil {
+		sigs_inner = append(sigs_inner, tmpsig)
+	} else {
+		return nil, ErrBLSSignature
+	}
+
+	return ethbls.AggregateSignatures(sigs_inner).Marshal(), nil
+}
+
 // 将相同消息的BLS签名聚合为一个签名
-func AggragateSignature(sigs [][]byte) ([]byte, error) {
+func AggragateAllSignature(sigs [][]byte) ([]byte, error) {
 	sigs_inner := make([]*ethbls.Signature, 0, len(sigs))
 
 	for i := 0; i < len(sigs); i++ {
