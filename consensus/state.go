@@ -2051,10 +2051,18 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
 	}
 
-	if type_ == types.PrevoteType {
+	if type_ == types.PrevoteType && hash != nil {
 		// prevote阶段对每条跨片交易生成签名
 		// 没有想好怎么处理这里的错误
 		err := cs.privValidator.SignCrossTXVote(cs.ProposalBlock.Txs, vote)
+
+		// log for DEBUG
+		cs.Logger.Debug("=============== crossTx Sig ===============\n")
+
+		for _, csig := range vote.CrossTxSigs {
+			cs.Logger.Debug("txid: ", csig.TxId, "sig: ", csig.CrossTxSig)
+		}
+		cs.Logger.Debug("=============== Sig End ===============")
 
 		if err != nil {
 			cs.Logger.Error("generate cross traction signature error, ", err)

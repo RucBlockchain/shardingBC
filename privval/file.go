@@ -274,17 +274,7 @@ func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 			errorNo += 1
 		}
 	}
-
-	fmt.Printf("[filePV] Sign cross traction,  success: %v, error: %v", successNo, errorNo)
-
-	// log for debug
-	fmt.Println("=============== crossTx Sig ===============")
-
-	for _, csig := range CTxSigs {
-		fmt.Println("txid: ", csig.TxId, "sig: ", csig.CrossTxSig)
-	}
-	fmt.Println("=============== Sig End ===============")
-
+	
 	copy(vote.CrossTxSigs, CTxSigs)
 	return nil
 }
