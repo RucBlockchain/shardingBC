@@ -2041,6 +2041,11 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	addr := cs.privValidator.GetPubKey().Address()
 	valIndex, _ := cs.Validators.GetByAddress(addr)
 
+	crossTxNum := 0
+	if cs.ProposalBlock != nil && cs.ProposalBlock.Txs != nil {
+		crossTxNum = len(cs.ProposalBlock.Txs)
+	}
+
 	vote := &types.Vote{
 		ValidatorAddress: addr,
 		ValidatorIndex:   valIndex,
@@ -2049,6 +2054,7 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		Timestamp:        cs.voteTime(),
 		Type:             type_,
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
+		CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
 	}
 
 	if type_ == types.PrevoteType && hash != nil {

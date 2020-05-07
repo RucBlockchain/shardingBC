@@ -253,7 +253,7 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 }
 
 // Implements PrivValidator.
-func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
+func (pv *FilePV)  SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 	var successNo, errorNo int
 	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
 	for _, txdata := range (txs) {
@@ -274,8 +274,8 @@ func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 			errorNo += 1
 		}
 	}
-	
-	copy(vote.CrossTxSigs, CTxSigs)
+
+	vote.CrossTxSigs = append(vote.CrossTxSigs, CTxSigs...)
 	return nil
 }
 
