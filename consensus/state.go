@@ -1126,7 +1126,6 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	// validate Tx signature
 	t := time.Now()
 	for txid, tx := range (cs.ProposalBlock.Txs) {
-		logger.Debug("validate tx========, id: %d, content: %s", txid, tx.String())
 		tx_tmp, err := tp.NewTX(tx)
 		if err != nil {
 			// cs.Logger.Debug("valite failed, err: ", err)
@@ -1134,16 +1133,13 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 		}
 		if res := tx_tmp.VerifySig(); res == false {
 			cs.Logger.Error("signature is wrong, tx index: ", txid)
-			fmt.Println("signature is wrong, tx index: ", txid)
 
 			// 签名验证错误，直接返回
 			cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{})
-			fmt.Println("1verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
 			return
 		}
-		// cs.Logger.Debug("validate tx========, id: %d, content: %s varify success。",txid,tx.String())
 	}
-	fmt.Println("verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
+	cs.Logger.Info("verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
 	// Prevote cs.ProposalBlock
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
@@ -2066,7 +2062,7 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		cs.Logger.Debug("=============== crossTx Sig ===============\n")
 
 		for _, csig := range vote.CrossTxSigs {
-			cs.Logger.Debug("txid: ", csig.TxId, "sig: ", csig.CrossTxSig)
+			cs.Logger.Debug(fmt.Sprint("sig: ", csig.CrossTxSig))
 		}
 		cs.Logger.Debug("=============== Sig End ===============")
 
