@@ -86,6 +86,14 @@ func (ve *SignerValidatorEndpoint) SignVote(chainID string, vote *types.Vote) er
 	return ve.signer.SignVote(chainID, vote)
 }
 
+
+// Implements PrivValidator.
+func (ve *SignerValidatorEndpoint) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
+	ve.mtx.Lock()
+	defer ve.mtx.Unlock()
+	return ve.signer.SignCrossTXVote(txs, vote)
+}
+
 // SignProposal implements PrivValidator.
 func (ve *SignerValidatorEndpoint) SignProposal(chainID string, proposal *types.Proposal) error {
 	ve.mtx.Lock()

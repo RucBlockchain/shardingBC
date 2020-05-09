@@ -24,6 +24,25 @@ func TestAggragatePubKey(t *testing.T) {
 	t.Log("aggegate pubkey: ", aggpub)
 }
 
+func TestBLSSignAndVerify1(t *testing.T) {
+	priv := bls.GenPrivKey()
+	pub := priv.PubKey()
+	t.Log("priv: ", priv.Bytes())
+	t.Log("pub: ", pub.Bytes())
+
+	msg := []byte("test BLS signature")
+
+	tt := time.Now()
+
+	for i := 0; i < 1000; i += 1 {
+		_, err := priv.Sign(msg)
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	t.Log(time.Now().Sub(tt).Seconds())
+
+}
 func TestBLSSignAndVerify(t *testing.T) {
 	priv := bls.GenPrivKey()
 	pub := priv.PubKey()

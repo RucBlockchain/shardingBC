@@ -119,6 +119,11 @@ func (sc *SignerRemote) SignProposal(chainID string, proposal *types.Proposal) e
 	return nil
 }
 
+// Implements PrivValidator.
+func (sc *SignerRemote) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
+	return nil
+}
+
 // Ping is used to check connection health.
 func (sc *SignerRemote) Ping() error {
 	err := writeMsg(sc.conn, &PingRequest{})

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
 	"io/ioutil"
 	"time"
 
@@ -248,6 +249,33 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 	if err := pv.signProposal(chainID, proposal); err != nil {
 		return fmt.Errorf("error signing proposal: %v", err)
 	}
+	return nil
+}
+
+// Implements PrivValidator.
+func (pv *FilePV)  SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
+	var successNo, errorNo int
+	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
+	for _, txdata := range (txs) {
+		tx, err := identypes.NewTX(txdata)
+		if err != nil {
+			return err
+		}
+		if tx.Txtype != "relaytx" {
+			// 暂时只处理跨片交易的前半程，后半程的addtx没想好
+			continue
+		}
+
+		if sig, err := pv.Key.PrivKey.Sign(tx.Digest()); err == nil {
+			csig := identypes.VoteCrossTxSig{TxId: tx.ID, CrossTxSig: sig}
+			CTxSigs = append(CTxSigs, csig)
+			successNo += 1
+		} else {
+			errorNo += 1
+		}
+	}
+
+	vote.CrossTxSigs = append(vote.CrossTxSigs, CTxSigs...)
 	return nil
 }
 

@@ -64,7 +64,7 @@ type TX struct {
 	Operate     int
 
 	// 当交易类型为relayTX时有用，其余类型为空跳过即可
-	AggSigs AggregateSig
+	AggSig AggregateSig
 	Height  int // 记录该条跨片交易被共识的区块高度
 }
 
@@ -99,6 +99,10 @@ func (tx *TX) VerifySig() bool {
 	}
 
 	return ecdsa.Verify(pub, tx.digest(), coor.X, coor.Y)
+}
+
+func (tx *TX) Digest() []byte {
+	return tx.digest()
 }
 
 // 摘要格式： {Content}
