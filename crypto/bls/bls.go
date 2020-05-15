@@ -4,6 +4,7 @@ package bls
 import (
 	"errors"
 	"fmt"
+
 	ethbls "github.com/prysmaticlabs/prysm/shared/bls"
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
@@ -124,7 +125,7 @@ func (pubKey PubKeyBLS) Equals(other crypto.PubKey) bool {
 // 输入聚合签名和已经聚合过的公钥，返回验证结果
 func AggragateVerify(asign []byte, msg [32]byte, pubkeys [][]byte) bool {
 	blspubkeys := make([]*ethbls.PublicKey, 0, 100)
-	for _, p := range (pubkeys) {
+	for _, p := range pubkeys {
 		tmpbyte := make([]byte, len(p)-1, len(p)-1)
 		if err := cdc.UnmarshalBinaryBare(p, &tmpbyte); err != nil {
 			return false
@@ -145,7 +146,7 @@ func AggragateVerify(asign []byte, msg [32]byte, pubkeys [][]byte) bool {
 	return aggsig.VerifyAggregateCommon(blspubkeys, msg, 0)
 }
 
-func AggragateSignature(sig []byte, aggSigByte [] byte) ([]byte, error) {
+func AggragateSignature(sig []byte, aggSigByte []byte) ([]byte, error) {
 	if aggSigByte == nil {
 		return sig, nil
 	}

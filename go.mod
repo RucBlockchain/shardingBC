@@ -19,18 +19,18 @@ require (
 	github.com/fortytw2/leaktest v0.0.0-20180314164940-a5ef70473c97
 	github.com/go-kit/kit v0.8.0
 	github.com/go-logfmt/logfmt v0.3.0
-	github.com/gogo/protobuf v1.2.1
+	github.com/go-yaml/yaml v2.1.0+incompatible // indirect
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
 	github.com/golang/protobuf v1.3.2
 	github.com/google/btree v1.0.0 // indirect
-	github.com/google/uuid v1.1.1 // indirect
 	github.com/gorilla/websocket v1.4.1-0.20190629185528-ae1634f6a989
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.12.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v0.0.0-20180826005136-8cb6e5b95923 // indirect
-	github.com/herumi/bls-eth-go-binary v0.0.0-20200317044537-980010b6b10b
+	github.com/herumi/bls-eth-go-binary v0.0.0-20200508110836-07e8f416e478 // indirect
 	github.com/inconshreveable/mousetrap v0.0.0-20141017200713-76626ae9c91c // indirect
 	github.com/jmhodges/levigo v0.0.0-20190228103307-853d788c5c41
 	github.com/jonboulle/clockwork v0.1.0 // indirect
@@ -50,7 +50,6 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
 	github.com/rs/cors v0.0.0-20181001164945-9a47f48565a7
 	github.com/soheilhy/cmux v0.1.4 // indirect
-	github.com/spf13/afero v0.0.0-20180907092351-d40851caa0d7 // indirect
 	github.com/spf13/cast v0.0.0-20181024225928-8c9545af88b1 // indirect
 	github.com/spf13/cobra v0.0.0-20171012182533-7b2c5ac9fc04
 	github.com/spf13/jwalterweatherman v0.0.0-20180907091759-4a4406e478ca // indirect
@@ -71,9 +70,13 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	google.golang.org/grpc v1.26.0
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1 // indirect
-	k8s.io/client-go v12.0.0+incompatible // indirect
+	k8s.io/api v0.18.2 // indirect
+	k8s.io/client-go v11.0.0+incompatible // indirect
+	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
 )
 
 replace github.com/coreos/go-systemd => github.com/coreos/go-systemd/v22 v22.0.0
 
 replace go.etcd.io/etcd => github.com/etcd-io/etcd v3.3.10+incompatible
+
+replace gopkg.in/urfave/cli.v2 => github.com/urfave/cli v1.22.3

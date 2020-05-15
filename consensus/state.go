@@ -6,6 +6,8 @@ import (
 	"net"
 	"reflect"
 	"runtime/debug"
+	"strconv"
+
 	//"strings"
 	"sync"
 	"time"
@@ -13,6 +15,7 @@ import (
 	//	"io"
 	"encoding/hex"
 	"encoding/json"
+
 	//"strconv"
 
 	//	"strings"
@@ -1125,7 +1128,7 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	cs.Logger.Debug(fmt.Sprintf("(%v/%v). Current: %v/%v/%v start verify the signature os txs", height, round, cs.Height, cs.Round, cs.Step))
 	// validate Tx signature
 	t := time.Now()
-	for txid, tx := range (cs.ProposalBlock.Txs) {
+	for txid, tx := range cs.ProposalBlock.Txs {
 		tx_tmp, err := tp.NewTX(tx)
 		if err != nil {
 			// cs.Logger.Debug("valite failed, err: ", err)
@@ -1350,6 +1353,102 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 		}
 	}
 }
+func (cs *ConsensusState) tryAddAggragate2Block() error {
+
+	if len(cs.ProposalBlock.Txs) == 0 {
+		return nil
+	} else {
+		voteSet := cs.Votes.Precommits(cs.CommitRound)
+		var txs types.Txs // 为了改造block的交易
+
+		if len(voteSet.CrossTxSigs) > 0 {
+			cs.Logger.Debug("跨片交易签名数量：" + strconv.Itoa(len(voteSet.CrossTxSigs)))
+			count_relay := 0
+			for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
+				tx, err := tp.NewTX(cs.ProposalBlock.Txs[i])
+				if err != nil {
+					cs.Logger.Debug("parse tx wrong.")
+				}
+
+				if tx.Txtype == "relaytx" {
+					count_relay += 1
+					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
+						if tx.ID == voteSet.CrossTxSigs[j].TxId {
+							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
+							for k := 0; k < len(cs.Validators.Validators); k++ { //拿公钥
+								var Participant tp.Participant
+								Participant.Address = cs.Validators.Validators[k].Copy().Address.Bytes()
+								Participant.Pubkey = cs.Validators.Validators[k].PubKey.Bytes()
+								tx.AggSig.Participants = append(tx.AggSig.Participants, Participant)
+								// cs.Logger.Debug("添加公钥成功")
+								// tx.AggSig.Participants[cs.Validators.Validators[i].Copy().Address.String()] = cs.Validators.Validators[i].PubKey.Bytes() //将公钥放入
+							}
+						}
+						// fmt.Println("tx.id", voteSet.CrossTxSigs[j].TxId, "tx的聚合签名", voteSet.CrossTxSigs[j].CrossTxSig)
+					}
+
+				}
+				tx1, _ := json.Marshal(tx) //反序列化
+				txs = append(txs, tx1)
+			}
+			fmt.Println("relaytx数量", count_relay)
+			cs.ProposalBlock.Txs = txs //看是否加锁
+			//验证是否正确
+			// count := 0
+			// for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
+			// 	tx, err := tp.NewTX(cs.ProposalBlock.Txs[i])
+			// 	if err != nil {
+			// 		fmt.Println("error")
+			// 	}
+			// 	if tx.Txtype == "relaytx" {
+			// 		for j := 0; j < len(voteSet.CrossTxSigs); j++ {
+			// 			if tx.ID == voteSet.CrossTxSigs[j].TxId && string(voteSet.CrossTxSigs[j].CrossTxSig) == string(tx.AggSig.Signature) {
+			// 				count += 1
+			// 			}
+			// 		}
+			// 	}
+			// }
+			// if count == len(voteSet.CrossTxSigs) {
+			// 	cs.Logger.Debug("verify correct!!!")
+			// 	fmt.Println("count=", count)
+			// }
+
+			cs.Logger.Debug("===============pubkey end and tx sig end=================")
+		}
+		return nil
+	}
+
+}
+
+// var txs types.Txs
+// var test_partcipant map[string][]byte
+// for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
+// 	tx, err := tp.NewTX(cs.ProposalBlock.Txs[i])
+// 	if err != nil {
+// 		cs.Logger.Debug("parse tx wrong.")
+// 	}
+// 	//
+// 	cs.Logger.Debug("签名：" + string(voteSet.CrossTxSigs[tx.ID][:]))
+// 	tx.AggSig.Signature = voteSet.CrossTxSigs[tx.ID][:] //深拷贝
+
+// 	tx.AggSig.Participants = make(map[string][]byte, len(cs.Validators.Validators))
+// 	test_partcipant = make(map[string][]byte, len(cs.Validators.Validators))
+// 	for j := 0; j < len(cs.Validators.Validators); j++ { //拿公钥
+// 		test_partcipant[cs.Validators.Validators[i].Copy().Address.String()] = cs.Validators.Validators[i].PubKey.Bytes()
+// 		cs.Logger.Debug("公钥地址：" + cs.Validators.Validators[i].Copy().Address.String())
+// 		// tx.AggSig.Participants[cs.Validators.Validators[i].Copy().Address.String()] = cs.Validators.Validators[i].PubKey.Bytes() //将公钥放入
+// 	}
+// 	tx1, _ := json.Marshal(tx)
+// 	txs = append(txs, tx1)
+// }
+// //反序列化
+// for i, v := range test_partcipant {
+// 	cs.Logger.Debug("公钥地址" + i + "公钥内容" + string(v))
+// }
+// cs.ProposalBlock.Data.Txs = txs //赋值给区块
+
+// cs.Logger.Debug("===============pubkey end and tx sig end=================")
+// return nil
 
 // If we have the block AND +2/3 commits for it, finalize.
 func (cs *ConsensusState) tryFinalizeCommit(height int64) {
@@ -1358,6 +1457,8 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 	if cs.Height != height {
 		cmn.PanicSanity(fmt.Sprintf("tryFinalizeCommit() cs.Height: %v vs height: %v", cs.Height, height))
 	}
+	//已经超过2/3同意了，就可以拿到voteset，对区块进行修改
+	cs.Logger.Debug("Done for VoteSet and Write Block")
 
 	blockID, ok := cs.Votes.Precommits(cs.CommitRound).TwoThirdsMajority()
 	if !ok || len(blockID.Hash) == 0 {
@@ -1443,6 +1544,9 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 
 	// Execute and commit the block, update and save the state, and update the mempool.
 	// NOTE The block.AppHash wont reflect these txs until the next block.
+	cs.Logger.Debug("try add aggragate")
+	//对区块进行修改,由于会改变tx的内容所以在这里进行处理
+	cs.tryAddAggragate2Block()
 	var err error
 	stateCopy, err = cs.blockExec.ApplyBlock(stateCopy, types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}, block, flag)
 	if err != nil {
@@ -1812,6 +1916,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 
 // Attempt to add the vote. if its a duplicate signature, dupeout the validator
 func (cs *ConsensusState) tryAddVote(vote *types.Vote, peerID p2p.ID) (bool, error) {
+
 	added, err := cs.addVote(vote, peerID)
 	if err != nil {
 		// If the vote height is off, we'll just ignore it,
@@ -1885,13 +1990,13 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 	//如果交易中包含checkpoint，检查checkpoint本地的relay list中保存的是否完全一致。
 	//如果不一致投票为false
 	block := cs.ProposalBlock
+
 	if block != nil {
 		if block.Data.Txs != nil {
 			for i := 0; i < len(block.Data.Txs); i++ {
 				data := block.Data.Txs[i]
 				encodeStr := hex.EncodeToString(data)
 				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
-				//fmt.Println(string(temptx))
 				var t tp.TX
 				json.Unmarshal(temptx, &t)
 				if t.Txtype == "checkpoint" {
@@ -2052,8 +2157,8 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
 		CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
 	}
-
-	if type_ == types.PrevoteType && hash != nil {
+	//是否是在precommit阶段进行签名？
+	if type_ == types.PrecommitType && hash != nil {
 		// prevote阶段对每条跨片交易生成签名
 		// 没有想好怎么处理这里的错误
 		err := cs.privValidator.SignCrossTXVote(cs.ProposalBlock.Txs, vote)

@@ -56,33 +56,34 @@ func (e peerError) Error() string {
 // BlockchainReactor handles long-term catchup syncing.
 type BlockchainReactor struct {
 	p2p.BaseReactor
-	line      *myline.Line
+	line *myline.Line
 	// immutable
 	initialState sm.State
-	blockExec *sm.BlockExecutor
-	store     *BlockStore
-	pool      *BlockPool
-	fastSync  bool
+	blockExec    *sm.BlockExecutor
+	store        *BlockStore
+	pool         *BlockPool
+	fastSync     bool
 
 	requestsCh <-chan BlockRequest
 	errorsCh   <-chan peerError
 }
-type node struct{
-	target map[string] []string
+type node struct {
+	target map[string][]string
 }
-// NewBlockchainReactor returns new reactor instance.
-func (bcR *BlockchainReactor) newline1() *myline.Line{
 
-	endpoints:=&node{
-		target:make(map[string][]string,16),
+// NewBlockchainReactor returns new reactor instance.
+func (bcR *BlockchainReactor) newline1() *myline.Line {
+
+	endpoints := &node{
+		target: make(map[string][]string, 16),
 	}
 
-	endpoints.target["A"]=[]string{"192.168.5.56:26657","192.168.5.56:36657","192.168.5.56:46657","192.168.5.56:56657"}
-	endpoints.target["B"]=[]string{"192.168.5.57:26657","192.168.5.57:36657","192.168.5.57:46657","192.168.5.57:56657"}
-	endpoints.target["C"]=[]string{"192.168.5.58:26657","192.168.5.58:36657","192.168.5.58:46657","192.168.5.58:56657"}
-	endpoints.target["D"]=[]string{"192.168.5.60:26657","192.168.5.60:36657","192.168.5.60:46657","192.168.5.60:56657"}
+	endpoints.target["A"] = []string{"192.168.5.56:26657", "192.168.5.56:36657", "192.168.5.56:46657", "192.168.5.56:56657"}
+	endpoints.target["B"] = []string{"192.168.5.57:26657", "192.168.5.57:36657", "192.168.5.57:46657", "192.168.5.57:56657"}
+	endpoints.target["C"] = []string{"192.168.5.58:26657", "192.168.5.58:36657", "192.168.5.58:46657", "192.168.5.58:56657"}
+	endpoints.target["D"] = []string{"192.168.5.60:26657", "192.168.5.60:36657", "192.168.5.60:46657", "192.168.5.60:56657"}
 
-	l:=myline.NewLine(endpoints.target)
+	l := myline.NewLine(endpoints.target)
 	return l
 }
 func NewBlockchainReactor(state sm.State, blockExec *sm.BlockExecutor, store *BlockStore,
@@ -112,14 +113,13 @@ func NewBlockchainReactor(state sm.State, blockExec *sm.BlockExecutor, store *Bl
 		requestsCh:   requestsCh,
 		errorsCh:     errorsCh,
 	}
-	bcR.line= bcR.newline1()
+	bcR.line = bcR.newline1()
 	//go func(){
 	//	if err:=bcR.line.Start();err!=nil{
 	//		fmt.Println(err)
 	//	}
 	//	fmt.Println("reactor connect!!!!!!!!!!!!!!!!")
 	//}()
-
 
 	bcR.BaseReactor = *p2p.NewBaseReactor("BlockchainReactor", bcR)
 	return bcR
@@ -373,7 +373,7 @@ FOR_LOOP:
 				// TODO: same thing for app - but we would need a way to
 				// get the hash without persisting the state
 				var err error
-				state, err = bcR.blockExec.ApplyBlock(state, firstID, first,false)
+				state, err = bcR.blockExec.ApplyBlock(state, firstID, first, false)
 				if err != nil {
 					// TODO This is bad, are we zombie?
 					panic(fmt.Sprintf("Failed to process committed block (%d:%X): %v", first.Height, first.Hash(), err))
@@ -512,4 +512,3 @@ func (m *bcStatusResponseMessage) ValidateBasic() error {
 func (m *bcStatusResponseMessage) String() string {
 	return fmt.Sprintf("[bcStatusResponseMessage %v]", m.Height)
 }
-
