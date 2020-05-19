@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/tendermint/go-amino"
-	types "github.com/tendermint/tendermint/rpc/lib/types"
-	mytype "github.com/tendermint/tendermint/types"
-	tp "github.com/tendermint/tendermint/identypes"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"reflect"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/tendermint/go-amino"
+	tp "github.com/tendermint/tendermint/identypes"
+	types "github.com/tendermint/tendermint/rpc/lib/types"
+	mytype "github.com/tendermint/tendermint/types"
 )
+
 const (
 	protoHTTP  = "http"
 	protoHTTPS = "https"
@@ -22,6 +24,7 @@ const (
 	protoWS    = "ws"
 	protoTCP   = "tcp"
 )
+
 type RPCFunc struct {
 	f        reflect.Value  // underlying rpc function
 	args     []reflect.Type // type of each function arg
@@ -39,10 +42,10 @@ type HTTP struct {
 	rpc    *JSONRPCClient
 }
 type ResultBroadcastTx struct {
-	Code uint32       `json:"code"`
-	Data []byte       `json:"data"`
-	Log  string       `json:"log"`
-	Hash []byte       `json:"hash"`
+	Code uint32 `json:"code"`
+	Data []byte `json:"data"`
+	Log  string `json:"log"`
+	Hash []byte `json:"hash"`
 }
 type RPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -56,8 +59,9 @@ type jsonrpcid interface {
 	isJSONRPCID()
 }
 type JSONRPCStringID string
+
 func (JSONRPCStringID) isJSONRPCID() {}
-func Send(funcMap map[string]*RPCFunc,cdc *amino.Codec){
+func Send(funcMap map[string]*RPCFunc, cdc *amino.Codec) {
 
 }
 func RegisterAmino(cdc *amino.Codec) {
@@ -130,8 +134,8 @@ func NewHTTP(remote, wsEndpoint string) *HTTP {
 	rc.SetCodec(cdc)
 
 	return &HTTP{
-		rpc:      rc,
-		remote:   remote,
+		rpc:    rc,
+		remote: remote,
 	}
 }
 func (c *JSONRPCClient) Call(method string, params map[string]interface{}, result interface{}) (interface{}, error) {
@@ -179,41 +183,20 @@ func unmarshalResponseBytes(cdc *amino.Codec, responseBytes []byte, result inter
 	}
 	return result, nil
 }
+
 //tx数组传入
-func (c *HTTP) broadcastTX(route string, tx []tp.TX)  {
-	for i :=0;i<len(tx);i++{
-		data,_:=json.Marshal(tx[i])
+func (c *HTTP) broadcastTX(route string, tx []tp.TX) {
+	for i := 0; i < len(tx); i++ {
+		data, _ := json.Marshal(tx[i])
 		result := new(ResultBroadcastTx)
 		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
-		// fmt.Println(result.Log)
-		// if err != nil {
-		// 	f := fmt.Sprintf("%s", err)
-		// 	fmt.Println(f)
-		// 	if f=="Mempool is full"{
-		// 		continue
-		// 	}else if f=="Tx already exists in cache"{
-		// 		if tx[i].Txtype=="relaytx"{
-		// 			tx[i].Txtype="addtx"
-		// 			name := "TT"+tx[i].Sender+"Node2:26657"
-		// 			tx_package:=[]tp.TX{}
-		// 			tx_package=append(tx_package,tx[i])
-		// 			for i:=0;i<len(tx_package);i++{
-		// 			client := *NewHTTP(name,"/websocket")
-		// 			go client.BroadcastTxAsync(tx_package)
-		// 			}
-		// 		}
-		// 		continue
-		// 	}
-	
-		// }
+		fmt.Println("返回值", result)
 	}
 
 }
-	
-
 
 //传入tx数组进行broadcast
-func (c *HTTP) BroadcastTxAsync(tx []tp.TX)  {
+func (c *HTTP) BroadcastTxAsync(tx []tp.TX) {
 	c.broadcastTX("broadcast_tx_async", tx)
 }
 

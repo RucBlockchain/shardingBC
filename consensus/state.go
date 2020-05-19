@@ -1358,97 +1358,47 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 	if len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
+
 		voteSet := cs.Votes.Precommits(cs.CommitRound)
-		var txs types.Txs // 为了改造block的交易
 
 		if len(voteSet.CrossTxSigs) > 0 {
-			cs.Logger.Debug("跨片交易签名数量：" + strconv.Itoa(len(voteSet.CrossTxSigs)))
+			cs.Logger.Error("跨片交易签名数量：" + strconv.Itoa(len(voteSet.CrossTxSigs)))
 			count_relay := 0
+			var Participants []tp.Participant
+
+			for k := 0; k < len(cs.Validators.Validators); k++ { //拿公钥
+				var Participant tp.Participant
+				Participant.Address = cs.Validators.Validators[k].Copy().Address.Bytes()
+				Participant.Pubkey = cs.Validators.Validators[k].PubKey.Bytes()
+				Participants = append(Participants, Participant)
+			}
 			for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
-				tx, err := tp.NewTX(cs.ProposalBlock.Txs[i])
-				if err != nil {
-					cs.Logger.Debug("parse tx wrong.")
-				}
+				encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
+
+				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+				//fmt.Println(string(temptx))
+				var tx tp.TX
+				json.Unmarshal(temptx, &tx)
 
 				if tx.Txtype == "relaytx" {
 					count_relay += 1
 					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
 						if tx.ID == voteSet.CrossTxSigs[j].TxId {
 							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
-							for k := 0; k < len(cs.Validators.Validators); k++ { //拿公钥
-								var Participant tp.Participant
-								Participant.Address = cs.Validators.Validators[k].Copy().Address.Bytes()
-								Participant.Pubkey = cs.Validators.Validators[k].PubKey.Bytes()
-								tx.AggSig.Participants = append(tx.AggSig.Participants, Participant)
-								// cs.Logger.Debug("添加公钥成功")
-								// tx.AggSig.Participants[cs.Validators.Validators[i].Copy().Address.String()] = cs.Validators.Validators[i].PubKey.Bytes() //将公钥放入
-							}
+							tx.AggSig.Participants = Participants
 						}
-						// fmt.Println("tx.id", voteSet.CrossTxSigs[j].TxId, "tx的聚合签名", voteSet.CrossTxSigs[j].CrossTxSig)
+
 					}
-
+					cs.blockExec.Add2RelaytxDB(tx)
+					//将tx将入relaylist之中
 				}
-				tx1, _ := json.Marshal(tx) //反序列化
-				txs = append(txs, tx1)
 			}
-			fmt.Println("relaytx数量", count_relay)
-			cs.ProposalBlock.Txs = txs //看是否加锁
-			//验证是否正确
-			// count := 0
-			// for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
-			// 	tx, err := tp.NewTX(cs.ProposalBlock.Txs[i])
-			// 	if err != nil {
-			// 		fmt.Println("error")
-			// 	}
-			// 	if tx.Txtype == "relaytx" {
-			// 		for j := 0; j < len(voteSet.CrossTxSigs); j++ {
-			// 			if tx.ID == voteSet.CrossTxSigs[j].TxId && string(voteSet.CrossTxSigs[j].CrossTxSig) == string(tx.AggSig.Signature) {
-			// 				count += 1
-			// 			}
-			// 		}
-			// 	}
-			// }
-			// if count == len(voteSet.CrossTxSigs) {
-			// 	cs.Logger.Debug("verify correct!!!")
-			// 	fmt.Println("count=", count)
-			// }
-
-			cs.Logger.Debug("===============pubkey end and tx sig end=================")
+			cs.Logger.Error("===============pubkey end and tx sig end=================")
 		}
 		return nil
 	}
 
 }
-
-// var txs types.Txs
-// var test_partcipant map[string][]byte
-// for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
-// 	tx, err := tp.NewTX(cs.ProposalBlock.Txs[i])
-// 	if err != nil {
-// 		cs.Logger.Debug("parse tx wrong.")
-// 	}
-// 	//
-// 	cs.Logger.Debug("签名：" + string(voteSet.CrossTxSigs[tx.ID][:]))
-// 	tx.AggSig.Signature = voteSet.CrossTxSigs[tx.ID][:] //深拷贝
-
-// 	tx.AggSig.Participants = make(map[string][]byte, len(cs.Validators.Validators))
-// 	test_partcipant = make(map[string][]byte, len(cs.Validators.Validators))
-// 	for j := 0; j < len(cs.Validators.Validators); j++ { //拿公钥
-// 		test_partcipant[cs.Validators.Validators[i].Copy().Address.String()] = cs.Validators.Validators[i].PubKey.Bytes()
-// 		cs.Logger.Debug("公钥地址：" + cs.Validators.Validators[i].Copy().Address.String())
-// 		// tx.AggSig.Participants[cs.Validators.Validators[i].Copy().Address.String()] = cs.Validators.Validators[i].PubKey.Bytes() //将公钥放入
-// 	}
-// 	tx1, _ := json.Marshal(tx)
-// 	txs = append(txs, tx1)
-// }
-// //反序列化
-// for i, v := range test_partcipant {
-// 	cs.Logger.Debug("公钥地址" + i + "公钥内容" + string(v))
-// }
-// cs.ProposalBlock.Data.Txs = txs //赋值给区块
-
-// cs.Logger.Debug("===============pubkey end and tx sig end=================")
-// return nil
 
 // If we have the block AND +2/3 commits for it, finalize.
 func (cs *ConsensusState) tryFinalizeCommit(height int64) {

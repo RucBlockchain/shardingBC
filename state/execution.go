@@ -4,13 +4,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/tendermint/tendermint/account"
-	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"net"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"github.com/tendermint/tendermint/account"
+	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
+
 	abci "github.com/tendermint/tendermint/abci/types"
+	myclient "github.com/tendermint/tendermint/client"
 	tp "github.com/tendermint/tendermint/identypes"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/fail"
@@ -18,7 +20,6 @@ import (
 	myline "github.com/tendermint/tendermint/line"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
-	myclient "github.com/tendermint/tendermint/client"
 )
 
 //-----------------------------------------------------------------------------
@@ -50,7 +51,7 @@ type BlockExecutor struct {
 	logger log.Logger
 
 	metrics *Metrics
-	Client []*myclient.HTTP
+	Client  []*myclient.HTTP
 }
 
 type BlockExecutorOption func(executor *BlockExecutor)
@@ -73,7 +74,7 @@ func NewBlockExecutor(db dbm.DB, logger log.Logger, proxyApp proxy.AppConnConsen
 		logger:   logger,
 		metrics:  NopMetrics(),
 	}
-	
+
 	for _, option := range options {
 		option(res)
 	}
@@ -189,8 +190,8 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	fail.Fail() // XXX
 	//从这里开始添加新的函数
 	//检查自己身份，判断是否是leader,如果是leader再执行检查
-	
-	blockExec.CheckRelayTxs(block,flag)
+
+	blockExec.CheckRelayTxs(block, flag)
 
 	// Events are fired after everything else.
 	// NOTE: if we crash between Commit and Save, events wont be fired during replay
@@ -201,11 +202,11 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 //------------------------------------------------------
 //检查是否有跨链交易产生，对其进行后续处理
-func (blockExec *BlockExecutor) CheckRelayTxs( /*line *myline.Line,*/ block *types.Block,flag bool) {
+func (blockExec *BlockExecutor) CheckRelayTxs( /*line *myline.Line,*/ block *types.Block, flag bool) {
 
 	fmt.Println("-------------Begin check Relay Txsc----------")
 	resendTxs := blockExec.UpdateRelaytxDB() //检查状态数据库，没有及时确认的relayTxs需要重新发送relaytxs
-	if flag{
+	if flag {
 		//只有leader执行以下代码
 		var shard_send [][]tp.TX
 		shard_send = make([][]tp.TX, 16)
@@ -237,7 +238,7 @@ func (blockExec *BlockExecutor) CheckRelayTxs( /*line *myline.Line,*/ block *typ
 		if receivetxs != nil {
 			blockExec.SendAddedRelayTxs(receivetxs) //如果该分区收到的relaytx已经add，向发送的分区回复
 		}
-			//每20个，更新一次checkpoint
+		//每20个，更新一次checkpoint
 		if block.Height%20 == 0 {
 			cpTxs := blockExec.GetAllTxs()
 			cptx := conver2cptx(cpTxs, block.Height)
@@ -266,22 +267,23 @@ func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) ([]tp.TX,
 
 			if t.Txtype == "tx" {
 				continue
-			} else if t.Txtype == "relaytx" {
-				if t.Sender == block.Shard {
-					t.Operate = 1
-					sendtxs = append(sendtxs, t)
-					blockExec.Add2RelaytxDB(t)
-				} else if t.Receiver == block.Shard {
-					receivetxs = append(receivetxs, t)
-				}
 			} else if t.Txtype == "addtx" {
 				blockExec.RemoveFromRelaytxDB(t)
 				//continue
 
 			} else if t.Txtype == "checkpoint" {
-				fmt.Println("checkpoint",t)
+				fmt.Println("checkpoint", t)
 				continue
 			}
+			//在共识过程就将relaytx加入list之中
+			// } else if t.Txtype == "relaytx" {
+			// 	if t.Sender == block.Shard {
+			// 		t.Operate = 1
+			// 		sendtxs = append(sendtxs, t)
+			// 		blockExec.Add2RelaytxDB(t)
+			// 	} else if t.Receiver == block.Shard {
+			// 		receivetxs = append(receivetxs, t)
+			// 	}
 		}
 		myline.Count = 0
 	}
@@ -335,33 +337,28 @@ func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX)
 	var rnd int
 	var key string
 	var index int
-	
+
 	if num > 0 {
-		
+
 		if tx_package[0].Txtype == "addtx" {
 			key = tx_package[0].Sender
-
-			//fmt.Println("发往分片",key)
-			//c2, rnd = myline.UseConnect(key, "ip")
 		} else {
 			key = tx_package[0].Receiver
-			//fmt.Println("发往分片",key)
-			//fmt.Println(key,len(tx_package))
-			//c2, rnd = myline.UseConnect(key, "ip")
 		}
 		index = int(key[0]) - 65
 		blockExec.SendMessage(index, rnd, c2, tx_package)
-		
+
 	}
 }
+
 // sending tx to shard x
-func (blockExec *BlockExecutor) SendMessage(index int, rnd int, c *websocket.Conn, tx_package []tp.TX){
-	name := "TT"+string(index+65)+"Node2:26657"
-	client := *myclient.NewHTTP(name,"/websocket")
+func (blockExec *BlockExecutor) SendMessage(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
+	name := "TT" + string(index+65) + "Node2:26657"
+	client := *myclient.NewHTTP(name, "/websocket")
 	client.BroadcastTxAsync(tx_package)
 }
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
-	
+
 	res, _ := json.Marshal(tx_package)
 	rawParamsJSON := json.RawMessage(res)
 	//第一层打包结束
@@ -554,10 +551,10 @@ func execBlockOnProxyApp(
 		}
 
 		/*
-         * @Author: zyj
-         * @Desc: update state
-         * @Date: 19.11.10
-         */
+		 * @Author: zyj
+		 * @Desc: update state
+		 * @Date: 19.11.10
+		 */
 		accountLog := account.NewAccountLog(tx)
 		if accountLog != nil {
 			accountLog.Save()

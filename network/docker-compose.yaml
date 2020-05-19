@@ -12,7 +12,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=17ea13db835d3d19ed3a218927c0024a0f12db4b@TTANode3:26656,a2434d8e211972389ff00ac71fa509a0484562b8@TTANode2:26656
+    - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -30,7 +30,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=45540a89dcb83c3d2a20ab4409fd4b09f4eac757@TTANode1:26656,77bdde94586bd3abaa9d9512e2acdf1cad7ce2d5@TTANode4:26656
+    - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -50,7 +50,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=45540a89dcb83c3d2a20ab4409fd4b09f4eac757@TTANode1:26656,77bdde94586bd3abaa9d9512e2acdf1cad7ce2d5@TTANode4:26656
+    - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -70,7 +70,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=17ea13db835d3d19ed3a218927c0024a0f12db4b@TTANode3:26656,a2434d8e211972389ff00ac71fa509a0484562b8@TTANode2:26656
+    - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -91,7 +91,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=32ada233690e8a0eb9d5f071fa7453b5dafb2c92@TTBNode3:26656,838a01af60bd6babb49369f5048d729bf290d9cf@TTBNode2:26656
+    - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -109,7 +109,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=83cedc33708dbd99d56d2874d4afc6aec9d32fd7@TTBNode1:26656,bd3369d944c5d57f2d78c578f58dbc15c063b14f@TTBNode4:26656
+    - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -129,7 +129,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=83cedc33708dbd99d56d2874d4afc6aec9d32fd7@TTBNode1:26656,bd3369d944c5d57f2d78c578f58dbc15c063b14f@TTBNode4:26656
+    - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
@@ -149,7 +149,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=32ada233690e8a0eb9d5f071fa7453b5dafb2c92@TTBNode3:26656,838a01af60bd6babb49369f5048d729bf290d9cf@TTBNode2:26656
+    - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
