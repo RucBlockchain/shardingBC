@@ -12,6 +12,7 @@ import (
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
 	tp "github.com/tendermint/tendermint/identypes"
 	dbm "github.com/tendermint/tendermint/libs/db"
@@ -85,7 +86,7 @@ func NewBlockExecutor(db dbm.DB, logger log.Logger, proxyApp proxy.AppConnConsen
 	 * @Date: 19.11.09
 	 */
 	account.InitAccountDB(res.db, res.logger)
-
+	checkdb.InitAddDB(res.db, res.logger)
 	return res
 }
 
@@ -339,7 +340,7 @@ func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX)
 	var index int
 
 	if num > 0 {
-
+		fmt.Println("tx:", tx_package)
 		if tx_package[0].Txtype == "addtx" {
 			key = tx_package[0].Sender
 		} else {
@@ -354,8 +355,9 @@ func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX)
 // sending tx to shard x
 func (blockExec *BlockExecutor) SendMessage(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
 	name := "TT" + string(index+65) + "Node2:26657"
+	fmt.Println("name", name)
 	client := *myclient.NewHTTP(name, "/websocket")
-	client.BroadcastTxAsync(tx_package)
+	go client.BroadcastTxAsync(tx_package)
 }
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
 
@@ -529,8 +531,6 @@ func execBlockOnProxyApp(
 	proxyAppConn.SetResponseCallback(proxyCb)
 
 	commitInfo, byzVals := getBeginBlockValidatorInfo(block, lastValSet, stateDB)
-	//fmt.Println("运行2")
-	// Begin block
 	var err error
 	abciResponses.BeginBlock, err = proxyAppConn.BeginBlockSync(abci.RequestBeginBlock{
 		Hash:                block.Hash(),
@@ -567,7 +567,6 @@ func execBlockOnProxyApp(
 		logger.Error("Error in proxyAppConn.EndBlock", "err", err)
 		return nil, err
 	}
-	//fmt.Println("运行3")
 	logger.Info("Executed block", "height", block.Height, "validTxs", validTxs, "invalidTxs", invalidTxs)
 
 	return abciResponses, nil

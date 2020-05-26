@@ -220,18 +220,18 @@ func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower
 	valIndex := vote.ValidatorIndex
 	//把vote的跨片交易签名加入voteset中
 	if vote.Type == PrecommitType && len(vote.CrossTxSigs) != 0 {
-		fmt.Println("开始跨片交易处理", "跨片交易数量", len(vote.CrossTxSigs))
+		// fmt.Println("开始跨片交易处理", "跨片交易数量", len(vote.CrossTxSigs))
 		for i := 0; i < len(vote.CrossTxSigs); i++ {
 			var err error
 			var ctsig identypes.VoteCrossTxSig
 			ctsig = identypes.VoteCrossTxSig{TxId: vote.CrossTxSigs[i].TxId, CrossTxSig: vote.CrossTxSigs[i].CrossTxSig}
-
+			//vote.CrossTxSigs[i].CrossTxSig
 			voteSet.CrossTxSigs = append(voteSet.CrossTxSigs, ctsig) //, err = bls1.AggragateSignature(vote.CrossTxSigs[i].CrossTxSig, nil)
 			if err != nil {
 				fmt.Println("Aggragate Err")
 			}
 		}
-		fmt.Println("voteset的跨片交易容量：", len(voteSet.CrossTxSigs))
+		// fmt.Println("voteset的跨片交易容量：", len(voteSet.CrossTxSigs))
 
 	}
 

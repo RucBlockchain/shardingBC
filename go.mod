@@ -30,7 +30,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.12.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v0.0.0-20180826005136-8cb6e5b95923 // indirect
-	github.com/herumi/bls-eth-go-binary v0.0.0-20200508110836-07e8f416e478 // indirect
+	github.com/herumi/bls-eth-go-binary v0.0.0-20200317044537-980010b6b10b // indirect
 	github.com/inconshreveable/mousetrap v0.0.0-20141017200713-76626ae9c91c // indirect
 	github.com/jmhodges/levigo v0.0.0-20190228103307-853d788c5c41
 	github.com/jonboulle/clockwork v0.1.0 // indirect

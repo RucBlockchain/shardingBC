@@ -166,18 +166,24 @@ func makeJSONRPCHandler(funcMap map[string]*RPCFunc, cdc *amino.Codec, logger lo
 		//在这里先做测试，看看效果。如果不行的话再将发送的信息进行条条处理
 
 		if len(request.Params) > 0 {
+
 			fnArgs, err := jsonParamsToArgs(rpcFunc, cdc, request.Params)
+
 			if err != nil {
 				WriteRPCResponseHTTP(w, types.RPCInvalidParamsError(request.ID, errors.Wrap(err, "Error converting json params to arguments")))
 				return
 			}
 			args = append(args, fnArgs...)
-		}
 
+		} else {
+			fmt.Println("没有结束到参数")
+		}
+		// fmt.Println("args", args)
 		returns := rpcFunc.f.Call(args)
 		//fmt.Println("method:", request.Method)
-		logger.Info("HTTPJSONRPC", "method", request.Method, "args", args, "returns", returns)
+		// logger.Error("HTTPJSONRPC", "method", request.Method, "args", args, "returns", returns)
 		result, err := unreflectResult(returns)
+		// logger.Error("result-server", result)
 		if err != nil {
 			WriteRPCResponseHTTP(w, types.RPCInternalError(request.ID, err))
 			return

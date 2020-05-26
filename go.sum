@@ -186,6 +186,8 @@ github.com/hashicorp/golang-lru v0.5.4 h1:YDjusn29QI/Das2iO9M0BHnIbxPeyuCHsjMW+l
 github.com/hashicorp/golang-lru v0.5.4/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
 github.com/hashicorp/hcl v0.0.0-20180826005136-8cb6e5b95923 h1:T4oc/Dmuop17QgMoIbY3A2l55e3oq4nIismo+dN4jUY=
 github.com/hashicorp/hcl v0.0.0-20180826005136-8cb6e5b95923/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
+github.com/herumi/bls-eth-go-binary v0.0.0-20200317044537-980010b6b10b h1:9jZqvokzqRjiPm0X0VlVKMqDO0L2aaDKJEZe5LqPNmA=
+github.com/herumi/bls-eth-go-binary v0.0.0-20200317044537-980010b6b10b/go.mod h1:mkJqB4TUh1srJij+PlC63mljuCXVzNgaxle9Lbr2m4U=
 github.com/herumi/bls-eth-go-binary v0.0.0-20200508110836-07e8f416e478 h1:UMIHMlIgtPmh96SmXdDiEDRbQ2NSroxBQzpEknueoG4=
 github.com/herumi/bls-eth-go-binary v0.0.0-20200508110836-07e8f416e478/go.mod h1:luAnRm3OsMQeokhGzpYmc0ZKwawY7o87PUEP11Z7r7U=
 github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=

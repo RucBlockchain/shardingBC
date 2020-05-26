@@ -186,18 +186,19 @@ func unmarshalResponseBytes(cdc *amino.Codec, responseBytes []byte, result inter
 
 //tx数组传入
 func (c *HTTP) broadcastTX(route string, tx []tp.TX) {
+
 	for i := 0; i < len(tx); i++ {
 		data, _ := json.Marshal(tx[i])
 		result := new(ResultBroadcastTx)
 		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
-		fmt.Println("返回值", result)
+
 	}
 
 }
 
 //传入tx数组进行broadcast
 func (c *HTTP) BroadcastTxAsync(tx []tp.TX) {
-	c.broadcastTX("broadcast_tx_async", tx)
+	go c.broadcastTX("broadcast_tx_async", tx)
 }
 
 // func (c *HTTP) Status() (*ctypes.ResultStatus, error) {

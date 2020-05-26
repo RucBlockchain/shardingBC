@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/tendermint/tendermint/account"
@@ -271,7 +272,7 @@ func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
 		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
 			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
 			i--
-			mem.logger.Error("成功移除relay交易")
+
 			break
 		}
 	}
@@ -431,6 +432,10 @@ func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 // CheckTxWithInfo performs the same operation as CheckTx, but with extra meta data about the tx.
 // Currently this metadata is the peer who sent it,
 // used to prevent the tx from being gossiped back to them.
+func getShard() string {
+	v, _ := syscall.Getenv("TASKID")
+	return v
+}
 func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
@@ -476,13 +481,19 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		}
 		var retx *tp.TX
 		retx, _ = tp.NewTX(tx)
-		retx.Txtype = "addtx"
-		name := "TT" + retx.Sender + "Node2:26657"
-		tx_package := []tp.TX{}
-		tx_package = append(tx_package, *retx)
-		for i := 0; i < len(tx_package); i++ {
-			client := *myclient.NewHTTP(name, "/websocket")
-			go client.BroadcastTxAsync(tx_package)
+		if retx.Txtype != "addtx" && retx.Txtype == "relaytx" {
+			shardname := getShard()
+			if shardname != retx.Sender {
+				retx.Txtype = "addtx"
+				name := "TT" + retx.Sender + "Node2:26657"
+				tx_package := []tp.TX{}
+				tx_package = append(tx_package, *retx)
+				for i := 0; i < len(tx_package); i++ {
+					client := *myclient.NewHTTP(name, "/websocket")
+					go client.BroadcastTxAsync(tx_package)
+				}
+			} //匹配现在分片
+
 		}
 		return ErrTxInCache
 	}
