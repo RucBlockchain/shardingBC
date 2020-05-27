@@ -6,7 +6,6 @@ import (
 	"net"
 	"reflect"
 	"runtime/debug"
-	"strconv"
 
 	//"strings"
 	"sync"
@@ -25,19 +24,19 @@ import (
 
 	"github.com/pkg/errors"
 
-	tp "github.com/tendermint/tendermint/identypes"
-	cmn "github.com/tendermint/tendermint/libs/common"
-	"github.com/tendermint/tendermint/libs/fail"
-	"github.com/tendermint/tendermint/libs/log"
-	tmtime "github.com/tendermint/tendermint/types/time"
-
+	"github.com/tendermint/tendermint/checkdb"
 	cfg "github.com/tendermint/tendermint/config"
 	cstypes "github.com/tendermint/tendermint/consensus/types"
+	tp "github.com/tendermint/tendermint/identypes"
+	cmn "github.com/tendermint/tendermint/libs/common"
 	tmevents "github.com/tendermint/tendermint/libs/events"
+	"github.com/tendermint/tendermint/libs/fail"
+	"github.com/tendermint/tendermint/libs/log"
 	myline "github.com/tendermint/tendermint/line"
 	"github.com/tendermint/tendermint/p2p"
 	sm "github.com/tendermint/tendermint/state"
 	"github.com/tendermint/tendermint/types"
+	tmtime "github.com/tendermint/tendermint/types/time"
 	// useetcd "github.com/tendermint/tendermint/useetcd"
 )
 
@@ -1353,6 +1352,8 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 		}
 	}
 }
+
+//获取片名
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 	if len(cs.ProposalBlock.Txs) == 0 {
@@ -1362,8 +1363,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		voteSet := cs.Votes.Precommits(cs.CommitRound)
 
 		if len(voteSet.CrossTxSigs) > 0 {
-			cs.Logger.Error("跨片交易签名数量：" + strconv.Itoa(len(voteSet.CrossTxSigs)))
-			count_relay := 0
+
 			var Participants []tp.Participant
 
 			for k := 0; k < len(cs.Validators.Validators); k++ { //拿公钥
@@ -1380,8 +1380,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				var tx tp.TX
 				json.Unmarshal(temptx, &tx)
 
-				if tx.Txtype == "relaytx" {
-					count_relay += 1
+				if tx.Txtype == "relaytx" && tx.Sender == getShard() {
+
 					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
 						if tx.ID == voteSet.CrossTxSigs[j].TxId {
 							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
@@ -1391,6 +1391,21 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 					}
 					cs.blockExec.Add2RelaytxDB(tx)
 					//将tx将入relaylist之中
+				} else if tx.Txtype == "relaytx" && tx.Receiver == getShard() {
+					//添加聚合签名
+					newtx :=tp.TX
+					
+					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
+						if tx.ID == voteSet.CrossTxSigs[j].TxId {
+							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
+							tx.AggSig.Participants = Participants
+						}
+					}
+
+					tx.Txtype = "addtx"
+					tx.Operate = 1
+					checkdb.Save(tx.ID, tx)
+					// cs.blockExec.Add2RelaytxDB(tx) //addtx
 				}
 			}
 			cs.Logger.Error("===============pubkey end and tx sig end=================")

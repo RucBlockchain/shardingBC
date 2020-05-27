@@ -499,7 +499,7 @@ type P2PConfig struct {
 	// FUzz connection
 	TestFuzz       bool            `mapstructure:"test_fuzz"`
 	TestFuzzConfig *FuzzConnConfig `mapstructure:"test_fuzz_config"`
-	Shard int                      `mapstructure:"shard_count"`
+	Shard          int             `mapstructure:"shard_count"`
 }
 
 // DefaultP2PConfig returns a default configuration for the peer-to-peer layer
@@ -911,8 +911,3 @@ func getDefaultMoniker() string {
 	}
 	return moniker
 }
-
-
-
-
-

@@ -229,13 +229,13 @@ func (blockExec *BlockExecutor) CheckRelayTxs( /*line *myline.Line,*/ block *typ
 		fmt.Println("需要发送的CheckRelayTxs交易数量：", num)
 	}
 
-	//对当前提交的块检查，看是否有新的relayTxs产生
-	sendtxs, receivetxs := blockExec.CheckCommitedBlock(block)
+	//对当前提交的块检查，看是否有新的relayTxs产生，无需检查已经在provote阶段加入
+	receivetxs := blockExec.CheckCommitedBlock(block)
 	if flag {
 		//只有leader节点发送交易
-		if sendtxs != nil {
-			blockExec.SendRelayTxs(sendtxs) //如果有relaytx,向其他分区发送交易（地址可以通过relaytx的格式解析）
-		}
+		// if sendtxs != nil {
+		// 	blockExec.SendRelayTxs(sendtxs) //如果有relaytx,向其他分区发送交易（地址可以通过relaytx的格式解析）
+		// }
 		if receivetxs != nil {
 			blockExec.SendAddedRelayTxs(receivetxs) //如果该分区收到的relaytx已经add，向发送的分区回复
 		}
@@ -249,11 +249,10 @@ func (blockExec *BlockExecutor) CheckRelayTxs( /*line *myline.Line,*/ block *typ
 
 }
 
-func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) ([]tp.TX, []tp.TX) { //判断relay tx是否存在
+func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) []tp.TX { //寻找需要回复的tx
 	//检查block中所有的tx是否包含relay TX
 	//返回两种，新加入到分区的和已被确认的relaytx
 	fmt.Println("CheckCommitedBlock")
-	var sendtxs []tp.TX
 	var receivetxs []tp.TX
 	if block.Data.Txs != nil {
 		for i := 0; i < len(block.Data.Txs); i++ {
@@ -275,6 +274,8 @@ func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) ([]tp.TX,
 			} else if t.Txtype == "checkpoint" {
 				fmt.Println("checkpoint", t)
 				continue
+			} else if t.Receiver == block.Shard && t.Txtype == "relaytx" {
+				receivetxs = append(receivetxs, t)
 			}
 			//在共识过程就将relaytx加入list之中
 			// } else if t.Txtype == "relaytx" {
@@ -282,13 +283,11 @@ func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) ([]tp.TX,
 			// 		t.Operate = 1
 			// 		sendtxs = append(sendtxs, t)
 			// 		blockExec.Add2RelaytxDB(t)
-			// 	} else if t.Receiver == block.Shard {
-			// 		receivetxs = append(receivetxs, t)
 			// 	}
 		}
 		myline.Count = 0
 	}
-	return sendtxs, receivetxs
+	return receivetxs
 }
 
 func (blockExec *BlockExecutor) Add2RelaytxDB(tx tp.TX) {
@@ -300,7 +299,6 @@ func (blockExec *BlockExecutor) RemoveFromRelaytxDB(tx tp.TX) {
 	blockExec.mempool.RemoveRelaytxDB(tx)
 }
 func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
-	fmt.Println("UpdateRelaytxDB")
 	resendTxs := blockExec.mempool.UpdaterDB()
 	return resendTxs
 }
@@ -340,7 +338,7 @@ func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX)
 	var index int
 
 	if num > 0 {
-		fmt.Println("tx:", tx_package)
+
 		if tx_package[0].Txtype == "addtx" {
 			key = tx_package[0].Sender
 		} else {
@@ -354,6 +352,7 @@ func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX)
 
 // sending tx to shard x
 func (blockExec *BlockExecutor) SendMessage(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
+
 	name := "TT" + string(index+65) + "Node2:26657"
 	fmt.Println("name", name)
 	client := *myclient.NewHTTP(name, "/websocket")
@@ -419,6 +418,9 @@ func (blockExec *BlockExecutor) SendAddedRelayTxs( /*line *myline.Line,*/ txs []
 		flag := int(txs[i].Receiver[0]) - 65
 		txs[i].Txtype = "addtx"
 		txs[i].Operate = 1
+		result := checkdb.Search(txs[i].ID)
+		//取到聚合签名和公钥，赋值给即将发送的tx
+		txs[i].AggSig = result.AggSig
 		shard_send[flag] = append(shard_send[flag], txs[i])
 	}
 	var tx_package []tp.TX

@@ -10,11 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tendermint/tendermint/account"
-
 	"github.com/pkg/errors"
-
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/account"
+	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
 	cfg "github.com/tendermint/tendermint/config"
 	tp "github.com/tendermint/tendermint/identypes"
@@ -264,7 +263,6 @@ func (mem *Mempool) AddRelaytxDB(tx tp.TX) {
 	rtx.Tx = tx
 	rtx.Height = 0
 	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
-	mem.logger.Error("成功添加relay交易")
 }
 
 func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
@@ -479,18 +477,22 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 				// but they can spam the same tx with little cost to them atm.
 			}
 		}
+		//检验是否交易已经放入状态数据库或者区块之中
 		var retx *tp.TX
 		retx, _ = tp.NewTX(tx)
 		if retx.Txtype != "addtx" && retx.Txtype == "relaytx" {
+
 			shardname := getShard()
 			if shardname != retx.Sender {
-				retx.Txtype = "addtx"
-				name := "TT" + retx.Sender + "Node2:26657"
-				tx_package := []tp.TX{}
-				tx_package = append(tx_package, *retx)
-				for i := 0; i < len(tx_package); i++ {
-					client := *myclient.NewHTTP(name, "/websocket")
-					go client.BroadcastTxAsync(tx_package)
+				dbtx := checkdb.Search(retx.ID)
+				if dbtx != nil {
+					name := "TT" + dbtx.Sender + "Node2:26657"
+					tx_package := []tp.TX{}
+					tx_package = append(tx_package, *dbtx)
+					for i := 0; i < len(tx_package); i++ {
+						client := *myclient.NewHTTP(name, "/websocket")
+						go client.BroadcastTxAsync(tx_package)
+					}
 				}
 			} //匹配现在分片
 
@@ -504,6 +506,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	 * @Desc: check tx
 	 * @Date: 19.11.10
 	 */
+
 	accountLog := account.NewAccountLog(tx)
 	if accountLog == nil {
 		return errors.New("交易解析失败")
@@ -512,7 +515,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	if !checkRes {
 		return errors.New("不合法的交易")
 	}
-
+	//对addtx进行检验，如果是已经加入则直接返回
 	// WAL
 	if mem.wal != nil {
 		// TODO: Notify administrators when WAL fails
