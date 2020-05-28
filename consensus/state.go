@@ -37,6 +37,7 @@ import (
 	sm "github.com/tendermint/tendermint/state"
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
+	// "github.com/tendermint/tendermint/crypto/bls"
 	// useetcd "github.com/tendermint/tendermint/useetcd"
 )
 
@@ -1190,6 +1191,7 @@ func (cs *ConsensusState) enterPrevoteWait(height int64, round int) {
 func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 	logger := cs.Logger.With("height", height, "round", round)
 	// logger.Error("enterPrecommit")
+
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cstypes.RoundStepPrecommit <= cs.Step) {
 		logger.Debug(fmt.Sprintf("enterPrecommit(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
@@ -2137,8 +2139,29 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
 		CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
 	}
-	//是否是在precommit阶段进行签名？
+	//在precommit阶段，核验addtx
 	if type_ == types.PrecommitType && hash != nil {
+		for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
+			encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
+
+			temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+
+			var tx tp.TX
+			json.Unmarshal(temptx, &tx)
+			if tx.Txtype=="addtx"{
+				//bls.AggragateVerify(tx.AggSig.Signature,tx.Content,tx.AggSig.Participants)核验
+				if true {
+					continue
+				}else{
+					vote.BlockID=types.BlockID{Hash: nil, PartsHeader: header}
+					break
+				}
+			}
+
+		}
+	}
+		//是否是在precommit阶段进行签名,加上条件
+	if type_ == types.PrecommitType && hash != nil && vote.BlockID.Hash != nil{
 		// prevote阶段对每条跨片交易生成签名
 		// 没有想好怎么处理这里的错误
 		err := cs.privValidator.SignCrossTXVote(cs.ProposalBlock.Txs, vote)
