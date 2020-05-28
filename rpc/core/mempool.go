@@ -6,11 +6,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
+	"syscall"
+	tp "github.com/tendermint/tendermint/identypes"
 	abci "github.com/tendermint/tendermint/abci/types"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
+	"github.com/tendermint/tendermint/checkdb"
+	myclient "github.com/tendermint/tendermint/client"
 )
 
 //-----------------------------------------------------------------------------
@@ -59,7 +62,42 @@ import (
 // | Parameter | Type | Default | Required | Description     |
 // |-----------+------+---------+----------+-----------------|
 // | tx        | Tx   | nil     | true     | The transaction |
+func getShard() string {
+	v, _ := syscall.Getenv("TASKID")
+	return v
+}
+func Checkdbtest(tx types.Tx) bool {
+	var retx *tp.TX
+	retx, _ = tp.NewTX(tx)		
+	if consensusState.IsLeader(){//leader才能判断
+	if retx.Txtype == "relaytx" {
+
+		shardname := getShard()
+		if shardname != retx.Sender {
+			dbtx := checkdb.Search(retx.ID)
+			if dbtx != nil {
+				if consensusState.IsLeader() {
+					name := "TT" + dbtx.Sender + "Node1:26657"
+					tx_package := []tp.TX{}
+					tx_package = append(tx_package, *dbtx)
+					for i := 0; i < len(tx_package); i++ {
+					client := *myclient.NewHTTP(name, "/websocket")
+					go client.BroadcastTxAsync(tx_package)
+				}
+				}	
+				return true
+			}
+		}
+	}
+}
+	return false
+}
 func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
+	//异步解决
+	if Checkdbtest(tx){
+			return nil,errors.New("状态数据库直接返回")
+	}
+	
 	err := mempool.CheckTx(tx, nil)
 	if err != nil {
 		return nil, err
@@ -192,11 +230,9 @@ func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadc
 
 
 	subscriber := ctx.RemoteAddr()
-	fmt.Println("订阅者",subscriber,"数量",eventBus.NumClientSubscriptions(subscriber))
 	if eventBus.NumClients() >= config.MaxSubscriptionClients {
 		return nil, fmt.Errorf("max_subscription_clients %d reached", config.MaxSubscriptionClients)
 	} else if eventBus.NumClientSubscriptions(subscriber) >= config.MaxSubscriptionsPerClient {
-		fmt.Println("订阅者",subscriber,"数量",eventBus.NumClientSubscriptions(subscriber))
 		return nil, fmt.Errorf("max_subscriptions_per_client %d reached", config.MaxSubscriptionsPerClient)
 	}
 

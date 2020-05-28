@@ -35,6 +35,7 @@ type Consensus interface {
 	GetLastHeight() int64
 	GetRoundStateJSON() ([]byte, error)
 	GetRoundStateSimpleJSON() ([]byte, error)
+	IsLeader()bool
 }
 
 type transport interface {

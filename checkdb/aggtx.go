@@ -19,7 +19,6 @@ func InitAddDB(db1 dbm.DB, logger1 log.Logger) {
 }
 
 func Save(Key [sha256.Size]byte, Value *identypes.TX) {
-	logger.Error("保存成功")
 	res, _ := json.Marshal(Value) //对值进行解析
 	db.Set(calcAddTxMetaKey(Key), res)
 
@@ -30,7 +29,6 @@ func Search(Key [sha256.Size]byte) *identypes.TX {
 	result := db.Get(calcAddTxMetaKey(Key))
 	err := json.Unmarshal(result, txArgs)
 	if err != nil {
-		logger.Error("获取交易失败")
 		return nil
 	}
 	return txArgs

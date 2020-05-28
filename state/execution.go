@@ -134,7 +134,6 @@ func (blockExec *BlockExecutor) ValidateBlock(state State, block *types.Block) e
 // from outside this package to process and commit an entire block.
 // It takes a blockID to avoid recomputing the parts hash.
 func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, blockID types.BlockID, block *types.Block, flag bool) (State, error) {
-
 	if err := blockExec.ValidateBlock(state, block); err != nil {
 		return state, ErrInvalidBlock(err)
 	}
@@ -272,7 +271,6 @@ func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) []tp.TX {
 				//continue
 
 			} else if t.Txtype == "checkpoint" {
-				fmt.Println("checkpoint", t)
 				continue
 			} else if t.Receiver == block.Shard && t.Txtype == "relaytx" {
 				receivetxs = append(receivetxs, t)
@@ -302,6 +300,7 @@ func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
 	resendTxs := blockExec.mempool.UpdaterDB()
 	return resendTxs
 }
+
 func (blockExec *BlockExecutor) GetAllTxs() []tp.TX {
 	cpTxs := blockExec.mempool.GetAllTxs()
 	return cpTxs
@@ -353,8 +352,8 @@ func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX)
 // sending tx to shard x
 func (blockExec *BlockExecutor) SendMessage(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
 
-	name := "TT" + string(index+65) + "Node2:26657"
-	fmt.Println("name", name)
+	name := "TT" + string(index+65) + "Node1:26657"
+	// fmt.Println("name", name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	go client.BroadcastTxAsync(tx_package)
 }

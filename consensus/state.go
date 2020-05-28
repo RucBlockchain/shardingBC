@@ -300,7 +300,12 @@ func (cs *ConsensusState) GetValidators() (int64, []*types.Validator) {
 	defer cs.mtx.RUnlock()
 	return cs.state.LastBlockHeight, cs.state.Validators.Copy().Validators
 }
-
+func (cs *ConsensusState) GetLeader() string{
+	cs.mtx.RLock()
+	defer cs.mtx.RUnlock()
+	return "hello"
+	// return cs.Validators.GetProposer().Address
+}
 // SetPrivValidator sets the private validator account for signing votes.
 func (cs *ConsensusState) SetPrivValidator(priv types.PrivValidator) {
 	cs.mtx.Lock()
@@ -688,6 +693,7 @@ func (cs *ConsensusState) receiveRoutine(maxSteps int) {
 
 		select {
 		case <-cs.txNotifier.TxsAvailable():
+			// cs.Logger.Error("txavailble")
 			cs.handleTxsAvailable()
 		case mi = <-cs.peerMsgQueue:
 			cs.wal.Write(mi)
@@ -905,8 +911,9 @@ func (cs *ConsensusState) needProofBlock(height int64) bool {
 // Enter (CreateEmptyBlocks, CreateEmptyBlocksInterval > 0 ): after enterNewRound(height,round), after timeout of CreateEmptyBlocksInterval
 // Enter (!CreateEmptyBlocks) : after enterNewRound(height,round), once txs are in the mempool
 func (cs *ConsensusState) enterPropose(height int64, round int) {
-	logger := cs.Logger.With("height", height, "round", round)
 
+	logger := cs.Logger.With("height", height, "round", round)
+	// logger.Error("enterPropose")
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cstypes.RoundStepPropose <= cs.Step) {
 		logger.Debug(fmt.Sprintf("enterPropose(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
@@ -997,7 +1004,7 @@ func getShard() string {
 func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 	var block *types.Block
 	var blockParts *types.PartSet
-
+	// cs.Logger.Error("make proposal")
 	// Decide on block
 	if cs.ValidBlock != nil {
 		// If there is valid block, choose that.
@@ -1055,6 +1062,7 @@ func (cs *ConsensusState) isProposalComplete() bool {
 // Returns nil block upon error.
 // NOTE: keep it side-effect free for clarity.
 func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts *types.PartSet) {
+	// cs.Logger.Error("createProposalBlock")
 	var commit *types.Commit
 	if cs.Height == 1 {
 		// We're creating a proposal for the first block.
@@ -1078,6 +1086,7 @@ func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts 
 // Prevote for LockedBlock if we're locked, or ProposalBlock if valid.
 // Otherwise vote nil.
 func (cs *ConsensusState) enterPrevote(height int64, round int) {
+	// cs.Logger.Error("enterPrevote")
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cstypes.RoundStepPrevote <= cs.Step) {
 		cs.Logger.Debug(fmt.Sprintf("enterPrevote(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
@@ -1085,6 +1094,7 @@ func (cs *ConsensusState) enterPrevote(height int64, round int) {
 
 	defer func() {
 		// Done enterPrevote:
+		// cs.Logger.Error("enterPrevoteDone")
 		cs.updateRoundStep(round, cstypes.RoundStepPrevote)
 		cs.newStep()
 	}()
@@ -1100,7 +1110,7 @@ func (cs *ConsensusState) enterPrevote(height int64, round int) {
 
 func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	logger := cs.Logger.With("height", height, "round", round)
-
+	// logger.Error("defaultDoPrevote")
 	// If a block is locked, prevote that.
 	if cs.LockedBlock != nil {
 		logger.Info("enterPrevote: Block was locked")
@@ -1126,7 +1136,6 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 
 	cs.Logger.Debug(fmt.Sprintf("(%v/%v). Current: %v/%v/%v start verify the signature os txs", height, round, cs.Height, cs.Round, cs.Step))
 	// validate Tx signature
-	t := time.Now()
 	for txid, tx := range cs.ProposalBlock.Txs {
 		tx_tmp, err := tp.NewTX(tx)
 		if err != nil {
@@ -1141,7 +1150,7 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 			return
 		}
 	}
-	cs.Logger.Info("verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
+	// cs.Logger.Error("verify signature cost: ", time.Now().Sub(t).Seconds(), " (s)")
 	// Prevote cs.ProposalBlock
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
@@ -1152,7 +1161,7 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 // Enter: any +2/3 prevotes at next round.
 func (cs *ConsensusState) enterPrevoteWait(height int64, round int) {
 	logger := cs.Logger.With("height", height, "round", round)
-
+	// logger.Error("enterPrevoteWait")
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cstypes.RoundStepPrevoteWait <= cs.Step) {
 		logger.Debug(fmt.Sprintf("enterPrevoteWait(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
@@ -1180,7 +1189,7 @@ func (cs *ConsensusState) enterPrevoteWait(height int64, round int) {
 // else, precommit nil otherwise.
 func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 	logger := cs.Logger.With("height", height, "round", round)
-
+	// logger.Error("enterPrecommit")
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cstypes.RoundStepPrecommit <= cs.Step) {
 		logger.Debug(fmt.Sprintf("enterPrecommit(%v/%v): Invalid args. Current step: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 		return
@@ -1276,7 +1285,7 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 // Enter: any +2/3 precommits for next round.
 func (cs *ConsensusState) enterPrecommitWait(height int64, round int) {
 	logger := cs.Logger.With("height", height, "round", round)
-
+	// logger.Error("enterPrecommitWait")
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cs.TriggeredTimeoutPrecommit) {
 		logger.Debug(
 			fmt.Sprintf(
@@ -1353,7 +1362,6 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 	}
 }
 
-//获取片名
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 	if len(cs.ProposalBlock.Txs) == 0 {
@@ -1376,10 +1384,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
 
 				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
-				//fmt.Println(string(temptx))
+
 				var tx tp.TX
 				json.Unmarshal(temptx, &tx)
-
 				if tx.Txtype == "relaytx" && tx.Sender == getShard() {
 
 					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
@@ -1389,12 +1396,12 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 						}
 
 					}
+					tx.Operate = 1
 					cs.blockExec.Add2RelaytxDB(tx)
 					//将tx将入relaylist之中
 				} else if tx.Txtype == "relaytx" && tx.Receiver == getShard() {
 					//添加聚合签名
-					newtx :=tp.TX
-					
+
 					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
 						if tx.ID == voteSet.CrossTxSigs[j].TxId {
 							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
@@ -1404,7 +1411,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 					tx.Txtype = "addtx"
 					tx.Operate = 1
-					checkdb.Save(tx.ID, tx)
+					// cs.Logger.Error("将addtx添加入状态数据库之中")
+					checkdb.Save(tx.ID, &tx)
 					// cs.blockExec.Add2RelaytxDB(tx) //addtx
 				}
 			}
@@ -1562,6 +1570,12 @@ func (cs *ConsensusState) isEqual(lastProposer []byte) bool {
 }
 
 func (cs *ConsensusState) isLeader() (flag bool) {
+
+	address := cs.privValidator.GetPubKey().Address()
+	flag = cs.isProposer(address)
+	return flag
+}
+func (cs *ConsensusState) IsLeader() (flag bool) {
 
 	address := cs.privValidator.GetPubKey().Address()
 	flag = cs.isProposer(address)
@@ -1985,6 +1999,7 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 
 	switch vote.Type {
 	case types.PrevoteType:
+		// cs.Logger.Error("watch")
 		prevotes := cs.Votes.Prevotes(vote.Round)
 		cs.Logger.Info("Added to prevote", "vote", vote, "prevotes", prevotes.StringShort())
 
@@ -2033,7 +2048,7 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 				cs.eventBus.PublishEventValidBlock(cs.RoundStateEvent())
 			}
 		}
-
+	
 		// If +2/3 prevotes for *anything* for future round:
 		if cs.Round < vote.Round && prevotes.HasTwoThirdsAny() {
 			// Round-skip if there is any 2/3+ of votes ahead of us
