@@ -47,7 +47,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20180503174638-e2704e165165
 	github.com/rs/cors v0.0.0-20181001164945-9a47f48565a7
 	github.com/soheilhy/cmux v0.1.4 // indirect
-	github.com/spf13/afero v0.0.0-20180907092351-d40851caa0d7 // indirect
+	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v0.0.0-20181024225928-8c9545af88b1 // indirect
 	github.com/spf13/cobra v0.0.0-20171012182533-7b2c5ac9fc04
 	github.com/spf13/jwalterweatherman v0.0.0-20180907091759-4a4406e478ca // indirect
@@ -74,3 +74,5 @@ require (
 replace github.com/coreos/go-systemd => github.com/coreos/go-systemd/v22 v22.0.0
 
 replace go.etcd.io/etcd => github.com/etcd-io/etcd v3.3.10+incompatible
+
+replace gopkg.in/urfave/cli.v2 => github.com/urfave/cli v1.22.3

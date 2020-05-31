@@ -4,15 +4,15 @@ import (
 	"crypto/sha256"
 	//	"encoding/binary"
 	//	"encoding/hex"
-	"encoding/json"
-	"strconv"
-	"fmt"
 	"crypto/ecdsa"
 	"crypto/md5"
 	crand "crypto/rand"
 	"encoding/asn1"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"strconv"
 
 	// it is ok to use math/rand here: we do not need a cryptographically secure random
 	// number generator here and we can run the tests a bit faster
@@ -102,7 +102,9 @@ func (t *transacter) Start() error {
 		go t.sendLoop(i, t.flag)
 		go t.receiveLoop(i)
 	}
+
 	t.startingWg.Wait()
+	// fmt.Println("发送交易完成")
 	return nil
 }
 
@@ -140,6 +142,7 @@ func (t *transacter) receiveLoop(connIndex int) {
 
 // sendLoop generates transactions at a given rate.
 func (t *transacter) sendLoop(connIndex int, index int) {
+	initfinish :=false
 	started := false
 	// Close the starting waitgroup, in the event that this fails to start
 	defer func() {
@@ -187,13 +190,14 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 			//rate是每秒发送消息的数量
 			for i := 0; i < t.Rate; i++ {
 				var ntx []byte
-				if index == 0 {
-					if i >= 100 {
-						break //初始化100个账户
-					}
+				if initfinish == false {
+					// if i >= 100 {
+					// 	break //第一秒钟，有几笔交易就产生多少账户
+					// }
 					ntx = t.generateTx(t.shard, i)
+
 				} else {
-					ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate)
+					ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
 				}
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
 
@@ -229,7 +233,7 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 
 				txNumber++
 			}
-
+			initfinish =true
 			timeToSend := time.Since(startTime)
 			logger.Info(fmt.Sprintf("sent %d transactions", numTxSent), "took", timeToSend)
 			if timeToSend < 1*time.Second {
@@ -300,53 +304,61 @@ func pub2string(pub ecdsa.PublicKey) string {
 func (t *transacter) createinitTxContent(shard string, i int) (string, string) {
 	toint, _ := strconv.ParseInt(shard, 32, 64)
 	index := toint - 10
+	//获取分片
 	shardcount := t.count[index]
-
+	//对所有账户存钱
 	priv := shardcount[i]
 
 	pub_s := priv.PublicKey
-	tx_content := "_" + pub2string(pub_s) + "_10000"
+	tx_content := "_" + pub2string(pub_s) + "_1000000" + "_" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	sig := "sig"
 	return tx_content, sig
 
 }
 
-func (t *transacter) createRelayTxContent(shard_s string, shard_r string) (string, string) {
+func (t *transacter) createRelayTxContent(shard_s string, shard_r string, rate int) (string, string) {
+	//rate指的是该分片账户数量
 	source := rand.NewSource(time.Now().Unix())
 	newrand := rand.New(source)
+	//产生转化交易金额
 	num := newrand.Intn(100)
 	toint, _ := strconv.ParseInt(shard_s, 32, 64)
 	sendshard := t.count[(toint - 10)]
-	priv := sendshard[newrand.Intn(100)]
+	//拿取支付方账户信息
+	priv := sendshard[newrand.Intn(rate)]
 	pub_s := priv.PublicKey
 
 	toint2, _ := strconv.ParseInt(shard_r, 32, 64)
 	receiveshard := t.count[(toint2 - 10)]
-	priv_r := receiveshard[newrand.Intn(100)]
+	//拿取转入方账户信息
+	priv_r := receiveshard[newrand.Intn(rate)]
 	pub_r := priv_r.PublicKey
+	//最后加入时间戳信息
+	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num) + "_" + strconv.FormatInt(time.Now().UnixNano(), 10) //添加时间戳来唯一标识该交易
 
-	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num)
 	tr, ts, _ := ecdsa.Sign(crand.Reader, priv, digest(tx_content))
 	sig := bigint2str(*tr, *ts)
 	return tx_content, sig
 
 }
 
-func (t *transacter) createLocalTxContent(shard string) (string, string) {
+func (t *transacter) createLocalTxContent(shard string, rate int) (string, string) {
+	//rate指的是该分片账户数量
 	source := rand.NewSource(time.Now().Unix())
 	newrand := rand.New(source)
+	//金额可以随便
 	num := newrand.Intn(100)
 
 	toint, _ := strconv.ParseInt(shard, 32, 64)
 
 	shardcount := t.count[(toint - 10)]
-	priv := shardcount[newrand.Intn(100)]
+	priv := shardcount[newrand.Intn(rate)]
 	pub_s := priv.PublicKey
 
-	priv_r := shardcount[newrand.Intn(100)]
+	priv_r := shardcount[newrand.Intn(rate)]
 	pub_r := priv_r.PublicKey
 
-	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num)
+	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num) + "_" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	tr, ts, _ := ecdsa.Sign(crand.Reader, priv, digest(tx_content))
 	sig := bigint2str(*tr, *ts)
 	return tx_content, sig
@@ -370,12 +382,12 @@ func (t *transacter) generateTx(shard string, index int) []byte {
 }
 
 // warning, mutates input byte slice
-func (t *transacter) updateTx(txNumber int, send_shard []string, shard string, rate int) []byte {
+func (t *transacter) updateTx(txNumber int, send_shard []string, shard string, rate int, txnum int) []byte {
 
 	var res []byte
 	if txNumber%rate == 0 {
 		step := len(send_shard)
-		content, sig := t.createRelayTxContent(shard, send_shard[txNumber%step])
+		content, sig := t.createRelayTxContent(shard, send_shard[txNumber%step], txnum)
 		tx := &tp.TX{
 			Txtype:      "relaytx",
 			Sender:      shard,
@@ -386,7 +398,7 @@ func (t *transacter) updateTx(txNumber int, send_shard []string, shard string, r
 			Operate:     0}
 		res, _ = json.Marshal(tx)
 	} else {
-		content, sig := t.createLocalTxContent(shard)
+		content, sig := t.createLocalTxContent(shard, txnum)
 		tx := &tp.TX{
 			Txtype:      "tx",
 			Sender:      "",

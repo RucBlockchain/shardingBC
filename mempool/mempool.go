@@ -5,14 +5,16 @@ import (
 	"container/list"
 	"crypto/sha256"
 	"fmt"
-	"github.com/tendermint/tendermint/account"
+
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
-
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/account"
+
 	cfg "github.com/tendermint/tendermint/config"
 	tp "github.com/tendermint/tendermint/identypes"
 	auto "github.com/tendermint/tendermint/libs/autofile"
@@ -21,9 +23,9 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
-	myclient"github.com/tendermint/tendermint/client"
 	//"github.com/tendermint/tendermint/state"
 )
+
 // PreCheckFunc is an optional filter executed before CheckTx and rejects
 // transaction if false is returned. An example would be to ensure that a
 // transaction doesn't exceeded the block size.
@@ -167,7 +169,7 @@ type Mempool struct {
 	txs          *clist.CList // concurrent linked-list of good txs
 	preCheck     PreCheckFunc
 	postCheck    PostCheckFunc
-	rDB          relaytxDB
+	rDB          relaytxDB //relaylist
 
 	// Track whether we're rechecking txs.
 	// These are not protected by a mutex and are expected to be mutated
@@ -199,16 +201,18 @@ type Mempool struct {
 
 	metrics *Metrics
 }
+
 //--------------------------------------------
 //新增的跨片交易的状态数据库
-type relaytxDB struct{
-	relaytx []RTx  //RelayTx结构的切片
+type relaytxDB struct {
+	relaytx []RTx //RelayTx结构的切片
 }
 
-type RTx struct{
-	Tx tp.TX
+type RTx struct {
+	Tx     tp.TX
 	Height int
 }
+
 //-------------------------------------------
 
 // MempoolOption sets an optional parameter on the Mempool.
@@ -244,60 +248,64 @@ func NewMempool(
 	}
 	return mempool
 }
+
 //--------------------------------------------------------
 //新增函数
-func newrDB() relaytxDB{
+
+func newrDB() relaytxDB {
 	var rdb relaytxDB
 	var rtx []RTx
 	rdb.relaytx = rtx
 	return rdb
 }
 
-func  (mem *Mempool)AddRelaytxDB(tx  tp.TX){
+func (mem *Mempool) AddRelaytxDB(tx tp.TX) {
 	var rtx RTx
-	rtx.Tx=tx
-	rtx.Height=0
-	mem.rDB.relaytx = append(mem.rDB.relaytx,rtx)
+	rtx.Tx = tx
+	rtx.Height = 0
+	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
 }
 
-func (mem *Mempool) RemoveRelaytxDB(tx  tp.TX){
+func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
 	for i := 0; i < len(mem.rDB.relaytx); i++ {
 		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
 			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
 			i--
-			//fmt.Println("succ add the rtx")
+
 			break
 		}
 	}
-	
-	
 }
-func (mem *Mempool) UpdaterDB()([]tp.TX){
+func (mem *Mempool) UpdaterDB() []tp.TX {
 	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认
-	
-	var stx []tp.TX	
+
+	var stx []tp.TX
 	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx!=nil{
-			if (mem.rDB.relaytx[i].Height == 10)||( mem.rDB.relaytx[i].Height == 20) {
-				stx= append(stx,mem.rDB.relaytx[i].Tx)
-				mem.rDB.relaytx[i].Height=0	
-			}else {
-				mem.rDB.relaytx[i].Height =mem.rDB.relaytx[i].Height +1
+		if mem.rDB.relaytx != nil {
+			if mem.rDB.relaytx[i].Height == 0 { //第一次高度为0就发布
+				stx = append(stx, mem.rDB.relaytx[i].Tx)
+				mem.rDB.relaytx[i].Height += 1 //增加高度
+			} else if (mem.rDB.relaytx[i].Height == 10) || (mem.rDB.relaytx[i].Height == 20) {
+				stx = append(stx, mem.rDB.relaytx[i].Tx)
+				mem.rDB.relaytx[i].Height = 0
+			} else {
+				mem.rDB.relaytx[i].Height = mem.rDB.relaytx[i].Height + 1
 			}
 		}
 	}
 	return stx
-	
+
 }
-func (mem *Mempool) GetAllTxs()([]tp.TX){
+func (mem *Mempool) GetAllTxs() []tp.TX {
 	var alltx []tp.TX
 	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx!=nil{
-			alltx= append(alltx,mem.rDB.relaytx[i].Tx)
+		if mem.rDB.relaytx != nil {
+			alltx = append(alltx, mem.rDB.relaytx[i].Tx)
 		}
-	}	
+	}
 	return alltx
 }
+
 //----------------------------------------------------------
 // EnableTxsAvailable initializes the TxsAvailable channel,
 // ensuring it will trigger once every height when transactions are available.
@@ -425,10 +433,18 @@ func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 // CheckTxWithInfo performs the same operation as CheckTx, but with extra meta data about the tx.
 // Currently this metadata is the peer who sent it,
 // used to prevent the tx from being gossiped back to them.
+func getShard() string {
+	v, _ := syscall.Getenv("TASKID")
+	return v
+}
+
 func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
+	// fmt.Println(retx1) //看看是否被阻隔
+	// var retx *tp.TX
+	// retx, _ = tp.NewTX(tx)
 
 	var (
 		memSize  = mem.Size()
@@ -436,25 +452,26 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	)
 	if memSize >= mem.config.Size ||
 		int64(len(tx))+txsBytes > mem.config.MaxTxsBytes {
+
 		return ErrMempoolIsFull{
 			memSize, mem.config.Size,
 			txsBytes, mem.config.MaxTxsBytes}
 	}
-
 	// The size of the corresponding amino-encoded TxMessage
 	// can't be larger than the maxMsgSize, otherwise we can't
 	// relay it to peers.
 	if len(tx) > maxTxSize {
+
 		return ErrTxTooLarge
 	}
-
 	if mem.preCheck != nil {
 		if err := mem.preCheck(tx); err != nil {
+
 			return ErrPreCheck{err}
 		}
 	}
-
 	// CACHE
+
 	if !mem.cache.Push(tx) {
 		// Record a new sender for a tx we've already seen.
 		// Note it's possible a tx is still in the cache but no longer in the mempool
@@ -468,35 +485,27 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 				// but they can spam the same tx with little cost to them atm.
 			}
 		}
-		var retx *tp.TX
-		retx,_=tp.NewTX(tx)
-		retx.Txtype="addtx"
-		name := "TT"+retx.Sender+"Node2:26657"
-		tx_package:=[]tp.TX{}
-		tx_package=append(tx_package,*retx)
-		for i:=0;i<len(tx_package);i++{
-		client := *myclient.NewHTTP(name,"/websocket")
-		go client.BroadcastTxAsync(tx_package)
-		}
+		//检验是否交易已经放入状态数据库或者区块之中
+
 		return ErrTxInCache
 	}
 	// END CACHE
-
 	/*
-     * @Author: zyj
-     * @Desc: check tx
-     * @Date: 19.11.10
-     */
+	 * @Author: zyj
+	 * @Desc: check tx
+	 * @Date: 19.11.10
+	 */
+
 	accountLog := account.NewAccountLog(tx)
 	if accountLog == nil {
 		return errors.New("交易解析失败")
 	}
 	checkRes := accountLog.Check()
+
 	if !checkRes {
 		return errors.New("不合法的交易")
 	}
-
-
+	//对addtx进行检验，如果是已经加入则直接返回
 	// WAL
 	if mem.wal != nil {
 		// TODO: Notify administrators when WAL fails
@@ -515,10 +524,8 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	if err = mem.proxyAppConn.Error(); err != nil {
 		return err
 	}
-
 	reqRes := mem.proxyAppConn.CheckTxAsync(tx)
 	reqRes.SetCallback(mem.reqResCb(tx, txInfo.PeerID, cb))
-
 	return nil
 }
 
@@ -696,6 +703,7 @@ func (mem *Mempool) notifyTxsAvailable() {
 		default:
 		}
 	}
+
 }
 
 // ReapMaxBytesMaxGas reaps transactions from the mempool up to maxBytes bytes total
@@ -705,7 +713,7 @@ func (mem *Mempool) notifyTxsAvailable() {
 func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
-
+	// mem.logger.Error("reap txs")
 	for atomic.LoadInt32(&mem.rechecking) > 0 {
 		// TODO: Something better?
 		time.Sleep(time.Millisecond * 10)

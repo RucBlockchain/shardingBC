@@ -12,8 +12,8 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=e7a3259971c91865a023edd8a5625d1dadc7cf37@TTANode3:26656,44f07e6c3de0d8e314dfba8f33e8b2a6c5d4d273@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
@@ -30,12 +30,14 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4f43d81e584b8a5f1afa4e8473157cf6697dc0f1@TTANode1:26656,6727914500c3a73dfbe36bbf11e6774d5e155ac5@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
         - TTANode2
+    links:
+    - TTANode1
   TTANode3:
     image: 10.77.70.142:5000/tendermint:v0.4
     container_name: TTANode3
@@ -48,12 +50,14 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4f43d81e584b8a5f1afa4e8473157cf6697dc0f1@TTANode1:26656,6727914500c3a73dfbe36bbf11e6774d5e155ac5@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
         - TTANode3
+    links:
+    - TTANode1
   TTANode4:
     image: 10.77.70.142:5000/tendermint:v0.4
     container_name: TTANode4
@@ -66,86 +70,14 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=e7a3259971c91865a023edd8a5625d1dadc7cf37@TTANode3:26656,44f07e6c3de0d8e314dfba8f33e8b2a6c5d4d273@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
         - TTANode4
-version: 2
-services:
-  TTANode1:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode1
-    hostname: TTANode1
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTANode1/config:/tendermint/config
-    environment:
-    - TASKID=A
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=626a0500ad94b8db60d0b986f6452cb77daf8283@TTANode3:26656,e29b455fc17b0624365e5127c69484f28a1a6eef@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTANode1
-  TTANode2:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode2
-    hostname: TTANode2
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTANode2/config:/tendermint/config
-    environment:
-    - TASKID=A
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=f04e3243603e16da2d8cbcf501d49a86bfc12aea@TTANode1:26656,ee5ded60776395d076ea49f3df431a1e11d56c50@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTANode2
-  TTANode3:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode3
-    hostname: TTANode3
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTANode3/config:/tendermint/config
-    environment:
-    - TASKID=A
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=f04e3243603e16da2d8cbcf501d49a86bfc12aea@TTANode1:26656,ee5ded60776395d076ea49f3df431a1e11d56c50@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTANode3
-  TTANode4:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode4
-    hostname: TTANode4
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTANode4/config:/tendermint/config
-    environment:
-    - TASKID=A
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=626a0500ad94b8db60d0b986f6452cb77daf8283@TTANode3:26656,e29b455fc17b0624365e5127c69484f28a1a6eef@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTANode4
+    links:
+    - TTANode3
 services:
   TTBNode1:
     image: 10.77.70.142:5000/tendermint:v0.4
@@ -159,8 +91,8 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=a9b25f85e2bcefafbdea621b4ae257c1d51b9448@TTBNode3:26656,71a94c5637b3b369d0d522ab8d837c5168db7091@TTBNode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
@@ -177,12 +109,14 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=a545ea41d78eb7c980f94cc7963bc707b8bc2b6c@TTBNode1:26656,f5c1c406018c3eff1180ecee8287ef14e00b2848@TTBNode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
         - TTBNode2
+    links:
+    - TTBNode1
   TTBNode3:
     image: 10.77.70.142:5000/tendermint:v0.4
     container_name: TTBNode3
@@ -195,12 +129,14 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=a545ea41d78eb7c980f94cc7963bc707b8bc2b6c@TTBNode1:26656,f5c1c406018c3eff1180ecee8287ef14e00b2848@TTBNode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
         - TTBNode3
+    links:
+    - TTBNode1
   TTBNode4:
     image: 10.77.70.142:5000/tendermint:v0.4
     container_name: TTBNode4
@@ -213,12 +149,14 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=a9b25f85e2bcefafbdea621b4ae257c1d51b9448@TTBNode3:26656,71a94c5637b3b369d0d522ab8d837c5168db7091@TTBNode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
+    - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
     networks:
       tendermintnet1:
         aliases:
         - TTBNode4
+    links:
+    - TTBNode3
 
 networks:
   tendermintnet1:

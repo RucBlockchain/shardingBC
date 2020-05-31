@@ -155,10 +155,9 @@ Examples:
 		}
 	}
 	logger.Debug("Time all transacters stopped", "t", time.Now())
-	time.Sleep(time.Second * 10)
-	
+
 	for i, _ := range endpoints {
-		client  = tmrpc.NewHTTP(endpoints[i], "/websocket")
+		client = tmrpc.NewHTTP(endpoints[i], "/websocket")
 		stats, err := calculateStatistics(
 			client,
 			initialHeight,
@@ -170,7 +169,6 @@ Examples:
 		}
 		printStatistics(stats, outputFormat)
 	}
-
 
 }
 
@@ -193,12 +191,12 @@ func countCrashes(crashes []bool) int {
 	return count
 }
 
-func createCount(allshard []string) []plist {
+func createCount(allshard []string, num int) []plist {
 
 	var count []plist
 	for i := 0; i < len(allshard); i++ {
 		var pl plist
-		for j := 0; j < 100; j++ {
+		for j := 0; j < num; j++ {
 			priv, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
 			pl = append(pl, priv)
 		}
@@ -218,9 +216,10 @@ func startTransacters(
 	broadcastTxMethod string) []*transacter {
 	transacters := make([]*transacter, len(endpoints))
 
-	count := createCount(allshard)
+	count := createCount(allshard, txsRate)
 	iwg := sync.WaitGroup{}
 	iwg.Add(len(endpoints))
+	//先创建账户
 	for i, e := range endpoints {
 		shard := allshard[i]
 		flag := 0
@@ -236,25 +235,26 @@ func startTransacters(
 		}(i)
 	}
 	iwg.Wait()
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(endpoints))
-	for i, e := range endpoints {
-		shard := allshard[i]
-		flag := 1
-		t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
-		t.SetLogger(logger)
-		go func(i int) {
-			defer wg.Done()
-			if err := t.Start(); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
-			}
-			transacters[i] = t
-		}(i)
-	}
-	wg.Wait()
-
+	// fmt.Println("创建账户完成")
+	//发送交易
+	// wg := sync.WaitGroup{}
+	// wg.Add(len(endpoints))
+	// for i, e := range endpoints {
+	// 	shard := allshard[i]
+	// 	flag := 1
+	// 	t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
+	// 	t.SetLogger(logger)
+	// 	go func(i int) {
+	// 		defer wg.Done()
+	// 		if err := t.Start(); err != nil {
+	// 			fmt.Fprintln(os.Stderr, err)
+	// 			os.Exit(1)
+	// 		}
+	// 		transacters[i] = t
+	// 	}(i)
+	// }
+	// wg.Wait()
+	// fmt.Println("交易发送完成")
 	return transacters
 }
 

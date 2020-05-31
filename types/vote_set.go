@@ -7,7 +7,8 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-
+	bls "github.com/tendermint/tendermint/crypto/bls"
+	"github.com/tendermint/tendermint/identypes"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
 
@@ -60,11 +61,12 @@ type VoteSet struct {
 
 	mtx           sync.Mutex
 	votesBitArray *cmn.BitArray
-	votes         []*Vote                // Primary votes to share
-	sum           int64                  // Sum of voting power for seen votes, discounting conflicts
-	maj23         *BlockID               // First 2/3 majority seen
-	votesByBlock  map[string]*blockVotes // string(blockHash|blockParts) -> blockVotes
-	peerMaj23s    map[P2PID]BlockID      // Maj23 for each peer
+	votes         []*Vote                    // Primary votes to share
+	sum           int64                      // Sum of voting power for seen votes, discounting conflicts
+	maj23         *BlockID                   // First 2/3 majority seen
+	votesByBlock  map[string]*blockVotes     // string(blockHash|blockParts) -> blockVotes
+	peerMaj23s    map[P2PID]BlockID          // Maj23 for each peer
+	CrossTxSigs   []identypes.VoteCrossTxSig //收集签名交易的集合
 }
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
@@ -84,6 +86,7 @@ func NewVoteSet(chainID string, height int64, round int, type_ SignedMsgType, va
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
 		peerMaj23s:    make(map[P2PID]BlockID),
+		// CrossTxSigs:   make([]identypes.VoteCrossTxSig, 5000), //先假定以后最多的跨片交易数为5000条
 	}
 }
 
@@ -216,6 +219,35 @@ func (voteSet *VoteSet) getVote(valIndex int, blockKey string) (vote *Vote, ok b
 // If conflicting vote exists, returns it.
 func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower int64) (added bool, conflicting *Vote) {
 	valIndex := vote.ValidatorIndex
+	//把vote的跨片交易签名加入voteset中
+	if vote.Type == PrecommitType && len(vote.CrossTxSigs) != 0 {
+		for i := 0; i < len(vote.CrossTxSigs); i++ {
+			var err error
+			var ctsig identypes.VoteCrossTxSig
+			var flag bool //表示其并没有相关聚合签名存在
+			flag = true
+			//取到相应的voteset的签名
+			for j := 0; j < len(voteSet.CrossTxSigs); j++ {
+
+				if vote.CrossTxSigs[i].TxId == voteSet.CrossTxSigs[j].TxId {
+					voteSet.CrossTxSigs[j].CrossTxSig, err = bls.AggragateSignature(voteSet.CrossTxSigs[j].CrossTxSig, vote.CrossTxSigs[i].CrossTxSig)
+					if err != nil {
+						fmt.Println("Aggragate Err")
+					} else { //测试用
+						fmt.Println("Aggragate Success")
+					}
+					flag = false
+				}
+			}
+			if flag { //在voteset没有相关签名，则直接加入
+
+				ctsig = identypes.VoteCrossTxSig{TxId: vote.CrossTxSigs[i].TxId, CrossTxSig: vote.CrossTxSigs[i].CrossTxSig}
+				voteSet.CrossTxSigs = append(voteSet.CrossTxSigs, ctsig)
+				fmt.Println("voteset没有该交易签名，直接加入")
+			}
+		}
+
+	}
 
 	// Already exists in voteSet.votes?
 	if existing := voteSet.votes[valIndex]; existing != nil {

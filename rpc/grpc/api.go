@@ -2,6 +2,7 @@ package core_grpc
 
 import (
 	"context"
+	fmt "fmt"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	core "github.com/tendermint/tendermint/rpc/core"
@@ -19,7 +20,7 @@ func (bapi *broadcastAPI) Ping(ctx context.Context, req *RequestPing) (*Response
 func (bapi *broadcastAPI) BroadcastTx(ctx context.Context, req *RequestBroadcastTx) (*ResponseBroadcastTx, error) {
 	// NOTE: there's no way to get client's remote address
 	// see https://stackoverflow.com/questions/33684570/session-and-remote-ip-address-in-grpc-go
-
+	fmt.Println("打印交易信息", req)
 	res, err := core.BroadcastTxCommit(&rpctypes.Context{}, req.Tx)
 	if err != nil {
 		return nil, err

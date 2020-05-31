@@ -1,14 +1,20 @@
 package identypes
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+)
 
 // 聚合签名结构定义
+type Participant struct {
+	Address []byte
+	Pubkey  []byte
+}
 type AggregateSig struct {
 	Signature []byte // sign
 
 	// 潜在的问题：传递的公钥中是否包含协议信息，毕竟验证方需要将byte构建为PubKey；
 	// 目前实现可以约定某种加密协议，也只能是bls。。
-	Participants [][]byte // 参与聚合签名生成的验证者的公钥
+	Participants []Participant // 参与聚合签名生成的验证者的公钥，对Participant进行修改。第一个是address的大小
 }
 
 // 定义投票过程中传递的签名

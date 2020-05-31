@@ -4,10 +4,11 @@ package bls
 import (
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
-	"io"
 
 	"github.com/herumi/bls-eth-go-binary/bls"
 )
@@ -169,10 +170,10 @@ func AggregateVerify(asign []byte, msg []byte, pubkeys [][]byte) bool {
 
 	// 还原公钥
 	blsPubkeys := make([]bls.PublicKey, 0, len(pubkeys))
-	for _, p := range (pubkeys) {
+	for _, p := range pubkeys {
 		if tmppub := getPubkeyFromByte(p); tmppub != nil {
 			blsPubkeys = append(blsPubkeys, *tmppub)
-		}else{
+		} else {
 			return false
 		}
 	}
@@ -181,7 +182,7 @@ func AggregateVerify(asign []byte, msg []byte, pubkeys [][]byte) bool {
 	return sig.VerifyByte(pubkey, msg)
 }
 
-func AggregateSignature(sig []byte, aggSigByte [] byte) ([]byte, error) {
+func AggregateSignature(sig []byte, aggSigByte []byte) ([]byte, error) {
 	if aggSigByte == nil {
 		return sig, nil
 	}
