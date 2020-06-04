@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"syscall"
-	tp "github.com/tendermint/tendermint/identypes"
+
+	"github.com/pkg/errors"
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/checkdb"
+	myclient "github.com/tendermint/tendermint/client"
+	tp "github.com/tendermint/tendermint/identypes"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
-	"github.com/tendermint/tendermint/checkdb"
-	myclient "github.com/tendermint/tendermint/client"
 )
 
 //-----------------------------------------------------------------------------
@@ -68,36 +69,39 @@ func getShard() string {
 }
 func Checkdbtest(tx types.Tx) bool {
 	var retx *tp.TX
-	retx, _ = tp.NewTX(tx)		
-	if consensusState.IsLeader(){//leader才能判断
-	if retx.Txtype == "relaytx" {
+	retx, _ = tp.NewTX(tx)
+	if consensusState.IsLeader() {
+		fmt.Println("leader") //leader才能判断
+		if retx.Txtype == "relaytx" {
 
-		shardname := getShard()
-		if shardname != retx.Sender {
-			dbtx := checkdb.Search(retx.ID)
-			if dbtx != nil {
-				if consensusState.IsLeader() {
-					name := "TT" + dbtx.Sender + "Node1:26657"
-					tx_package := []tp.TX{}
-					tx_package = append(tx_package, *dbtx)
-					for i := 0; i < len(tx_package); i++ {
-					client := *myclient.NewHTTP(name, "/websocket")
-					go client.BroadcastTxAsync(tx_package)
+			shardname := getShard()
+			if shardname != retx.Sender {
+				dbtx := checkdb.Search(retx.ID)
+				if dbtx != nil {
+					if consensusState.IsLeader() {
+						name := "TT" + dbtx.Sender + "Node1:26657"
+						tx_package := []tp.TX{}
+						tx_package = append(tx_package, *dbtx)
+						for i := 0; i < len(tx_package); i++ {
+							client := *myclient.NewHTTP(name, "/websocket")
+							go client.BroadcastTxAsync(tx_package)
+						}
+					}
+					return true
 				}
-				}	
-				return true
 			}
 		}
+	} else {
+		fmt.Println("不是leader不做判断")
 	}
-}
 	return false
 }
 func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	//异步解决
-	if Checkdbtest(tx){
-			return nil,errors.New("状态数据库直接返回")
+	if Checkdbtest(tx) {
+		return nil, errors.New("状态数据库直接返回")
 	}
-	
+
 	err := mempool.CheckTx(tx, nil)
 	if err != nil {
 		return nil, err
@@ -226,8 +230,6 @@ func BroadcastTxSync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcas
 // |-----------+------+---------+----------+-----------------|
 // | tx        | Tx   | nil     | true     | The transaction |
 func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
-
-
 
 	subscriber := ctx.RemoteAddr()
 	if eventBus.NumClients() >= config.MaxSubscriptionClients {
