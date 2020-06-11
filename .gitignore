@@ -3,3 +3,4 @@ vendor/
 .DS_Store
 build/
 network/
+DOCKER/tendermint
