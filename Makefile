@@ -29,7 +29,7 @@ build_race:
 	CGO_ENABLED=0 go build -race $(BUILD_FLAGS) -tags $(BUILD_TAGS) -o $(OUTPUT) ./cmd/tendermint
 
 install:
-	CGO_ENABLED=0 go install  $(BUILD_FLAGS) -tags $(BUILD_TAGS) ./cmd/tendermint
+	CGO_ENABLED=1 go install  $(BUILD_FLAGS) -tags $(BUILD_TAGS) ./cmd/tendermint
 
 install_c:
 	CGO_ENABLED=1 go install  $(BUILD_FLAGS) -tags "$(BUILD_TAGS) gcc" ./cmd/tendermint

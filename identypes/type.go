@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 )
 
 const (
@@ -157,4 +158,9 @@ func sig2bigInt(sig_str string) (*EcdsaCoordinate, error) {
 	}
 
 	return &EcdsaCoordinate{X: coor.X, Y: coor.Y}, nil
+}
+type RelayLive struct{
+	ID [sha256.Size]byte
+	BeginTime time.Time
+	EndTime time.Time
 }

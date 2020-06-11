@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/account"
-
+	"github.com/tendermint/tendermint/checkdb"
 	cfg "github.com/tendermint/tendermint/config"
 	tp "github.com/tendermint/tendermint/identypes"
 	auto "github.com/tendermint/tendermint/libs/autofile"
@@ -170,7 +170,7 @@ type Mempool struct {
 	preCheck     PreCheckFunc
 	postCheck    PostCheckFunc
 	rDB          relaytxDB //relaylist
-
+	testList     TestDB//testlist
 	// Track whether we're rechecking txs.
 	// These are not protected by a mutex and are expected to be mutated
 	// in serial (ie. by abci responses which are called in serial).
@@ -211,6 +211,9 @@ type relaytxDB struct {
 type RTx struct {
 	Tx     tp.TX
 	Height int
+}
+type TestDB struct {
+	TestDatas []*tp.RelayLive
 }
 
 //-------------------------------------------
@@ -263,6 +266,9 @@ func (mem *Mempool) AddRelaytxDB(tx tp.TX) {
 	var rtx RTx
 	rtx.Tx = tx
 	rtx.Height = 0
+	//添加testlist
+	testdata := &tp.RelayLive{ID:tx.ID,BeginTime:time.Now()}//收集数据
+	mem.testList.TestDatas = append(mem.testList.TestDatas,testdata)
 	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
 }
 
@@ -273,6 +279,20 @@ func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
 			i--
 
 			break
+		}
+	}
+	//对测试数据集进行遍历
+	for i:=0;i<len(mem.testList.TestDatas);i++{
+		if mem.testList.TestDatas[i].ID==tx.ID{
+			mem.testList.TestDatas[i].EndTime=time.Now()//得到最终的交易结构
+			//存db
+			checkdb.SaveTestData(mem.testList.TestDatas[i].ID,mem.testList.TestDatas[i])//刷入硬盘之中，固化
+
+			mem.testList.TestDatas = append(mem.testList.TestDatas[:i], mem.testList.TestDatas[i+1:]...)//删除该条交易
+			i--
+
+			break
+
 		}
 	}
 }

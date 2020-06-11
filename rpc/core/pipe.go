@@ -36,6 +36,7 @@ type Consensus interface {
 	GetRoundStateJSON() ([]byte, error)
 	GetRoundStateSimpleJSON() ([]byte, error)
 	IsLeader()bool
+	IsRandRelay()(bool,int)//判断是否开启relay丢失交易
 }
 
 type transport interface {

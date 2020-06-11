@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"syscall"
@@ -67,32 +68,61 @@ func getShard() string {
 	v, _ := syscall.Getenv("TASKID")
 	return v
 }
+//共识提供是否开启随机丢弃的开关
+
+func SendTx(retx *tp.TX)bool{
+	shardname := getShard()
+	if shardname != retx.Sender {
+		dbtx := checkdb.Search(retx.ID)
+		if dbtx != nil {
+			name := "TT" + dbtx.Sender + "Node1:26657"
+			tx_package := []tp.TX{}
+			tx_package = append(tx_package, *dbtx)
+			for i := 0; i < len(tx_package); i++ {
+				client := *myclient.NewHTTP(name, "/websocket")
+				go client.BroadcastTxAsync(tx_package)
+			}
+			return true
+		}
+	}else{
+		return false//状态数据库无此数据，需要加入共识
+	}
+	return false
+}
+func isabandon(rate int)bool{
+	if rate==0{
+		return false
+	}else{
+		source := rand.NewSource(time.Now().UnixNano())
+		newrand := rand.New(source)
+		//产生转化交易金额
+		num := newrand.Intn(100)
+		if num<=rate{
+			return true
+		}else{
+			return false
+		}
+	}
+}
 func Checkdbtest(tx types.Tx) bool {
 	var retx *tp.TX
 	retx, _ = tp.NewTX(tx)
 	if consensusState.IsLeader() {
-		fmt.Println("leader") //leader才能判断
-		if retx.Txtype == "relaytx" {
-
-			shardname := getShard()
-			if shardname != retx.Sender {
-				dbtx := checkdb.Search(retx.ID)
-				if dbtx != nil {
-					if consensusState.IsLeader() {
-						name := "TT" + dbtx.Sender + "Node1:26657"
-						tx_package := []tp.TX{}
-						tx_package = append(tx_package, *dbtx)
-						for i := 0; i < len(tx_package); i++ {
-							client := *myclient.NewHTTP(name, "/websocket")
-							go client.BroadcastTxAsync(tx_package)
-						}
-					}
+		if retx.Txtype == "relaytx" {//只有relay，才做罢工决定
+			relaystrike, rate := consensusState.IsRandRelay()
+			if relaystrike { //罢工
+				//调用丢弃接口
+				if isabandon(rate) { //该条交易是否罢工
+					//罢工
 					return true
+				} else {
+					//不罢工
+					return SendTx(retx)
 				}
+			} else {//不罢工
+				return false
 			}
 		}
-	} else {
-		fmt.Println("不是leader不做判断")
 	}
 	return false
 }

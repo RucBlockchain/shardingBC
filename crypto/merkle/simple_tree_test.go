@@ -19,7 +19,7 @@ func (tI testItem) Hash() []byte {
 
 func TestSimpleProof(t *testing.T) {
 
-	total := 100
+	total := 4
 
 	items := make([][]byte, total)
 	for i := 0; i < total; i++ {

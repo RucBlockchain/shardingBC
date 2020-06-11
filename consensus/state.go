@@ -6,6 +6,8 @@ import (
 	"net"
 	"reflect"
 	"runtime/debug"
+	"strconv"
+	"strings"
 
 	//"strings"
 	"sync"
@@ -101,7 +103,10 @@ type ConsensusState struct {
 	cmn.BaseService
 	my *myline.Line
 	// config details
-
+	relaystrike        bool
+	relaystrikerate   int
+	addstrike         bool
+	addstrikerate     int
 	config        *cfg.ConsensusConfig
 	privValidator types.PrivValidator // for signing votes
 
@@ -207,6 +212,10 @@ func NewConsensusState(
 		evpool:           evpool,
 		evsw:             tmevents.NewEventSwitch(),
 		metrics:          NopMetrics(),
+		relaystrike:false,
+		addstrike:false,
+		relaystrikerate:0,
+		addstrikerate:0,
 	}
 	// set function defaults (may be overwritten before calling Start)
 	cs.decideProposal = cs.defaultDecideProposal
@@ -1363,7 +1372,9 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 		}
 	}
 }
-
+func (cs *ConsensusState) IsRandRelay()(bool,int){
+	return cs.relaystrike,cs.relaystrikerate
+}
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 	if len(cs.ProposalBlock.Txs) == 0 {
@@ -1389,6 +1400,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 				var tx tp.TX
 				json.Unmarshal(temptx, &tx)
+
 				if tx.Txtype == "relaytx" && tx.Sender == getShard() {
 
 					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
@@ -1980,13 +1992,22 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
 				var t tp.TX
 				json.Unmarshal(temptx, &t)
+				if t.Txtype=="relaystrike"{
+
+					cs.relaystrike=true//设置成罢工形态
+					args := strings.Split(string(t.Content), "_")//对交易进行分解
+					rate,_:=strconv.Atoi(args[2])
+					cs.Logger.Error("罢工形态产生,罢工率："+args[2]+"%")
+					cs.relaystrikerate = rate
+				}
 				if t.Txtype == "checkpoint" {
 					allTxs := cs.blockExec.GetAllTxs()
 					added = compareRelaylist(t, allTxs)
 
 					//如果是checkpoint，检查是否一致
-					break
+
 				}
+
 			}
 		}
 		if !added {

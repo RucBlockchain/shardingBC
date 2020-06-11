@@ -17,7 +17,6 @@ func InitAddDB(db1 dbm.DB, logger1 log.Logger) {
 	db = db1
 	logger = logger1
 }
-
 func Save(Key [sha256.Size]byte, Value *identypes.TX) {
 	res, _ := json.Marshal(Value) //对值进行解析
 	db.Set(calcAddTxMetaKey(Key), res)
@@ -37,4 +36,14 @@ func Search(Key [sha256.Size]byte) *identypes.TX {
 func calcAddTxMetaKey(id [sha256.Size]byte) []byte {
 	//将key变成height+id
 	return []byte(fmt.Sprintf("ID:%v", id))
+}
+func SaveTestData(Key [sha256.Size]byte, Value *identypes.RelayLive){
+	fmt.Println(Value)
+	fmt.Println("固化测试数据1")
+	res, _ := json.Marshal(Value) //对值进行解析
+	db.Set(calcTestDataMetaKey(Key), res)
+}
+func calcTestDataMetaKey(id [sha256.Size]byte) []byte {
+	//将key变成height+id
+	return []byte(fmt.Sprintf("Test:%v", id))
 }
