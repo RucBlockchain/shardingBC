@@ -4,13 +4,15 @@ package bls
 import (
 	"errors"
 	"fmt"
+	"go.dedis.ch/kyber/v3"
+	"go.dedis.ch/kyber/v3/pairing/bn256"
+	"go.dedis.ch/kyber/v3/sign/bls"
+	"go.dedis.ch/kyber/v3/util/random"
 	"io"
 
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
-
-	"github.com/herumi/bls-eth-go-binary/bls"
 )
 
 //-------------------------------------
@@ -18,6 +20,7 @@ import (
 var (
 	ErrBLSSignature       = errors.New("Invalid BLS signature")
 	ErrAggregateSignature = errors.New("Error in BLS aggregate process")
+	bn256_suite           = bn256.NewSuite()
 )
 
 var _ crypto.PrivKey = PrivKeyBLS{}
@@ -38,17 +41,20 @@ func init() {
 	cdc.RegisterConcrete(PrivKeyBLS{},
 		PrivKeyBLSName, nil)
 
-	bls.Init(bls.BLS12_381)
+
+	cdc.RegisterInterface((*kyber.Point)(nil), nil)
+	cdc.RegisterInterface((*kyber.Scalar)(nil), nil)
+
 }
 
 // PrivKeyBLS implements crypto.PrivKey.
 type PrivKeyBLS struct {
-	Priv *bls.SecretKey
+	Priv kyber.Scalar
 }
 
 // Bytes marshals the privkey using amino encoding.
 func (privKey PrivKeyBLS) Bytes() []byte {
-	return cdc.MustMarshalBinaryBare(privKey)
+	return cdc.MustMarshalBinaryBare(privKey.Bytes())
 }
 
 func (privKey PrivKeyBLS) Sign(msg []byte) ([]byte, error) {
@@ -59,17 +65,17 @@ func (privKey PrivKeyBLS) Sign(msg []byte) ([]byte, error) {
 		return nil, errors.New("msg is empty")
 	}
 
-	sig := privKey.Priv.SignByte(msg)
-	if sig == nil {
+	if sig, err := bls.Sign(bn256_suite, privKey.Priv, msg); err != nil {
 		return nil, errors.New("bls sign msg failed.")
+	} else {
+		return sig, nil
 	}
-
-	return sig.Serialize(), nil
 }
 
 // PubKey gets the corresponding public key from the private key.
 func (privKey PrivKeyBLS) PubKey() crypto.PubKey {
-	return PubKeyBLS{privKey.Priv.GetPublicKey()}
+	pub := bn256_suite.G2().Point().Mul(privKey.Priv, nil)
+	return PubKeyBLS{pub}
 }
 
 // Equals - you probably don't need to use this.
@@ -87,11 +93,7 @@ func GenPrivKey() PrivKeyBLS {
 
 // genPrivKey generates a new bls private key using the provided reader.
 func genPrivKey(rander io.Reader) PrivKeyBLS {
-	bls.SetRandFunc(rander)
-
-	priv := &bls.SecretKey{} // 此时为空
-	priv.SetByCSPRNG()
-
+	priv, _ := bls.NewKeyPair(bn256_suite, random.New(rander))
 	return PrivKeyBLS{Priv: priv}
 }
 
@@ -100,18 +102,23 @@ func genPrivKey(rander io.Reader) PrivKeyBLS {
 var _ crypto.PubKey = PubKeyBLS{}
 
 type PubKeyBLS struct {
-	Pubkey *bls.PublicKey
+	Pubkey kyber.Point
 }
 
 func (pubKey PubKeyBLS) Address() crypto.Address {
-	b := pubKey.Pubkey.Serialize()
+	b, _ := pubKey.Pubkey.Data()
 	return crypto.Address(tmhash.SumTruncated(b))
 }
 
 // 返回公钥完整的byte
 func (pubKey PubKeyBLS) Bytes() []byte {
-	b := pubKey.Pubkey.Serialize()
-	return cdc.MustMarshalBinaryBare(b)
+	return cdc.MustMarshalBinaryBare(pubKey)
+	//if b, err := pubKey.Pubkey.MarshalBinary(); err == nil {
+	//	return cdc.MustMarshalBinaryBare(b)
+	//} else {
+	//	fmt.Println(err)
+	//	return nil
+	//}
 }
 
 func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
@@ -120,16 +127,15 @@ func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	}
 
 	// byte还原为bls的Sign结构
-	blsSig := &bls.Sign{}
-	err := blsSig.Deserialize(sig)
-	if err != nil {
+	if err := bls.Verify(bn256_suite, pubKey.Pubkey, msg, sig); err == nil {
+		return true
+	} else {
 		return false
 	}
-	return blsSig.VerifyByte(pubKey.Pubkey, msg)
 }
 
 func (pubKey PubKeyBLS) String() string {
-	return fmt.Sprintf("PubKeyBLS{%X}", pubKey.Pubkey.Serialize())
+	return fmt.Sprintf("PubKeyBLS{%X}", pubKey.Pubkey.String())
 }
 
 // nolint: golint
@@ -138,144 +144,18 @@ func (pubKey PubKeyBLS) Equals(other crypto.PubKey) bool {
 	return true
 }
 
-// 不需要聚合公钥的验证方法
-func AggregateVerifyNP(asign []byte, msg []byte, pubkey []byte) bool {
-	if len(asign) == 0 {
-		return false
-	}
+func GetPubkeyFromByte(data []byte) (*PubKeyBLS, error) {
 
-	// 还原公钥
-	pub := GetPubkeyFromByte(pubkey)
-	if pub == nil {
-		return false
-	}
+	pub := bn256_suite.G2().Point()
 
-	return pub.VerifyBytes(msg, asign)
-}
-
-// 输入聚合签名和已经聚合过的公钥，返回验证结果
-func AggregateVerify(asign []byte, msg []byte, pubkeys [][]byte) bool {
-	if len(asign) == 0 {
-		return false
-	}
-	if len(pubkeys) == 0 {
-		return false
-	}
-
-	// 还原signature
-	sig := bls.Sign{}
-	if err := sig.Deserialize(asign); err != nil {
-		return false
-	}
-
-	// 还原公钥
-	blsPubkeys := make([]bls.PublicKey, 0, len(pubkeys))
-	for _, p := range pubkeys {
-		if tmppub := getPubkeyFromByte(p); tmppub != nil {
-			blsPubkeys = append(blsPubkeys, *tmppub)
-		} else {
-			return false
-		}
-	}
-	pubkey, _ := aggregatePubKey(pubkeys)
-
-	return sig.VerifyByte(pubkey, msg)
-}
-
-func AggregateSignature(sig []byte, aggSigByte []byte) ([]byte, error) {
-	if aggSigByte == nil {
-		return sig, nil
-	}
-
-	aggSig := &bls.Sign{}
-
-	// 就两个签名合并：原始的聚合签名，准备合并的签名
-
-	if err := aggSig.Deserialize(aggSigByte); err != nil {
-		return nil, ErrBLSSignature
-	}
-
-	tmpsig := &bls.Sign{}
-	if err := tmpsig.Deserialize(sig); err == nil {
-		aggSig.Add(tmpsig)
-	} else {
-		return nil, ErrBLSSignature
-	}
-	return aggSig.Serialize(), nil
-}
-
-// 将相同消息的BLS签名聚合为一个签名，sigs含有2个以上的签名
-func AggregateAllSignature(sigs [][]byte) ([]byte, error) {
-	aggSig := &bls.Sign{}
-
-	if len(sigs) == 0 {
-		return nil, errors.New("signature is empty")
-	} else if len(sigs) == 1 {
-		return sigs[0], nil
-	}
-
-	for i := 0; i < len(sigs); i++ {
-		tmpSig := &bls.Sign{}
-		err := tmpSig.Deserialize(sigs[i])
-		if err != nil {
-			return nil, err
-		}
-		aggSig.Add(tmpSig)
-	}
-
-	return aggSig.Serialize(), nil
-}
-
-func AggregatePubkey(pubkeys [][]byte) (*PubKeyBLS, error) {
-	p, err := aggregatePubKey(pubkeys)
-	if err != nil {
+	if err := cdc.UnmarshalBinaryBare(data, pub); err != nil {
 		return nil, err
+	} else {
+		return &PubKeyBLS{Pubkey: pub}, nil
 	}
-	return &PubKeyBLS{Pubkey: p}, nil
-}
-
-// 将多个BLS的公钥聚合成一把公钥
-func aggregatePubKey(pubkeys [][]byte) (*bls.PublicKey, error) {
-	if len(pubkeys) == 0 {
-		return nil, errors.New("public keys is empty")
-	}
-
-	aggPub := &bls.PublicKey{}
-	for i := 0; i < len(pubkeys); i++ {
-		tmppub := getPubkeyFromByte(pubkeys[i])
-		if tmppub == nil {
-			return nil, errors.New("recover BLS public key failed.")
-		}
-		aggPub.Add(tmppub)
-	}
-	return aggPub, nil
-}
-
-func GetPubkeyFromByte(pub []byte) *PubKeyBLS {
-	blspub := getPubkeyFromByte(pub)
-	if blspub == nil {
-		return nil
-	}
-
-	return &PubKeyBLS{Pubkey: blspub}
-}
-
-func getPubkeyFromByte(pub []byte) *bls.PublicKey {
-	if len(pub) == 0 {
-		return nil
-	}
-
-	tmpbyte := make([]byte, len(pub)-1, len(pub)-1)
-	// 首先反序列
-	if err := cdc.UnmarshalBinaryBare(pub, &tmpbyte); err != nil {
-		return nil
-	}
-
-	blspub := &bls.PublicKey{}
-
-	if err := blspub.Deserialize(tmpbyte); err != nil {
-		return nil
-	}
-
-	return blspub
+	//if err := pub.UnmarshalBinary(newdata); err == nil {
+	//	return &PubKeyBLS{Pubkey: pub}, err
+	//} else {
+	//	return nil, err
+	//}
 }
