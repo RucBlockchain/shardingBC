@@ -2,6 +2,7 @@
 package bls
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go.dedis.ch/kyber/v3"
@@ -41,10 +42,6 @@ func init() {
 	cdc.RegisterConcrete(PrivKeyBLS{},
 		PrivKeyBLSName, nil)
 
-
-	cdc.RegisterInterface((*kyber.Point)(nil), nil)
-	cdc.RegisterInterface((*kyber.Scalar)(nil), nil)
-
 }
 
 // PrivKeyBLS implements crypto.PrivKey.
@@ -54,7 +51,8 @@ type PrivKeyBLS struct {
 
 // Bytes marshals the privkey using amino encoding.
 func (privKey PrivKeyBLS) Bytes() []byte {
-	return cdc.MustMarshalBinaryBare(privKey.Bytes())
+	b, _ := privKey.Priv.MarshalBinary()
+	return cdc.MustMarshalBinaryBare(b)
 }
 
 func (privKey PrivKeyBLS) Sign(msg []byte) ([]byte, error) {
@@ -80,9 +78,8 @@ func (privKey PrivKeyBLS) PubKey() crypto.PubKey {
 
 // Equals - you probably don't need to use this.
 // Runs in constant time based on length of the keys.
-// TODO
 func (privKey PrivKeyBLS) Equals(other crypto.PrivKey) bool {
-	return true
+	return bytes.Equal(privKey.Bytes(), other.Bytes())
 }
 
 // GenPrivKey generates a new BLS private key.
@@ -106,19 +103,17 @@ type PubKeyBLS struct {
 }
 
 func (pubKey PubKeyBLS) Address() crypto.Address {
-	b, _ := pubKey.Pubkey.Data()
+	b := pubKey.Bytes()
 	return crypto.Address(tmhash.SumTruncated(b))
 }
 
 // 返回公钥完整的byte
 func (pubKey PubKeyBLS) Bytes() []byte {
-	return cdc.MustMarshalBinaryBare(pubKey)
-	//if b, err := pubKey.Pubkey.MarshalBinary(); err == nil {
-	//	return cdc.MustMarshalBinaryBare(b)
-	//} else {
-	//	fmt.Println(err)
-	//	return nil
-	//}
+	if b, err := pubKey.Pubkey.MarshalBinary(); err == nil {
+		return cdc.MustMarshalBinaryBare(b)
+	} else {
+		panic(err)
+	}
 }
 
 func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
@@ -139,19 +134,20 @@ func (pubKey PubKeyBLS) String() string {
 }
 
 // nolint: golint
-// TODO
 func (pubKey PubKeyBLS) Equals(other crypto.PubKey) bool {
-	return true
+	return bytes.Equal(pubKey.Bytes(), other.Bytes())
 }
 
 func GetPubkeyFromByte(data []byte) (*PubKeyBLS, error) {
-
 	pub := bn256_suite.G2().Point()
-
-	if err := cdc.UnmarshalBinaryBare(data, pub); err != nil {
+	var tmpdata []byte
+	if err := cdc.UnmarshalBinaryBare(data, &tmpdata); err != nil {
 		return nil, err
-	} else {
+	}
+	if err := pub.UnmarshalBinary(tmpdata); err == nil {
 		return &PubKeyBLS{Pubkey: pub}, nil
+	} else {
+		return nil, err
 	}
 	//if err := pub.UnmarshalBinary(newdata); err == nil {
 	//	return &PubKeyBLS{Pubkey: pub}, err

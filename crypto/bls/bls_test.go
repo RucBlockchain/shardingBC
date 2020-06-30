@@ -16,12 +16,10 @@ func TestGetPubkeyFromByte(t *testing.T) {
 	priv := bls.GenPrivKey()
 	pub := priv.PubKey()
 
-	newpub, err := bls.GetPubkeyFromByte(pub.Bytes())
-	t.Log(err)
-	assert.NotNil(t, newpub, "公钥byte反序列失败")
+	newpub, _ := bls.GetPubkeyFromByte(pub.Bytes())
 
-	t.Log(pub)
-	t.Log(newpub)
+	assert.NotNil(t, newpub, "公钥byte反序列失败")
+	assert.True(t, pub.Equals(newpub), "序列化前后数据不一致")
 }
 
 func TestSignatureRecovery(t *testing.T) {
