@@ -3,11 +3,11 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
-	bls "github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/identypes"
 	cmn "github.com/tendermint/tendermint/libs/common"
 )
@@ -230,14 +230,15 @@ func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower
 			for j := 0; j < len(voteSet.CrossTxSigs); j++ {
 
 				if vote.CrossTxSigs[i].TxId == voteSet.CrossTxSigs[j].TxId {
-					voteSet.CrossTxSigs[j].CrossTxSig, err = bls.AggragateSignature(voteSet.CrossTxSigs[j].CrossTxSig, vote.CrossTxSigs[i].CrossTxSig)
-					if err != nil {
-						fmt.Println("Aggragate Err")
-					} else { //测试用
-						fmt.Println("Aggragate Success")
-					}
+					_, _ = bls.SignatureRecovery(1, nil, nil)
+					//voteSet.CrossTxSigs[j].CrossTxSig, err = bls.AggragateSignature(voteSet.CrossTxSigs[j].CrossTxSig, vote.CrossTxSigs[i].CrossTxSig)
+					//if err != nil {
+					//	fmt.Println("Aggragate Err")
+					//} else { //测试用
+					//	fmt.Println("Aggragate Success")
+					//}
 					flag = false
-// 					voteSet.CrossTxSigs[j].CrossTxSig = vote.CrossTxSigs[i].CrossTxSig //改成最新的跨片交易签名
+					// 					voteSet.CrossTxSigs[j].CrossTxSig = vote.CrossTxSigs[i].CrossTxSig //改成最新的跨片交易签名
 				}
 			}
 			if flag { //在voteset没有相关签名，则直接加入

@@ -1,102 +1,89 @@
 package bls_test
 
 import (
+	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/types/time"
+	"go.dedis.ch/kyber/v3/pairing/bn256"
+	kbls "go.dedis.ch/kyber/v3/sign/bls"
 	"testing"
 )
 
+// todo
+// 序列化和反序列化重写
 func TestGetPubkeyFromByte(t *testing.T) {
 	priv := bls.GenPrivKey()
 	pub := priv.PubKey()
 
-	newpub := bls.GetPubkeyFromByte(pub.Bytes())
+	newpub, _ := bls.GetPubkeyFromByte(pub.Bytes())
 
-	t.Log(pub)
-	t.Log(newpub)
+	assert.NotNil(t, newpub, "公钥byte反序列失败")
+	assert.True(t, pub.Equals(newpub), "序列化前后数据不一致")
 }
 
-func TestAggragatePubKey(t *testing.T) {
-	totaln := 10
+func TestSignatureRecovery(t *testing.T) {
+	msg := []byte("test signature for threshold")
+	d := 1000
 
-	pubs := make([][]byte, 0, totaln)
+	private := bls.GenPrivKey()
+	pub := (private.PubKey()).(bls.PubKeyBLS)
+	public := pub.Pubkey
+	origin_sig, _ := private.Sign(msg)
 
-	for i := 0; i < totaln; i++ {
-		priv := bls.GenPrivKey()
-		pub := priv.PubKey()
-		pubs = append(pubs, pub.Bytes())
-	}
+	polynome := bls.Master(private.Priv, d)
 
-	aggpub, err := bls.AggregatePubkey(pubs)
-	if err != nil {
-		t.Error(err)
-	}
-	t.Log("aggegate pubkey: ", aggpub)
-}
+	t.Log("share private: ", private)
+	t.Log("polynome: ", polynome)
 
-func TestBLSSignAndVerify(t *testing.T) {
-	priv := bls.GenPrivKey()
-	pub := priv.PubKey()
+	//ids := []int{151, 2426, 45, 673, 123, 7564}
+	ids := func(lens int) []int64 {
+		data := make([]int64, lens, lens)
+		for i := 1; i <= lens; i++ {
+			data[i-1] = int64(i) //rand.Int() % 90000
+		}
+		return data
+	}(d + 1)
 
-	msg := []byte("test BLS signature")
-	tt := time.Now()
-	for i := 0; i < 1000; i += 1 {
-		_, err := priv.Sign(msg)
-		if err != nil {
+	suite := bn256.NewSuite()
+
+	sigs := [][]byte{}
+	for _, id := range ids {
+		x_i, err := polynome.GetValue(id)
+		assert.Nil(t, err, "计算f(x)函数值出错。err：", err)
+		if sig, err := kbls.Sign(suite, x_i, msg); err != nil {
 			t.Error(err)
+		} else {
+			assert.Nil(t, kbls.Verify(suite, suite.G2().Point().Mul(x_i, nil), msg, sig))
+			sigs = append(sigs, sig)
 		}
 	}
-	t.Log("generate sign 1000 times cost: ", time.Now().Sub(tt).Seconds()/1000, "s")
+	tt := time.Now()
+	sig, err := bls.SignatureRecovery(d, sigs, ids)
+	t.Log(time.Now().Sub(tt).Seconds())
+	t.Log("ids: ", ids)
+	t.Log("sigs: ", sigs)
+	t.Log("sig: ", sig)
+	t.Log("origin sig: ", origin_sig)
 
-	sig, err := priv.Sign(msg)
-	if err != nil {
-		t.Error(err)
-	}
-
-	assert.True(t, pub.VerifyBytes(msg, sig), "verify signature failed.")
-
-	tt = time.Now()
-	for i := 0; i < 1000; i += 1 {
-		pub.VerifyBytes(msg, sig)
-	}
-	t.Log("verify sign 1000 times cost: ", time.Now().Sub(tt).Seconds()/1000, "s")
-
+	assert.Nil(t, err, "签名还原错误")
+	assert.NotNil(t, sig, "还原的签名为空")
+	assert.True(t, bytes.Equal(sig, origin_sig), "还原出来的签名和原始签名不相等")
+	assert.Nil(t, kbls.Verify(suite, public, msg, sig), "还原出来的签名验证错误")
+	assert.Nil(t, kbls.Verify(suite, public, msg, origin_sig), "还原出来的签名验证错误")
 }
 
-func TestAggragateSignature(t *testing.T) {
-	totaln := 1000
+func TestBlsUse(t *testing.T) {
+	// single signature
+	msg := []byte("Hello Boneh-Lynn-Shacham")
+	private := bls.GenPrivKey()
+	public := private.PubKey()
 
-	pubs := make([][]byte, 0, totaln)
-	sigs := make([][]byte, 0, totaln)
-	msg := []byte("test alsk okjoizxcv 098u32 vcnl234 234 123sdf**$#%@# #szdlgfjalksdjf lasd asdfu aisduf oasdufao9sdf ")
+	sig, err := private.Sign(msg)
+	assert.Nil(t, err, "签名出错")
+	t.Log(sig)
 
-	for i := 0; i < totaln; i++ {
-		priv := bls.GenPrivKey()
-		pub := priv.PubKey()
-		pubs = append(pubs, pub.Bytes())
-		sig, err := priv.Sign(msg)
-		if err != nil {
-			t.Error("generate signature failed.")
-		}
-		assert.True(t, pub.VerifyBytes(msg, sig))
-		sigs = append(sigs, sig)
-	}
-
-	as, err := bls.AggregateAllSignature(sigs)
-
-	assert.Nil(t, err)
-
-	//pubs[0], pubs[1] = pubs[1], pubs[0]
-
-	pub, err := bls.AggregatePubkey(pubs)
-	assert.Nil(t, err)
-
-	// 三种验证聚合签名的方式
-	assert.True(t, bls.AggregateVerify(as, msg, pubs))
-	assert.True(t, bls.AggregateVerifyNP(as, msg, pub.Bytes()))
-	assert.True(t, pub.VerifyBytes(msg, as))
-
+	assert.True(t, public.VerifyBytes(msg, sig), "验证签名失败")
 }
 
 func TestAVG(t *testing.T) {
