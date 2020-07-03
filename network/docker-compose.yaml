@@ -1,4 +1,4 @@
-version: 2
+version: '2.0'
 services:
   TTANode1:
     image: 10.77.70.142:5000/tendermint:v0.4
@@ -13,7 +13,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -31,7 +31,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -51,7 +51,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -71,7 +71,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -92,7 +92,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -110,7 +110,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -130,7 +130,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
@@ -150,7 +150,7 @@ services:
     - sh
     - -c
     - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore --consensus.create_empty_blocks=false
+      --moniker=`hostname` --proxy_app=persistent_kvstore 
     networks:
       tendermintnet1:
         aliases:
