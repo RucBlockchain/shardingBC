@@ -22,10 +22,16 @@ type Mempool interface {
 	Lock()
 	Unlock()
 
-	AddRelaytxDB(tx tp.TX)
-	RemoveRelaytxDB(tx tp.TX)
-	UpdaterDB() []tp.TX
-	GetAllTxs() []tp.TX
+	//AddRelaytxDB(tx tp.TX)
+	//RemoveRelaytxDB(tx tp.TX)
+	//UpdaterDB() []tp.TX
+	//GetAllTxs() []tp.TX
+
+	AddCrossMessagesDB(tcm *tp.CrossMessages)
+	RemoveCrossMessagesDB(tcm *tp.CrossMessages)
+	UpdatecmDB() []*tp.CrossMessages
+	GetAllCrossMessages() []*tp.CrossMessages
+
 
 	Size() int
 	CheckTx(types.Tx, func(*abci.Response)) error
@@ -67,12 +73,22 @@ func (MockMempool) Flush()                        {}
 func (MockMempool) FlushAppConn() error           { return nil }
 func (MockMempool) TxsAvailable() <-chan struct{} { return make(chan struct{}) }
 func (MockMempool) EnableTxsAvailable()           {}
-func (MockMempool) AddRelaytxDB(tx tp.TX){}
-func (MockMempool) RemoveRelaytxDB(tx tp.TX){}
-func (MockMempool) UpdaterDB() []tp.TX           {var str []tp.TX
-return str} 
-func (MockMempool) GetAllTxs() []tp.TX           {var str []tp.TX
-return str} 
+//func (MockMempool) AddRelaytxDB(tx tp.TX){}
+//func (MockMempool) RemoveRelaytxDB(tx tp.TX){}
+//func (MockMempool) UpdaterDB() []tp.TX           {var str []tp.TX
+//return str}
+//func (MockMempool) GetAllTxs() []tp.TX           {var str []tp.TX
+//return str}
+func (MockMempool)AddCrossMessagesDB(tcm *tp.CrossMessages){}
+func (MockMempool)RemoveCrossMessagesDB(tcm *tp.CrossMessages){}
+func (MockMempool)UpdatecmDB() []*tp.CrossMessages{
+	var cms []*tp.CrossMessages
+	return cms
+}
+func (MockMempool)GetAllCrossMessages()[]*tp.CrossMessages{
+	var cms []*tp.CrossMessages
+	return cms
+}
 //------------------------------------------------------
 // blockstore
 

@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tendermint/tendermint/identypes"
+	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
@@ -18,6 +21,7 @@ type PrivValidator interface {
 	SignVote(chainID string, vote *Vote) error
 	SignProposal(chainID string, proposal *Proposal) error
 	SignCrossTXVote(txs Txs, vote *Vote) error // 为每一个跨片交易产生一个签名
+	SigCrossMerkleRoot(MerkleRoot []byte,vote *Vote)error
 }
 
 //----------------------------------------
@@ -128,10 +132,24 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 	}
 	fmt.Println("=============== Sig End ===============")
 
-	copy(vote.CrossTxSigs, CTxSigs)
+	//copy(vote.CrossTxSigs, CTxSigs)
 	return nil
 }
-
+//分割字符串得到相应的内容,默认容器名为：A_0
+func ParseId()int64{
+	v, _ := syscall.Getenv("TASKID")
+	args := strings.Split(string(v), "_")
+	Shard, _ := strconv.Atoi(args[0])
+	Index, _ := strconv.Atoi(args[1])
+	var id int64
+	id = int64(Shard*500+Index)
+	return id
+}
+func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte,vote *Vote)error{
+	vote.PartSig.Id = ParseId()
+	vote.PartSig.PeerCrossSig = MerkleRoot
+	return nil
+}
 // String returns a string representation of the MockPV.
 func (pv *MockPV) String() string {
 	addr := pv.GetPubKey().Address()

@@ -70,6 +70,7 @@ func getShard()(string){
 	v, _ := syscall.Getenv("TASKID")
 	return v
 }
+
 /*
 func GetShard()(string){
     v := Config{}
@@ -412,6 +413,7 @@ type Header struct {
 	// consensus info
 	EvidenceHash    cmn.HexBytes `json:"evidence_hash"`    // evidence included in the block
 	ProposerAddress Address      `json:"proposer_address"` // original proposer of the block
+	CrossMerkleRoot cmn.HexBytes  `json:"cross_merkleroot"`
 }
 
 // Populate the Header with state-derived data.

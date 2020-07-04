@@ -166,11 +166,11 @@ type Mempool struct {
 
 	proxyMtx     sync.Mutex
 	proxyAppConn proxy.AppConnMempool
-	txs          *clist.CList // concurrent linked-list of good txs
+	txs	*clist.CList // concurrent linked-list of good txs
 	preCheck     PreCheckFunc
 	postCheck    PostCheckFunc
-	rDB          relaytxDB //relaylist
-
+	//rDB          relaytxDB //relaylist
+	cmDB		 CrossMessagesDB
 	// Track whether we're rechecking txs.
 	// These are not protected by a mutex and are expected to be mutated
 	// in serial (ie. by abci responses which are called in serial).
@@ -202,16 +202,27 @@ type Mempool struct {
 	metrics *Metrics
 }
 
+
+
 //--------------------------------------------
 //新增的跨片交易的状态数据库
-type relaytxDB struct {
-	relaytx []RTx //RelayTx结构的切片
+type CrossMessagesDB struct {
+	CrossMessages []*CrossMessage
 }
-
-type RTx struct {
-	Tx     tp.TX
+type CrossMessage struct {
+	Content *tp.CrossMessages
 	Height int
 }
+
+//type relaytxDB struct {
+//	relaytx []RTx //RelayTx结构的切片
+//}
+//
+//type RTx struct {
+//	Tx     tp.TX
+//	Height int
+//	CrossMessageIndex tp.CrossMessageIndex
+//}
 
 //-------------------------------------------
 
@@ -235,7 +246,7 @@ func NewMempool(
 		recheckEnd:    nil,
 		logger:        log.NewNopLogger(),
 		metrics:       NopMetrics(),
-		rDB:           newrDB(),
+		cmDB:           newcmDB(),
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -251,60 +262,112 @@ func NewMempool(
 
 //--------------------------------------------------------
 //新增函数
-
-func newrDB() relaytxDB {
-	var rdb relaytxDB
-	var rtx []RTx
-	rdb.relaytx = rtx
-	return rdb
+func newcmDB() CrossMessagesDB {
+	var cmdb CrossMessagesDB
+	var cm []*CrossMessage
+	cmdb.CrossMessages = cm
+	return cmdb
 }
-
-func (mem *Mempool) AddRelaytxDB(tx tp.TX) {
-	var rtx RTx
-	rtx.Tx = tx
-	rtx.Height = 0
-	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
+func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
+	var cm *CrossMessage
+	cm.Content = tcm
+	cm.Height = 0
+	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
 }
+func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 
-func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
-	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
-			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
+	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+		if mem.cmDB.CrossMessages[i].Content.Height == tcm.Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot,tcm.CrossMerkleRoot) {
+			mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
 			i--
 
 			break
 		}
 	}
 }
-func (mem *Mempool) UpdaterDB() []tp.TX {
-	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认
+func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
+	//检查cmDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送交易包，让其被确认
 
-	var stx []tp.TX
-	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx != nil {
-			if mem.rDB.relaytx[i].Height == 0 { //第一次高度为0就发布
-				stx = append(stx, mem.rDB.relaytx[i].Tx)
-				mem.rDB.relaytx[i].Height += 1 //增加高度
-			} else if (mem.rDB.relaytx[i].Height == 10) || (mem.rDB.relaytx[i].Height == 20) {
-				stx = append(stx, mem.rDB.relaytx[i].Tx)
-				mem.rDB.relaytx[i].Height = 0
+	var scm []*tp.CrossMessages
+	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+		if mem.cmDB.CrossMessages != nil {
+			if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
+				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
+			} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
+				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+				mem.cmDB.CrossMessages[i].Height = 0
 			} else {
-				mem.rDB.relaytx[i].Height = mem.rDB.relaytx[i].Height + 1
+				mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
 			}
 		}
 	}
-	return stx
+	return scm
 
 }
-func (mem *Mempool) GetAllTxs() []tp.TX {
-	var alltx []tp.TX
-	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx != nil {
-			alltx = append(alltx, mem.rDB.relaytx[i].Tx)
+func (mem *Mempool) GetAllCrossMessages() []*tp.CrossMessages {
+	var allcm []*tp.CrossMessages
+	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+		if mem.cmDB.CrossMessages != nil {
+			allcm = append(allcm, mem.cmDB.CrossMessages[i].Content)
 		}
 	}
-	return alltx
+	return allcm
 }
+//func newrDB() relaytxDB {
+//	var rdb relaytxDB
+//	var rtx []RTx
+//	rdb.relaytx = rtx
+//	return rdb
+//}
+//
+//func (mem *Mempool) AddRelaytxDB(tx tp.TX,CIndex tp.CrossMessageIndex) {
+//	var rtx RTx
+//	rtx.Tx = tx
+//	rtx.Height = 0
+//	rtx.CrossMessageIndex = CIndex
+//	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
+//}
+//
+//func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
+//	for i := 0; i < len(mem.rDB.relaytx); i++ {
+//		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
+//			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
+//			i--
+//
+//			break
+//		}
+//	}
+//}
+//func (mem *Mempool) UpdaterDB() []tp.TX {
+//	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认
+//
+//	var stx []tp.TX
+//	for i := 0; i < len(mem.rDB.relaytx); i++ {
+//		if mem.rDB.relaytx != nil {
+//			if mem.rDB.relaytx[i].Height == 0 { //第一次高度为0就发布
+//				stx = append(stx, mem.rDB.relaytx[i].Tx)
+//				mem.rDB.relaytx[i].Height += 1 //增加高度
+//			} else if (mem.rDB.relaytx[i].Height == 10) || (mem.rDB.relaytx[i].Height == 20) {
+//				stx = append(stx, mem.rDB.relaytx[i].Tx)
+//				mem.rDB.relaytx[i].Height = 0
+//			} else {
+//				mem.rDB.relaytx[i].Height = mem.rDB.relaytx[i].Height + 1
+//			}
+//		}
+//	}
+//	return stx
+//
+//}
+//func (mem *Mempool) GetAllTxs() []tp.TX {
+//	var alltx []tp.TX
+//	for i := 0; i < len(mem.rDB.relaytx); i++ {
+//		if mem.rDB.relaytx != nil {
+//			alltx = append(alltx, mem.rDB.relaytx[i].Tx)
+//		}
+//	}
+//	return alltx
+//}
 
 //----------------------------------------------------------
 // EnableTxsAvailable initializes the TxsAvailable channel,
@@ -442,9 +505,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
-	// fmt.Println(retx1) //看看是否被阻隔
-	// var retx *tp.TX
-	// retx, _ = tp.NewTX(tx)
+
 
 	var (
 		memSize  = mem.Size()
