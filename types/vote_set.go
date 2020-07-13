@@ -86,7 +86,6 @@ func NewVoteSet(chainID string, height int64, round int, type_ SignedMsgType, va
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
 		peerMaj23s:    make(map[P2PID]BlockID),
-		PartSigs:         make([]*identypes.PartSig, valSet.Size()),//最多所有节点，所以最大值应该跟vote一致
 	}
 }
 
@@ -219,11 +218,16 @@ func (voteSet *VoteSet) getVote(valIndex int, blockKey string) (vote *Vote, ok b
 // If conflicting vote exists, returns it.
 func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower int64) (added bool, conflicting *Vote) {
 	valIndex := vote.ValidatorIndex
-	//把vote的跨片交易签名加入voteset中，如果存在则加入
+	//把vote的跨片交易签名加入voteset中，如果存在则加入。由于在
 	if vote.Type == PrecommitType && vote.PartSig.Id!=0{
-
-		voteSet.PartSigs = append(voteSet.PartSigs,vote.PartSig)
-
+		part := &identypes.PartSig{
+			PeerCrossSig: vote.PartSig.PeerCrossSig[:],
+			Id:           vote.PartSig.Id,
+		}
+		voteSet.PartSigs = append(voteSet.PartSigs,part)
+		fmt.Println("现存voteset大小")
+		fmt.Println(len(voteSet.PartSigs))
+		fmt.Println(voteSet.PartSigs)
 	}
 
 	// Already exists in voteSet.votes?

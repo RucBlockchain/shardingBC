@@ -2,7 +2,9 @@ package state
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	tp "github.com/tendermint/tendermint/identypes"
 	"io/ioutil"
 	"time"
 
@@ -137,10 +139,12 @@ func (state State) MakeBlock(
 	commit *types.Commit,
 	evidence []types.Evidence,
 	proposerAddress []byte,
+	Packages []tp.Package,
 ) (*types.Block, *types.PartSet) {
 
 	// Build base block with block data.
-	block := types.MakeBlock(height, txs, commit, evidence)
+	pack_data,_:=json.Marshal(Packages)
+	block := types.MakeBlock(height, txs, commit, evidence,pack_data)
 
 	// Set time.
 	var timestamp time.Time
@@ -158,10 +162,21 @@ func (state State) MakeBlock(
 		state.ConsensusParams.Hash(), state.AppHash, state.LastResultsHash,
 		proposerAddress,
 	)
+	//解压
 
 	return block, block.MakePartSet(types.BlockPartSizeBytes)
 }
-
+func ParsePackages(data []byte)[]tp.Package{
+	var packs []tp.Package
+	err := json.Unmarshal(data, &packs)
+	if len(packs)==0{
+		return nil
+	}
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	return packs
+}
 // MedianTime computes a median time for a given Commit (based on Timestamp field of votes messages) and the
 // corresponding validator set. The computed time is always between timestamps of
 // the votes sent by honest processes, i.e., a faulty processes can not arbitrarily increase or decrease the

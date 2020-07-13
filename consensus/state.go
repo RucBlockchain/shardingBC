@@ -7,6 +7,7 @@ import (
 	"net"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 
 	//"strings"
 	"sync"
@@ -1373,6 +1374,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		voteSet := cs.Votes.Precommits(cs.CommitRound)
 		var ids = make([]int64,len(voteSet.PartSigs))
 		var sigs = make([][]byte,len(voteSet.PartSigs))
+
 		for i:=0;i<len(voteSet.PartSigs);i++{
 			ids = append(ids, voteSet.PartSigs[i].Id)
 			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
@@ -1380,8 +1382,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 		var threshold int
 		threshold = len(voteSet.PartSigs)*2/3
+		fmt.Println(len(voteSet.PartSigs))
 		var err error
-		voteSet.CrossMerkleSigs,err = bls.SignatureRecovery(threshold,sigs,ids)
+		voteSet.CrossMerkleSigs,err = bls.SignatureRecovery(threshold,nil,ids)
 		if err!=nil{
 			cs.Logger.Error("Aggregate error")
 			return err
@@ -1405,6 +1408,17 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		return nil
 	}
 
+}
+func ParsePackages(data []byte)[]tp.Package{
+	var packs []tp.Package
+	err := json.Unmarshal(data, &packs)
+	if len(packs)==0{
+		return nil
+	}
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	return packs
 }
 //需要完善基础功能，不然无法做测试
 func ClassifyTxFromBlock(txs types.Txs)[]*tp.CrossMessages{
@@ -1983,7 +1997,38 @@ func compareRelaylist(t tp.TX, allCms []*tp.CrossMessages) (result bool) {
 	}
 	return result
 }
+func ParseId()int64{
 
+	fmt.Println("i am here")
+
+	v, _ := syscall.Getenv("TASKID")
+	g, _ := syscall.Getenv("TASKINDEX")
+	Shard, _ := strconv.Atoi(v)
+	Index, _ := strconv.Atoi(g)
+	var id int64
+	id = int64(Shard*500+Index)
+	fmt.Println(id)
+	return id
+}
+func (cs *ConsensusState)JudgeBlockPakcages()bool{
+	packs := ParsePackages(cs.ProposalBlock.CmRelation)
+	//说明该区块没有跨片交易
+	if len(packs)==0{
+		return true
+	}
+	for i:=0;i<len(packs);i++{
+		if !cs.blockExec.SearchPackageExist(packs[i]) {
+			return false
+		}
+	}
+	//做同步relationtable操作
+	for i:=0;i<len(packs);i++{
+		cs.blockExec.SyncRelationTable(packs[i],cs.ProposalBlock.Height)
+	}
+	cs.Logger.Error("所有cm包都找到并且对映射表做同步")
+
+	return true
+}
 func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, header types.PartSetHeader) (*types.Vote, error) {
 	// Flush the WAL. Otherwise, we may not recompute the same vote to sign, and the privValidator will refuse to sign anything.
 	cs.wal.FlushAndSync()
@@ -2004,43 +2049,66 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		Timestamp:        cs.voteTime(),
 		Type:             type_,
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
+		PartSig:          &tp.PartSig{PeerCrossSig: nil, Id:0},
 		//CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
 	}
 	//在precommit阶段，核验addtx
-	if type_ == types.PrecommitType && hash != nil {
-		for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
-			encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
+	//if type_ == types.PrecommitType && hash != nil {
+	//	for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
+	//		encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
+	//
+	//		temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+	//
+	//		var tx tp.TX
+	//		json.Unmarshal(temptx, &tx)
+	//		if tx.Txtype=="addtx"{
+	//			//bls.AggragateVerify(tx.AggSig.Signature,tx.Content,tx.AggSig.Participants)核验
+	//			if true {
+	//				continue
+	//			}else{
+	//				vote.BlockID=types.BlockID{Hash: nil, PartsHeader: header}
+	//				break
+	//			}
+	//		}
+	//
+	//	}
+	//}
+		//这里是对跨片进行签名
 
-			temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+	cs.Logger.Error("单个节点")
+	fmt.Println(vote)
+	if hash!=nil{
+		fmt.Println("hash不为空")
+	}
+	if vote.BlockID.Hash!=nil{
+		fmt.Println("block hash 不为空")
+	}
+	if type_ == types.PrecommitType{
+		fmt.Println("type 不为空")
+	}
+	if type_ == types.PrecommitType && hash != nil && vote.BlockID.Hash != nil{
+		//还要进行验证如果打包cm不在自己的mempool之中，说明leader作恶，需要投反对票
+		//交易池没有该交易并且不是leader，那么就需要判断是否存在
+			if !cs.JudgeBlockPakcages(){
+			cs.Logger.Error("在mempool未找到对应交易，投反对票")
+			vote.BlockID.Hash=nil//投反对票
+			}else{
+				err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, vote)
+				vote.PartSig.Id = ParseId()
+				vote.PartSig.PeerCrossSig = cs.ProposalBlock.CrossMerkleRoot[:]
+				// log for DEBUG
+				cs.Logger.Error("=============== crossTx Sig ===============\n")
 
-			var tx tp.TX
-			json.Unmarshal(temptx, &tx)
-			if tx.Txtype=="addtx"{
-				//bls.AggragateVerify(tx.AggSig.Signature,tx.Content,tx.AggSig.Participants)核验
-				if true {
-					continue
-				}else{
-					vote.BlockID=types.BlockID{Hash: nil, PartsHeader: header}
-					break
+				cs.Logger.Error("=============== Sig End ===============")
+
+				if err != nil {
+					cs.Logger.Error("generate cross traction signature error, ", err)
 				}
 			}
 
-		}
-	}
-		//这里是对跨片进行签名
-	if type_ == types.PrecommitType && hash != nil && vote.BlockID.Hash != nil{
 		// prevote阶段对每条跨片交易生成签名
 		// 没有想好怎么处理这里的错误
-		err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, vote)
 
-		// log for DEBUG
-		cs.Logger.Debug("=============== crossTx Sig ===============\n")
-
-		cs.Logger.Debug("=============== Sig End ===============")
-
-		if err != nil {
-			cs.Logger.Error("generate cross traction signature error, ", err)
-		}
 	}
 
 	err := cs.privValidator.SignVote(cs.state.ChainID, vote)

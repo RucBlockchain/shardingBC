@@ -31,12 +31,13 @@ type Mempool interface {
 	RemoveCrossMessagesDB(tcm *tp.CrossMessages)
 	UpdatecmDB() []*tp.CrossMessages
 	GetAllCrossMessages() []*tp.CrossMessages
-
-
+	SearchRelationTable(Height int64)[]tp.Package
+	SearchPackageExist(pack tp.Package)bool
+	SyncRelationTable(pack tp.Package,height int64)
 	Size() int
 	CheckTx(types.Tx, func(*abci.Response)) error
 	CheckTxWithInfo(types.Tx, func(*abci.Response), mempool.TxInfo) error
-	ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs
+	ReapMaxBytesMaxGas(maxBytes, maxGas int64,height int64) types.Txs
 	Update(int64, types.Txs, mempool.PreCheckFunc, mempool.PostCheckFunc) error
 	Flush()
 	FlushAppConn() error
@@ -47,6 +48,8 @@ type Mempool interface {
 
 // MockMempool is an empty implementation of a Mempool, useful for testing.
 type MockMempool struct{}
+
+
 
 var _ Mempool = MockMempool{}
 
@@ -60,7 +63,7 @@ func (MockMempool) CheckTxWithInfo(_ types.Tx, _ func(*abci.Response),
 	_ mempool.TxInfo) error {
 	return nil
 }
-func (MockMempool) ReapMaxBytesMaxGas(_, _ int64) types.Txs { return types.Txs{} }
+func (MockMempool) ReapMaxBytesMaxGas(_, _ int64,_ int64) types.Txs { return types.Txs{} }
 func (MockMempool) Update(
 	_ int64,
 	_ types.Txs,
@@ -73,13 +76,16 @@ func (MockMempool) Flush()                        {}
 func (MockMempool) FlushAppConn() error           { return nil }
 func (MockMempool) TxsAvailable() <-chan struct{} { return make(chan struct{}) }
 func (MockMempool) EnableTxsAvailable()           {}
-//func (MockMempool) AddRelaytxDB(tx tp.TX){}
-//func (MockMempool) RemoveRelaytxDB(tx tp.TX){}
-//func (MockMempool) UpdaterDB() []tp.TX           {var str []tp.TX
-//return str}
-//func (MockMempool) GetAllTxs() []tp.TX           {var str []tp.TX
-//return str}
 func (MockMempool)AddCrossMessagesDB(tcm *tp.CrossMessages){}
+func (MockMempool) SearchRelationTable(Height int64) []tp.Package {
+	var pack []tp.Package
+	return pack
+}
+func (MockMempool)SyncRelationTable(tp tp.Package,height int64){}
+func (MockMempool) SearchPackageExist(tp tp.Package) bool {
+
+	return true
+}
 func (MockMempool)RemoveCrossMessagesDB(tcm *tp.CrossMessages){}
 func (MockMempool)UpdatecmDB() []*tp.CrossMessages{
 	var cms []*tp.CrossMessages

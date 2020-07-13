@@ -1,162 +1,86 @@
-version: '2.0'
+version: 2
 services:
-  TTANode1:
+  0S1:
     image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode1
-    hostname: TTANode1
+    container_name: 0S1
+    hostname: 0S1
     tty: true
     volumes:
-    - /home/centos/NFS500/network/TTANode1/config:/tendermint/config
+    - /home/centos/NFS500/network/0S1/config:/tendermint/config
     environment:
-    - TASKID=A
+    - TASKID=0
+    - TASKINDEX=1
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
+    - tendermint node --p2p.persistent_peers=e548516b68adb5fc52d327e360397fb681f634d7@0S2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
-        - TTANode1
-  TTANode2:
+        - 0S1
+  0S2:
     image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode2
-    hostname: TTANode2
+    container_name: 0S2
+    hostname: 0S2
     tty: true
     volumes:
-    - /home/centos/NFS500/network/TTANode2/config:/tendermint/config
+    - /home/centos/NFS500/network/0S2/config:/tendermint/config
     environment:
-    - TASKID=A
+    - TASKID=0
+    - TASKINDEX=2
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
+    - tendermint node --p2p.persistent_peers=2dda64689cfa361014b97bb0e76cd2ee753a4015@0S1:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
-        - TTANode2
+        - 0S2
     links:
-    - TTANode1
-  TTANode3:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode3
-    hostname: TTANode3
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTANode3/config:/tendermint/config
-    environment:
-    - TASKID=A
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=e5ad222ca333d8ab7c9e88bcd32e2424dcca03d4@TTANode1:26656,d4bbda6f7f238ea412ec07f2d0f3cc96b41a4b04@TTANode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTANode3
-    links:
-    - TTANode1
-  TTANode4:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTANode4
-    hostname: TTANode4
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTANode4/config:/tendermint/config
-    environment:
-    - TASKID=A
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=08099c3df857ddcc03cada4b6ced4768f8e48149@TTANode3:26656,56015f9591f38f8a5582e512263723410d80dd7d@TTANode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTANode4
-    links:
-    - TTANode3
+    - 0S1
 services:
-  TTBNode1:
+  1S1:
     image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTBNode1
-    hostname: TTBNode1
+    container_name: 1S1
+    hostname: 1S1
     tty: true
     volumes:
-    - /home/centos/NFS500/network/TTBNode1/config:/tendermint/config
+    - /home/centos/NFS500/network/1S1/config:/tendermint/config
     environment:
-    - TASKID=B
+    - TASKID=1
+    - TASKINDEX=1
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
+    - tendermint node --p2p.persistent_peers=91c1c74c303dd7c62e5aa0829da00138f6f08be1@1S2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
-        - TTBNode1
-  TTBNode2:
+        - 1S1
+  1S2:
     image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTBNode2
-    hostname: TTBNode2
+    container_name: 1S2
+    hostname: 1S2
     tty: true
     volumes:
-    - /home/centos/NFS500/network/TTBNode2/config:/tendermint/config
+    - /home/centos/NFS500/network/1S2/config:/tendermint/config
     environment:
-    - TASKID=B
+    - TASKID=1
+    - TASKINDEX=2
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
+    - tendermint node --p2p.persistent_peers=26796b2fc867bab60a25b3d62461bc2119f05543@1S1:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
-        - TTBNode2
+        - 1S2
     links:
-    - TTBNode1
-  TTBNode3:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTBNode3
-    hostname: TTBNode3
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTBNode3/config:/tendermint/config
-    environment:
-    - TASKID=B
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=4c72144b5969fd7d5d03db643426a294a596a116@TTBNode1:26656,61b94c1432e1996cf1dae2eb65596fa561a4eb1d@TTBNode4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTBNode3
-    links:
-    - TTBNode1
-  TTBNode4:
-    image: 10.77.70.142:5000/tendermint:v0.4
-    container_name: TTBNode4
-    hostname: TTBNode4
-    tty: true
-    volumes:
-    - /home/centos/NFS500/network/TTBNode4/config:/tendermint/config
-    environment:
-    - TASKID=B
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=6a85f49d5fed28e3afa1440530a191f3c2356421@TTBNode3:26656,91d7dec4cadef34e65800d6535e4238858486a3f@TTBNode2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore 
-    networks:
-      tendermintnet1:
-        aliases:
-        - TTBNode4
-    links:
-    - TTBNode3
+    - 1S1
 
 networks:
   tendermintnet1:

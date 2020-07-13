@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/tendermint/tendermint/identypes"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/tendermint/tendermint/crypto"
@@ -135,17 +134,22 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 	//copy(vote.CrossTxSigs, CTxSigs)
 	return nil
 }
-//分割字符串得到相应的内容,默认容器名为：A_0
+//分割字符串得到相应的内容,默认容器名为：1_0 分片名_分片的index
 func ParseId()int64{
+
+	fmt.Println("i am here")
+
 	v, _ := syscall.Getenv("TASKID")
-	args := strings.Split(string(v), "_")
-	Shard, _ := strconv.Atoi(args[0])
-	Index, _ := strconv.Atoi(args[1])
+	g, _ := syscall.Getenv("TASKINDEX")
+	Shard, _ := strconv.Atoi(v)
+	Index, _ := strconv.Atoi(g)
 	var id int64
 	id = int64(Shard*500+Index)
+	fmt.Println(id)
 	return id
 }
 func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte,vote *Vote)error{
+	fmt.Println("i am in")
 	vote.PartSig.Id = ParseId()
 	vote.PartSig.PeerCrossSig = MerkleRoot
 	return nil

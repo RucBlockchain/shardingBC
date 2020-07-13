@@ -115,9 +115,12 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 
 	// Fetch a limited amount of valid txs
 	maxDataBytes := types.MaxDataBytes(maxBytes, state.Validators.Size(), len(evidence))
-	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas)
-
-	return state.MakeBlock(height, txs, commit, evidence, proposerAddr)
+	//拿到相关的txs
+	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas,height)
+	Packages := blockExec.mempool.SearchRelationTable(height)
+	fmt.Println(Packages)
+	//将相关的txs进行
+	return state.MakeBlock(height, txs, commit, evidence, proposerAddr,Packages)
 }
 
 // ValidateBlock validates the given block against the given state.
@@ -309,7 +312,12 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 //	resendTxs := blockExec.mempool.UpdaterDB()
 //	return resendTxs
 //}
-
+func (blockExec *BlockExecutor) SearchPackageExist(pack tp.Package) bool {
+	return blockExec.mempool.SearchPackageExist(pack)
+}
+func (BlockExecutor *BlockExecutor)SyncRelationTable(pack tp.Package,height int64){
+	BlockExecutor.mempool.SyncRelationTable(pack,height)
+}
 func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
 	cpTxs := blockExec.mempool.GetAllCrossMessages()
 	return cpTxs

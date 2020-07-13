@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -73,13 +74,12 @@ func Checkdbtest(tx types.Tx) bool {
 	if consensusState.IsLeader() {
 		fmt.Println("leader") //leader才能判断
 		if retx.Txtype == "relaytx" {
-
 			shardname := getShard()
 			if shardname != retx.Sender {
 				dbtx := checkdb.Search(retx.ID)
 				if dbtx != nil {
 					if consensusState.IsLeader() {
-						name := "TT" + dbtx.Sender + "Node1:26657"
+						name := dbtx.Sender + "_1:26657"
 						tx_package := []tp.TX{}
 						tx_package = append(tx_package, *dbtx)
 						for i := 0; i < len(tx_package); i++ {
@@ -96,16 +96,35 @@ func Checkdbtest(tx types.Tx) bool {
 	}
 	return false
 }
+func ParseData(data types.Tx)(*tp.CrossMessages){
+	cm:=new(tp.CrossMessages)
+	err:=json.Unmarshal(data,&cm)
+	if err!=nil{
+		fmt.Println("ParseData Wrong")
+	}
+	if cm.Txlist==nil{
+		return nil
+	}else{
+		return cm
+	}
+}
+
 func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	//异步解决
-	if Checkdbtest(tx) {
-		return nil, errors.New("状态数据库直接返回")
-	}
+	//if cm:=ParseData(tx);cm!=nil{//处理CrossMessage流程
+	////TODO:需要完善此接口函数
+	//	mempool.CheckCrossMessage(tx)//check这个消息如果通过则放入mempool之中
+	//}else{//处理Tx流程
+	//状态数据库先不检验
+		//if Checkdbtest(tx) {
+		//	return nil, errors.New("状态数据库直接返回")
+		//}
+		err := mempool.CheckTx(tx, nil)
+		if err != nil {
+			return nil, err
+		}
+	//}
 
-	err := mempool.CheckTx(tx, nil)
-	if err != nil {
-		return nil, err
-	}
 	return &ctypes.ResultBroadcastTx{Hash: tx.Hash()}, nil
 }
 
