@@ -118,7 +118,6 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	//拿到相关的txs
 	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas,height)
 	Packages := blockExec.mempool.SearchRelationTable(height)
-	fmt.Println(Packages)
 	//将相关的txs进行
 	return state.MakeBlock(height, txs, commit, evidence, proposerAddr,Packages)
 }
@@ -318,13 +317,17 @@ func (blockExec *BlockExecutor) SearchPackageExist(pack tp.Package) bool {
 func (BlockExecutor *BlockExecutor)SyncRelationTable(pack tp.Package,height int64){
 	BlockExecutor.mempool.SyncRelationTable(pack,height)
 }
+func(blockExec *BlockExecutor)MergePackage(height int64)[]byte{
+	packs:=blockExec.mempool.SearchRelationTable(height)
+	pack_data,_:=json.Marshal(packs)
+	return pack_data
+}
 func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
 	cpTxs := blockExec.mempool.GetAllCrossMessages()
 	return cpTxs
 }
 
 func (blockExec *BlockExecutor) AddCrossMessagesDB(tcm *tp.CrossMessages) {
-	//fmt.Println("Add2RelaytxDB")
 	blockExec.mempool.AddCrossMessagesDB(tcm)
 }
 func (blockExec *BlockExecutor) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
@@ -368,16 +371,15 @@ func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.Cros
 
 
 	if num > 0 {
-		index,_:=strconv.Atoi(tx_package[0].DesZone)
-		blockExec.SendMessage(index, tx_package)
+		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
 
 	}
 }
 
 // sending tx to shard x
-func (blockExec *BlockExecutor) SendMessage(index int,  tx_package []*tp.CrossMessages) {
+func (blockExec *BlockExecutor) SendMessage(DesZone string,  tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
-	name := string(index+65) + "_1:26657"
+	name := DesZone + "S1:26657"
 	client := *myclient.NewHTTP(name, "/websocket")
 	go client.BroadcastCrossMessageAsync(tx_package)
 }

@@ -9,7 +9,7 @@ type CrossMessages struct{
 	SrcZone string//发送方
 	DesZone string//接收方
 	Height int64//标志时刻
-	Packages []Package//应该回复删除什么包
+	Packages []byte//应该回复删除什么包
 	ConfirmPackSigs []byte//对于这些包的签名
 }
 type PartSig struct {

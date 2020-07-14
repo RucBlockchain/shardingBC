@@ -219,7 +219,7 @@ func (voteSet *VoteSet) getVote(valIndex int, blockKey string) (vote *Vote, ok b
 func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower int64) (added bool, conflicting *Vote) {
 	valIndex := vote.ValidatorIndex
 	//把vote的跨片交易签名加入voteset中，如果存在则加入。由于在
-	if vote.Type == PrecommitType && vote.PartSig.Id!=0{
+	if vote.Type == PrevoteType && vote.PartSig.Id!=0{
 		part := &identypes.PartSig{
 			PeerCrossSig: vote.PartSig.PeerCrossSig[:],
 			Id:           vote.PartSig.Id,

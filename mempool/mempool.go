@@ -293,12 +293,27 @@ func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
 	cm.Height = 0
 	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
 }
+func ParsePackages(data []byte)[]tp.Package{
+	var packs []tp.Package
+	err := json.Unmarshal(data, &packs)
+	if len(packs)==0{
+		return nil
+	}
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	return packs
+}
 func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 	//删除交易包
-	for j := 0; j < len(tcm.Packages); j++ {
+	//对package进行解析
+	packs:=ParsePackages(tcm.Packages)
+	mem.logger.Error("解析包资源")
+	fmt.Println(len(packs))
+	for j := 0; j < len(packs); j++ {
 		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
 
-			if mem.cmDB.CrossMessages[i].Content.Height == tcm.Packages[i].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, tcm.Packages[i].CrossMerkleRoot) {
+			if mem.cmDB.CrossMessages[i].Content.Height == packs[i].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[i].CrossMerkleRoot) {
 				mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
 				i--
 

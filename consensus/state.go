@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"fmt"
-	"github.com/tendermint/tendermint/crypto/bls"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -1371,7 +1370,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		return nil
 	} else {
 
-		voteSet := cs.Votes.Precommits(cs.CommitRound)
+		voteSet := cs.Votes.Prevotes(cs.CommitRound)
 		var ids = make([]int64,len(voteSet.PartSigs))
 		var sigs = make([][]byte,len(voteSet.PartSigs))
 
@@ -1379,18 +1378,18 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			ids = append(ids, voteSet.PartSigs[i].Id)
 			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
 		}
-
-		var threshold int
-		threshold = len(voteSet.PartSigs)*2/3
-		fmt.Println(len(voteSet.PartSigs))
-		var err error
-		voteSet.CrossMerkleSigs,err = bls.SignatureRecovery(threshold,nil,ids)
-		if err!=nil{
-			cs.Logger.Error("Aggregate error")
-			return err
-		}
+		//TODO:引入聚合签名接口
+		//var threshold int
+		//threshold = len(voteSet.PartSigs)*2/3
+		//fmt.Println(len(voteSet.PartSigs))
+		//var err error
+		//voteSet.CrossMerkleSigs,err = bls.SignatureRecovery(threshold,nil,ids)
+		//if err!=nil{
+		//	cs.Logger.Error("Aggregate error")
+		//	return err
+		//}
 		//生成跨片消息包保存在relaylist之中
-		cms := ClassifyTxFromBlock(cs.ProposalBlock.Txs)
+		cms := cs.ClassifyTxFromBlock(cs.ProposalBlock.Txs)
 		for i:=0;i<len(cms);i++{
 			cms[i].Sig = voteSet.CrossMerkleSigs
 			if cms[i].Txlist[0].Sender == getShard(){
@@ -1402,9 +1401,12 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			}
 			cms[i].Height=cs.ProposalBlock.Height
 			//存入realylist之中
+
+
 			cs.blockExec.AddCrossMessagesDB(cms[i])
 		}
-
+		cs.Logger.Error("存入cms")
+		fmt.Println("存入大小为",len(cms))
 		return nil
 	}
 
@@ -1421,29 +1423,30 @@ func ParsePackages(data []byte)[]tp.Package{
 	return packs
 }
 //需要完善基础功能，不然无法做测试
-func ClassifyTxFromBlock(txs types.Txs)[]*tp.CrossMessages{
+func (cs *ConsensusState)ClassifyTxFromBlock(txs types.Txs)[]*tp.CrossMessages{
 	var cms []*tp.CrossMessages
 	var txlist []*tp.TX
 	for i:=0;i<len(txs);i++{
-
 		encodeStr := hex.EncodeToString(txs[i])
-
 		temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
 
 		var tx *tp.TX
 		json.Unmarshal(temptx, &tx)
-
-		txlist = append(txlist, tx)
-		if i%5==0{
+		if tx.Txtype=="relaytx"{
+			txlist = append(txlist, tx)
+		}
+		if i%5==0 && len(txlist)>0{
 			cm :=&tp.CrossMessages{
 				Txlist:          txlist[:],
 				Sig:             nil,
 				Pubkeys:         nil,
-				CrossMerkleRoot: nil,
+				CrossMerkleRoot: []byte("hello"),
 				TreePath:        nil,
-				SrcZone:         "",
-				DesZone:         "",
+				SrcZone:         "0",
+				DesZone:         "1",
 				Height:          0,
+				Packages:		cs.blockExec.MergePackage(cs.Height),
+				ConfirmPackSigs:cs.ProposalBlock.CmRelation,
 			}
 			cms = append(cms, cm)
 			//清空txlist
@@ -2075,18 +2078,8 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	//}
 		//这里是对跨片进行签名
 
-	cs.Logger.Error("单个节点")
 	fmt.Println(vote)
-	if hash!=nil{
-		fmt.Println("hash不为空")
-	}
-	if vote.BlockID.Hash!=nil{
-		fmt.Println("block hash 不为空")
-	}
-	if type_ == types.PrecommitType{
-		fmt.Println("type 不为空")
-	}
-	if type_ == types.PrecommitType && hash != nil && vote.BlockID.Hash != nil{
+	if type_ == types.PrevoteType && hash != nil && vote.BlockID.Hash != nil{
 		//还要进行验证如果打包cm不在自己的mempool之中，说明leader作恶，需要投反对票
 		//交易池没有该交易并且不是leader，那么就需要判断是否存在
 			if !cs.JudgeBlockPakcages(){
