@@ -149,8 +149,8 @@ func ParseId()int64{
 	return id
 }
 func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte,vote *Vote)error{
-	fmt.Println("i am in")
 	vote.PartSig.Id = ParseId()
+	fmt.Println("节点id",vote.PartSig.Id)
 	vote.PartSig.PeerCrossSig = MerkleRoot
 	return nil
 }

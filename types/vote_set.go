@@ -218,16 +218,13 @@ func (voteSet *VoteSet) getVote(valIndex int, blockKey string) (vote *Vote, ok b
 // If conflicting vote exists, returns it.
 func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower int64) (added bool, conflicting *Vote) {
 	valIndex := vote.ValidatorIndex
-	//把vote的跨片交易签名加入voteset中，如果存在则加入。由于在
+	//把vote的跨片交易签名加入voteset中
 	if vote.Type == PrevoteType && vote.PartSig.Id!=0{
 		part := &identypes.PartSig{
 			PeerCrossSig: vote.PartSig.PeerCrossSig[:],
 			Id:           vote.PartSig.Id,
 		}
 		voteSet.PartSigs = append(voteSet.PartSigs,part)
-		fmt.Println("现存voteset大小")
-		fmt.Println(len(voteSet.PartSigs))
-		fmt.Println(voteSet.PartSigs)
 	}
 
 	// Already exists in voteSet.votes?

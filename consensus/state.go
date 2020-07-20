@@ -1369,12 +1369,16 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 	if len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
-
 		voteSet := cs.Votes.Prevotes(cs.CommitRound)
+		if len(voteSet.PartSigs)==0{
+			return nil
+		}
+		fmt.Println("prevote 收集到的对merkle root签名数量为",len(voteSet.PartSigs))
 		var ids = make([]int64,len(voteSet.PartSigs))
 		var sigs = make([][]byte,len(voteSet.PartSigs))
 
 		for i:=0;i<len(voteSet.PartSigs);i++{
+			fmt.Println("投票",voteSet.PartSigs[i].Id, voteSet.PartSigs[i].PeerCrossSig)
 			ids = append(ids, voteSet.PartSigs[i].Id)
 			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
 		}
@@ -1390,6 +1394,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		//}
 		//生成跨片消息包保存在relaylist之中
 		cms := cs.ClassifyTxFromBlock(cs.ProposalBlock.Txs)
+
 		for i:=0;i<len(cms);i++{
 			cms[i].Sig = voteSet.CrossMerkleSigs
 			if cms[i].Txlist[0].Sender == getShard(){
@@ -1402,7 +1407,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cms[i].Height=cs.ProposalBlock.Height
 			//存入realylist之中
 
-
+			fmt.Println("cms",cms[i])
+			fmt.Println("cms",cms[i].Txlist[0])
+			fmt.Println("cms",cms[i].DesZone)
 			cs.blockExec.AddCrossMessagesDB(cms[i])
 		}
 		cs.Logger.Error("存入cms")
@@ -1432,7 +1439,11 @@ func (cs *ConsensusState)ClassifyTxFromBlock(txs types.Txs)[]*tp.CrossMessages{
 
 		var tx *tp.TX
 		json.Unmarshal(temptx, &tx)
-		if tx.Txtype=="relaytx"{
+		if tx.Txtype=="relaytx" {
+			tx.Operate=1
+			if tx.Receiver==getShard(){
+				tx.Txtype="addtx"
+			}
 			txlist = append(txlist, tx)
 		}
 		if i%5==0 && len(txlist)>0{
@@ -2077,8 +2088,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	//	}
 	//}
 		//这里是对跨片进行签名
-
-	fmt.Println(vote)
 	if type_ == types.PrevoteType && hash != nil && vote.BlockID.Hash != nil{
 		//还要进行验证如果打包cm不在自己的mempool之中，说明leader作恶，需要投反对票
 		//交易池没有该交易并且不是leader，那么就需要判断是否存在

@@ -104,7 +104,6 @@ func (t *transacter) Start() error {
 	}
 
 	t.startingWg.Wait()
-	// fmt.Println("发送交易完成")
 	return nil
 }
 
@@ -200,7 +199,7 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 					ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
 				}
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
-
+				fmt.Println(string(ntx))
 				if err != nil {
 					fmt.Printf("failed to encode params: %v\n", err)
 					os.Exit(1)
@@ -303,7 +302,7 @@ func pub2string(pub ecdsa.PublicKey) string {
 
 func (t *transacter) createinitTxContent(shard string, i int) (string, string) {
 	toint, _ := strconv.ParseInt(shard, 32, 64)
-	index := toint - 10
+	index := toint
 	//获取分片
 	shardcount := t.count[index]
 	//对所有账户存钱
@@ -323,13 +322,13 @@ func (t *transacter) createRelayTxContent(shard_s string, shard_r string, rate i
 	//产生转化交易金额
 	num := newrand.Intn(100)
 	toint, _ := strconv.ParseInt(shard_s, 32, 64)
-	sendshard := t.count[(toint - 10)]
+	sendshard := t.count[toint]
 	//拿取支付方账户信息
 	priv := sendshard[newrand.Intn(rate)]
 	pub_s := priv.PublicKey
 
 	toint2, _ := strconv.ParseInt(shard_r, 32, 64)
-	receiveshard := t.count[(toint2 - 10)]
+	receiveshard := t.count[toint2]
 	//拿取转入方账户信息
 	priv_r := receiveshard[newrand.Intn(rate)]
 	pub_r := priv_r.PublicKey
@@ -351,7 +350,7 @@ func (t *transacter) createLocalTxContent(shard string, rate int) (string, strin
 
 	toint, _ := strconv.ParseInt(shard, 32, 64)
 
-	shardcount := t.count[(toint - 10)]
+	shardcount := t.count[toint]
 	priv := shardcount[newrand.Intn(rate)]
 	pub_s := priv.PublicKey
 

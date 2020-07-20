@@ -288,9 +288,12 @@ func newcmDB() CrossMessagesDB {
 	return cmdb
 }
 func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
-	var cm *CrossMessage
-	cm.Content = tcm
-	cm.Height = 0
+	fmt.Println(tcm)
+	cm:=&CrossMessage{
+		Content: tcm,
+		Height:  0,
+	}
+	fmt.Println(cm)
 	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
 }
 func ParsePackages(data []byte)[]tp.Package{
@@ -327,17 +330,17 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 	//检查cmDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送交易包，让其被确认
 
 	var scm []*tp.CrossMessages
-	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
-		if mem.cmDB.CrossMessages != nil {
-			if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
-				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
-				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
-			} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
-				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
-				mem.cmDB.CrossMessages[i].Height = 0
-			} else {
-				mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
-			}
+			for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+				if mem.cmDB.CrossMessages != nil {
+						if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
+						scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+						mem.cmDB.CrossMessages[i].Height += 1 //增加高度
+					} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
+						scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+						mem.cmDB.CrossMessages[i].Height = 0
+					} else {
+						mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
+					}
 		}
 	}
 	return scm
@@ -572,16 +575,21 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	}
 	mem.logger.Error("完成检验cm")
 	//交易合法性检验
+	fmt.Println("cms交易集合数量",len(cm.Txlist))
+
 	for i := 0; i < len(cm.Txlist); i++ {
+		fmt.Println(cm.Txlist[i])
 		var tx types.Tx
 		tx, err = json.Marshal(cm.Txlist[i])
 		accountLog := account.NewAccountLog(tx)
 		if accountLog == nil {
+			fmt.Println("解析失败")
 			return errors.New("交易解析失败")
 		}
 		checkRes := accountLog.Check()
 
 		if !checkRes {
+			fmt.Println("不合法")
 			return errors.New("不合法的交易")
 		}
 	}
@@ -716,7 +724,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			return result
 		}
 	} else {
-		mem.logger.Error("未接受到Cm消息")
+
 		accountLog := account.NewAccountLog(tx)
 		if accountLog == nil {
 			return errors.New("交易解析失败")

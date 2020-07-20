@@ -209,7 +209,9 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 	blockExec.logger.Error("-------------Begin check Cross Messages----------")
 	//resendTxs := blockExec.UpdateRelaytxDB() //检查状态数据库，没有及时确认的relayTxs需要重新发送relaytxs
 	resendMessages:=blockExec.UpdatecmDB()//检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
-
+	if len(resendMessages)>0{
+		fmt.Println("需要发送的cm",resendMessages)
+	}
 	if flag {
 		//只有leader执行以下代码
 		var shard_send [][]*tp.CrossMessages
