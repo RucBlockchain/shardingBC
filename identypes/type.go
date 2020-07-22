@@ -61,20 +61,42 @@ type TX struct {
 	ID          [sha256.Size]byte
 	Content     string
 	TxSignature string
-	Operate     int
+	Operate     int // 查部分的定义 0为转出方 1为转入方
 
 	// 当交易类型为relayTX时有用，其余类型为空跳过即可
 	AggSig AggregateSig
-	Height  int // 记录该条跨片交易被共识的区块高度
+	Height int // 记录该条跨片交易被共识的区块高度
 }
 
 func NewTX(data []byte) (*TX, error) {
 	tx := new(TX)
-	err := json.Unmarshal(data, tx)
+
+	tmp := make([]byte, len(data), len(data))
+	copy(tmp, data)
+
+	err := json.Unmarshal(tmp, tx)
 	if err != nil {
 		return nil, err
 	}
 	return tx, err
+}
+
+// 处理跨片交易的后程，修改交易属性
+func (tx *TX) UpdateTx() {
+	if tx.Receiver != getShard() && tx.Txtype != "relaytx" {
+		return
+	}
+
+	tx.Operate = 1
+}
+
+func (tx *TX) Data() []byte {
+	if data, err := json.Marshal(tx); err == nil {
+		return data
+	} else {
+		return nil
+	}
+
 }
 
 func (tx *TX) VerifySig() bool {

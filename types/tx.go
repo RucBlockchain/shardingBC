@@ -81,6 +81,16 @@ func (txs Txs) Proof(i int) TxProof {
 	}
 }
 
+func (txs Txs) Bytes() [][]byte {
+	l := len(txs)
+	bzs := make([][]byte, l)
+	for i := 0; i < l; i++ {
+		bzs[i] = txs[i]
+	}
+
+	return bzs
+}
+
 // TxProof represents a Merkle proof of the presence of a transaction in the Merkle tree.
 type TxProof struct {
 	RootHash cmn.HexBytes
