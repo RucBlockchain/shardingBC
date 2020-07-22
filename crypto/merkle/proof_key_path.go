@@ -1,6 +1,7 @@
 package merkle
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"net/url"
@@ -57,6 +58,11 @@ const (
 	KeyEncodingMax // Number of known encodings. Used for testing
 )
 
+const (
+	PathLeft  byte = uint8(0)
+	PathRight byte = uint8(1)
+)
+
 type Key struct {
 	name []byte
 	enc  keyEncoding
@@ -108,4 +114,41 @@ func KeyPathToKeys(path string) (keys [][]byte, err error) {
 		}
 	}
 	return keys, nil
+}
+
+// 检验某个交易的tree path是否正确
+func VerifyTreePath(item []byte, path string, roothash []byte) bool {
+	if item == nil || roothash == nil {
+		return false
+	}
+
+	// 从path中解析出directions
+	if path == "" || path[0] != '/' {
+		return false
+	}
+	parts := strings.Split(path[1:], "/")
+	directs, err := hex.DecodeString(parts[0])
+	if err != nil {
+		return false
+	}
+
+	// 解析路径上的key
+	keys, err := KeyPathToKeys("/" + strings.Join(parts[1:], "/"))
+	if err != nil || len(keys) != len(directs) {
+		return false
+	}
+
+	hashVal := leafHash(item)
+	for i, key := range (keys) {
+		if directs[i] == PathLeft {
+			hashVal = innerHash(hashVal, key)
+		} else if directs[i] == PathRight {
+			hashVal = innerHash(key, hashVal)
+		}
+	}
+
+	if bytes.Equal(hashVal, roothash) {
+		return true
+	}
+	return false
 }

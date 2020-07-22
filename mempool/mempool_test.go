@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
 	"io/ioutil"
 	mrand "math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -546,6 +548,69 @@ func TestMempoolRemoteAppConcurrency(t *testing.T) {
 	}
 	err := mempool.FlushAppConn()
 	require.NoError(t, err)
+}
+
+func TestMempool_CheckCrossMessageSig(t *testing.T) {
+	app := kvstore.NewKVStoreApplication()
+	cc := proxy.NewLocalClientCreator(app)
+	config := cfg.ResetTestRoot("mempool_test")
+	config.Mempool.MaxTxsBytes = 10
+	mempool, cleanup := newMempoolWithAppAndConfig(cc, config)
+	defer cleanup()
+
+	txNum := 10
+	txs := types.HandleSortTx(randTX(txNum))
+
+	for _, tx := range (txs) {
+		t.Log(tx)
+	}
+
+	mts, err := types.GenerateMerkleTree(txs)
+	assert.Nil(t, err, "生成merkle树出错，err: ", err)
+	cms := types.ClassifyTxFromBlock(mts, txs, []byte{0}, []byte{1}, 10)
+
+	for ith, cm := range (cms) {
+		data := cm.Data()
+		assert.NotNil(t, data)
+		res := mempool.CheckCrossMessageSig(data)
+		assert.True(t, res, fmt.Sprintf("%v个CrossMessage验证失败", ith))
+	}
+}
+
+// 随机生成一定数量的relaytx和addtx
+func randTX(txNum int) types.Txs {
+	res := make([]types.Tx, txNum, txNum)
+	destination := []string{"A", "B", "C", "D", "E", ""}
+	txtype := []string{"addtx", "relaytx", ""}
+	for i := 0; i < txNum; i++ {
+		//tmpdes := destination[rand.Intn(5)] // [0-n)
+		content := randTXContent()
+		tx := &identypes.TX{
+			Txtype:      txtype[mrand.Intn(len(txtype))],
+			Sender:      "Neo",
+			Receiver:    destination[mrand.Intn(len(destination))],
+			ID:          sha256.Sum256([]byte(content)),
+			Content:     content,
+			TxSignature: "signature",
+			Operate:     1,
+			Height:      mrand.Int(),
+		}
+		res[i] = tx.Data()
+	}
+
+	return res
+}
+
+func randTXContent() string {
+	//产生转化交易金额
+	num := mrand.Intn(100)
+	//最后加入时间戳信息
+	tx_content := strconv.FormatInt(mrand.Int63(), 10) +
+		"_" + strconv.FormatInt(mrand.Int63(), 10) +
+		"_" + strconv.Itoa(num) +
+		"_" + strconv.FormatInt(time.Now().UnixNano(), 10) //添加时间戳来唯一标识该交易
+
+	return tx_content
 }
 
 // caller must close server

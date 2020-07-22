@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"crypto/sha256"
 	"fmt"
+	"github.com/tendermint/tendermint/crypto/merkle"
 
 	"sync"
 	"sync/atomic"
@@ -958,3 +959,28 @@ var _ txCache = (*nopTxCache)(nil)
 func (nopTxCache) Reset()             {}
 func (nopTxCache) Push(types.Tx) bool { return true }
 func (nopTxCache) Remove(types.Tx)    {}
+
+// 检查CrossMessage交易，检查tree path，但不验证tree root签名
+func (mem *Mempool) CheckCrossMessageSig(m []byte) bool {
+	cm, err := tp.CrossMessageFromByteSlices(m)
+	if err != nil {
+		return false
+	}
+
+	// 检验参数
+
+	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
+	txs := cm.Txlist
+
+	// 生成分片的tree root，获得该分片的merkle tree root来验证路径的正确性
+	smt := merkle.SimpleTreeFromByteSlices(txs)
+	if smt == nil {
+		return false
+	}
+
+	currentRoot := smt.ComputeRootHash()
+	if currentRoot == nil || len(currentRoot) == 0 {
+		return false
+	}
+	return merkle.VerifyTreePath(currentRoot, cm.TreePath, cm.CrossMerkleRoot)
+}

@@ -1,6 +1,9 @@
 package merkle
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"github.com/tendermint/tendermint/types/time"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +21,6 @@ func (tI testItem) Hash() []byte {
 }
 
 func TestSimpleProof(t *testing.T) {
-
 	total := 100
 
 	items := make([][]byte, total)
@@ -80,6 +82,8 @@ func Test_getSplitPoint(t *testing.T) {
 		{3, 2},
 		{4, 2},
 		{5, 4},
+		{6, 4},
+		{9, 8},
 		{10, 8},
 		{20, 16},
 		{100, 64},
@@ -90,5 +94,65 @@ func Test_getSplitPoint(t *testing.T) {
 	for _, tt := range tests {
 		got := getSplitPoint(tt.length)
 		require.Equal(t, tt.want, got, "getSplitPoint(%d) = %v, want %v", tt.length, got, tt.want)
+	}
+}
+
+func TestSimpleTree(t *testing.T) {
+	total := 5
+
+	items := make([][]byte, total)
+	for i := 0; i < total; i++ {
+		items[i] = []byte{uint8(i)} //testItem(cmn.RandBytes(tmhash.Size))
+	}
+
+	smt := SimpleTreeFromByteSlices(items)
+	for i, leaf := range (smt.Leaves) {
+		assert.Equal(t, leaf.Hash, leafHash(items[i]))
+	}
+	for _, leaf := range (smt.Leaves) {
+		node := leaf
+
+		for node != smt.Root {
+			fmt.Print(" ", fmt.Sprintf("%X", node.Hash))
+			node = node.Parent
+		}
+		fmt.Println()
+	}
+
+	pathByindex, _ := smt.GetPathByIndex(3)
+	pathByTx, _ := smt.GetPathByValue(items[2])
+	assert.True(t, pathByTx == pathByindex, "pathByHash != pathByindex")
+	assert.True(t, VerifyTreePath(items[2], pathByindex, smt.ComputeRootHash()))
+
+}
+
+func TestVerifyTreePath(t *testing.T) {
+	total := 103
+
+	items := make([][]byte, total)
+	for i := 0; i < total; i++ {
+		items[i] = []byte{uint8(i)} //testItem(cmn.RandBytes(tmhash.Size))
+	}
+
+	smt := SimpleTreeFromByteSlices(items)
+	maxLen, avgLen := 0, 0.0
+	start := time.Now()
+	for i := 0; i < total; i++ {
+		path, _ := smt.GetPathByValue(items[i])
+		assert.True(t,
+			VerifyTreePath(items[i], path, smt.ComputeRootHash()),
+			fmt.Sprintf("第%v个交易检验失败", i+1))
+		maxLen = max(maxLen, len(path))
+		avgLen = (avgLen*float64(i) + float64(len(path))) / float64(i+1)
+	}
+	t.Logf("%v个交易merkle验证耗时:%v", total, time.Now().Sub(start).Seconds())
+	t.Logf("%v个交易merkle tree path最大值为: %v, 平均值为: %v", total, maxLen, avgLen)
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	} else {
+		return b
 	}
 }
