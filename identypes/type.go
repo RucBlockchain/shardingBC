@@ -25,6 +25,9 @@ Tx的type有五种：
 跨片tx：
 	relaytx
 	addtx
+共识tx
+	aggregate
+	confirmmessage
 检查点tx：
 	checkpoint
 初始化tx:
@@ -64,8 +67,9 @@ type TX struct {
 	Operate     int // 查部分的定义 0为转出方 1为转入方
 
 	// 当交易类型为relayTX时有用，其余类型为空跳过即可
-	AggSig AggregateSig
-	Height int // 记录该条跨片交易被共识的区块高度
+
+	//AggSig AggregateSig
+	Height  int // 记录该条跨片交易被共识的区块高度
 }
 
 func NewTX(data []byte) (*TX, error) {

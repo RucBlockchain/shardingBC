@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"github.com/tendermint/tendermint/crypto/merkle"
-
+	"github.com/tendermint/tendermint/checkdb"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -40,6 +42,11 @@ type PostCheckFunc func(types.Tx, *abci.ResponseCheckTx) error
 // TxInfo are parameters that get passed when attempting to add a tx to the
 // mempool.
 type TxInfo struct {
+	// We don't use p2p.ID here because it's too big. The gain is to store max 2
+	// bytes with each tx to identify the sender rather than 20 bytes.
+	PeerID uint16
+}
+type CmInfo struct {
 	// We don't use p2p.ID here because it's too big. The gain is to store max 2
 	// bytes with each tx to identify the sender rather than 20 bytes.
 	PeerID uint16
@@ -152,6 +159,15 @@ func PostCheckMaxGas(maxGas int64) PostCheckFunc {
 func TxID(tx []byte) string {
 	return fmt.Sprintf("%X", types.Tx(tx).Hash())
 }
+func Sum(bz []byte) []byte {
+	h := sha256.Sum256(bz)
+	return h[:]
+}
+func CmID(cm *tp.CrossMessages) string {
+	heightHash := Sum([]byte(strconv.FormatInt(cm.Height, 10)))
+	ID := append(heightHash, cm.CrossMerkleRoot...)
+	return fmt.Sprintf("%X", ID)
+}
 
 // txKey is the fixed length array sha256 hash used as the key in maps.
 func txKey(tx types.Tx) [sha256.Size]byte {
@@ -168,10 +184,14 @@ type Mempool struct {
 	proxyMtx     sync.Mutex
 	proxyAppConn proxy.AppConnMempool
 	txs          *clist.CList // concurrent linked-list of good txs
-	preCheck     PreCheckFunc
-	postCheck    PostCheckFunc
-	rDB          relaytxDB //relaylist
+	Cms          *clist.CList
 
+	preCheck  PreCheckFunc
+	postCheck PostCheckFunc
+	//rDB          relaytxDB //relaylist
+	cmDB   CrossMessagesDB
+	RlDB   []RelationTable
+	cmChan chan *tp.CrossMessages
 	// Track whether we're rechecking txs.
 	// These are not protected by a mutex and are expected to be mutated
 	// in serial (ie. by abci responses which are called in serial).
@@ -183,9 +203,10 @@ type Mempool struct {
 	txsAvailable         chan struct{} // fires once for each height, when the mempool is not empty
 
 	// Map for quick access to txs to record sender in CheckTx.
-	// txsMap: txKey -> CElement
+	// txsMap: txKey -> cmCElement
 	txsMap sync.Map
 
+	cmsMap sync.Map
 	// Atomic integers
 	height     int64 // the last block Update()'d to
 	rechecking int32 // for re-checking filtered txs on Update()
@@ -205,14 +226,23 @@ type Mempool struct {
 
 //--------------------------------------------
 //新增的跨片交易的状态数据库
-type relaytxDB struct {
-	relaytx []RTx //RelayTx结构的切片
+type CrossMessagesDB struct {
+	CrossMessages []*CrossMessage
+}
+type CrossMessage struct {
+	Content *tp.CrossMessages
+	Height  int
 }
 
-type RTx struct {
-	Tx     tp.TX
-	Height int
-}
+//type relaytxDB struct {
+//	relaytx []RTx //RelayTx结构的切片
+//}
+//
+//type RTx struct {
+//	Tx     tp.TX
+//	Height int
+//	CrossMessageIndex tp.CrossMessageIndex
+//}
 
 //-------------------------------------------
 
@@ -236,7 +266,8 @@ func NewMempool(
 		recheckEnd:    nil,
 		logger:        log.NewNopLogger(),
 		metrics:       NopMetrics(),
-		rDB:           newrDB(),
+		cmDB:          newcmDB(),
+		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -252,60 +283,131 @@ func NewMempool(
 
 //--------------------------------------------------------
 //新增函数
-
-func newrDB() relaytxDB {
-	var rdb relaytxDB
-	var rtx []RTx
-	rdb.relaytx = rtx
-	return rdb
+func newcmDB() CrossMessagesDB {
+	var cmdb CrossMessagesDB
+	var cm []*CrossMessage
+	cmdb.CrossMessages = cm
+	return cmdb
 }
-
-func (mem *Mempool) AddRelaytxDB(tx tp.TX) {
-	var rtx RTx
-	rtx.Tx = tx
-	rtx.Height = 0
-	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
-}
-
-func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
-	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
-			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
-			i--
-
-			break
-		}
+func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
+	cm := &CrossMessage{
+		Content: tcm,
+		Height:  0,
 	}
+	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
 }
-func (mem *Mempool) UpdaterDB() []tp.TX {
-	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认
+func ParsePackages(data []byte) []tp.Package {
+	var packs []tp.Package
+	err := json.Unmarshal(data, &packs)
+	if len(packs) == 0 {
+		return nil
+	}
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	return packs
+}
+func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
+	//删除交易包
+	//对package进行解析
 
-	var stx []tp.TX
-	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx != nil {
-			if mem.rDB.relaytx[i].Height == 0 { //第一次高度为0就发布
-				stx = append(stx, mem.rDB.relaytx[i].Tx)
-				mem.rDB.relaytx[i].Height += 1 //增加高度
-			} else if (mem.rDB.relaytx[i].Height == 10) || (mem.rDB.relaytx[i].Height == 20) {
-				stx = append(stx, mem.rDB.relaytx[i].Tx)
-				mem.rDB.relaytx[i].Height = 0
-			} else {
-				mem.rDB.relaytx[i].Height = mem.rDB.relaytx[i].Height + 1
+	packs := ParsePackages(tcm.Packages)
+	for j := 0; j < len(packs); j++ {
+		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+			if mem.cmDB.CrossMessages[i].Content.Height == packs[j].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[j].CrossMerkleRoot) {
+				mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
+				i--
+
+				break
 			}
 		}
 	}
-	return stx
 
 }
-func (mem *Mempool) GetAllTxs() []tp.TX {
-	var alltx []tp.TX
-	for i := 0; i < len(mem.rDB.relaytx); i++ {
-		if mem.rDB.relaytx != nil {
-			alltx = append(alltx, mem.rDB.relaytx[i].Tx)
+func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
+	//检查cmDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送交易包，让其被确认
+
+	var scm []*tp.CrossMessages
+	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+		if mem.cmDB.CrossMessages != nil {
+			if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
+				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
+			} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
+				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+				mem.cmDB.CrossMessages[i].Height = 0
+			} else {
+				mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
+			}
 		}
 	}
-	return alltx
+	return scm
+
 }
+func (mem *Mempool) GetAllCrossMessages() []*tp.CrossMessages {
+	var allcm []*tp.CrossMessages
+	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+		if mem.cmDB.CrossMessages != nil {
+			allcm = append(allcm, mem.cmDB.CrossMessages[i].Content)
+		}
+	}
+	return allcm
+}
+
+//func newrDB() relaytxDB {
+//	var rdb relaytxDB
+//	var rtx []RTx
+//	rdb.relaytx = rtx
+//	return rdb
+//}
+//
+//func (mem *Mempool) AddRelaytxDB(tx tp.TX,CIndex tp.CrossMessageIndex) {
+//	var rtx RTx
+//	rtx.Tx = tx
+//	rtx.Height = 0
+//	rtx.CrossMessageIndex = CIndex
+//	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
+//}
+//
+//func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
+//	for i := 0; i < len(mem.rDB.relaytx); i++ {
+//		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
+//			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
+//			i--
+//
+//			break
+//		}
+//	}
+//}
+//func (mem *Mempool) UpdaterDB() []tp.TX {
+//	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认
+//
+//	var stx []tp.TX
+//	for i := 0; i < len(mem.rDB.relaytx); i++ {
+//		if mem.rDB.relaytx != nil {
+//			if mem.rDB.relaytx[i].Height == 0 { //第一次高度为0就发布
+//				stx = append(stx, mem.rDB.relaytx[i].Tx)
+//				mem.rDB.relaytx[i].Height += 1 //增加高度
+//			} else if (mem.rDB.relaytx[i].Height == 10) || (mem.rDB.relaytx[i].Height == 20) {
+//				stx = append(stx, mem.rDB.relaytx[i].Tx)
+//				mem.rDB.relaytx[i].Height = 0
+//			} else {
+//				mem.rDB.relaytx[i].Height = mem.rDB.relaytx[i].Height + 1
+//			}
+//		}
+//	}
+//	return stx
+//
+//}
+//func (mem *Mempool) GetAllTxs() []tp.TX {
+//	var alltx []tp.TX
+//	for i := 0; i < len(mem.rDB.relaytx); i++ {
+//		if mem.rDB.relaytx != nil {
+//			alltx = append(alltx, mem.rDB.relaytx[i].Tx)
+//		}
+//	}
+//	return alltx
+//}
 
 //----------------------------------------------------------
 // EnableTxsAvailable initializes the TxsAvailable channel,
@@ -413,12 +515,18 @@ func (mem *Mempool) Flush() {
 func (mem *Mempool) TxsFront() *clist.CElement {
 	return mem.txs.Front()
 }
+func (mem *Mempool) CmsFront() *clist.CElement {
+	return mem.Cms.Front()
+}
 
 // TxsWaitChan returns a channel to wait on transactions. It will be closed
 // once the mempool is not empty (ie. the internal `mem.txs` has at least one
 // element)
 func (mem *Mempool) TxsWaitChan() <-chan struct{} {
 	return mem.txs.WaitChan()
+}
+func (mem *Mempool) CmsWaitChan() <-chan struct{} {
+	return mem.Cms.WaitChan()
 }
 
 // CheckTx executes a new transaction against the application to determine its validity
@@ -431,6 +539,157 @@ func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 	return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID})
 }
 
+//添加新的函数------------------------------------------------------------------
+//为了投票使用
+func (mem *Mempool) SearchPackageExist(pack tp.Package) bool {
+	_, ok := mem.txsMap.Load(pack.CmID)
+	return ok
+}
+func (mem *Mempool) SyncRelationTable(pack tp.Package, height int64) {
+	var rl RelationTable
+	rl = RelationTable{
+		CsHeight: height,
+		CmHeight: pack.Height,
+		CmHash:   pack.CrossMerkleRoot,
+		CmID:     pack.CmID,
+	}
+	rl.RlID = RlID(rl)
+	mem.RlDB = append(mem.RlDB, rl)
+}
+
+//检查验证Cm的正确性
+func (mem *Mempool) ModifyCrossMessagelist(cm *tp.CrossMessages) {
+	mem.RemoveCrossMessagesDB(cm)
+}
+func (mem *Mempool) CheckCrossMessage(cm *tp.CrossMessages) error {
+	//TODO:CheckMessages还未完善
+	return mem.CheckCrossMessageWithInfo(cm)
+}
+func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) {
+	//由于上层已经锁了，在这里不用锁
+	//检验包的正确性
+	mem.logger.Error("检验cm")
+	if result := cm.CheckMessages(); !result {
+		return errors.New("聚合签名或者检验失败")
+	}
+	//交易合法性检验
+	for i := 0; i < len(cm.Txlist); i++ {
+		var tx types.Tx
+		tx, err = json.Marshal(cm.Txlist[i])
+		accountLog := account.NewAccountLog(tx)
+		if accountLog == nil {
+			return errors.New("交易解析失败")
+		}
+		checkRes := accountLog.Check()
+
+		if !checkRes {
+			fmt.Println("不合法")
+			return errors.New("不合法的交易")
+		}
+	}
+	//删除对应的CrossList内容
+	mem.ModifyCrossMessagelist(cm)
+
+	return nil
+}
+
+type RelationTable struct {
+	CsHeight       int64
+	CmHeight       int64
+	CmHash         []byte
+	CmID           [32]byte
+	RlID           string
+	Packages       []byte
+	ComfirmPackSig []byte
+	SrcZone        string
+	DesZone        string
+}
+
+func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [32]byte) {
+	//打包区块的高度Cs.Height|Cm.Height|Cm.Hash|Cm.ID
+
+	rl := RelationTable{
+		CsHeight: height,
+		CmHeight: cm.Height,
+		CmHash:   cm.CrossMerkleRoot,
+		CmID:     cmID,
+		SrcZone:  cm.SrcZone,
+		DesZone:  cm.DesZone,
+	}
+
+	rl.RlID = RlID(rl)
+	fmt.Println("添加映射表的id",rl.RlID)
+	mem.RlDB = append(mem.RlDB, rl)
+}
+
+//todo
+func (mem *Mempool) SearchRelationTable(Height int64) []tp.Package {
+	var packlist []tp.Package
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].CsHeight == Height {
+			pack := tp.Package{
+				CrossMerkleRoot: mem.RlDB[i].CmHash,
+				Height:          mem.RlDB[i].CmHeight,
+				CmID:            mem.RlDB[i].CmID,
+			}
+			packlist = append(packlist, pack)
+		}
+	}
+	return packlist
+}
+func (mem *Mempool) ModifyRelationTable(packages []byte, ConfirmPackSig []byte, Height int64) {
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].CsHeight == Height {
+			mem.RlDB[i].Packages = packages
+			mem.RlDB[i].ComfirmPackSig = ConfirmPackSig
+		}
+	}
+}
+
+//删除映射表关系
+func (mem *Mempool) RemoveRelationTable(rlid string) {
+	fmt.Println("删除映射表")
+	fmt.Println("映射表容量", len(mem.RlDB))
+	fmt.Println("本次删除映射表的选项是",rlid)
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].RlID == rlid {
+			//先固化到磁盘
+			cm := &tp.CrossMessages{
+				Txlist:          nil,
+				Sig:             nil,
+				Pubkeys:         nil,
+				CrossMerkleRoot: mem.RlDB[i].CmHash,
+				TreePath:        nil,
+				SrcZone:         mem.RlDB[i].SrcZone,
+				DesZone:         mem.RlDB[i].DesZone,
+				Height:          mem.RlDB[i].CmHeight,
+				Packages:        mem.RlDB[i].Packages,
+				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
+			}
+
+			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
+			checkdb.Save([]byte(CmID(cm)), cm) //存储
+			fmt.Println("存储", "root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)))
+			i--
+			break
+		}
+	}
+	fmt.Println("删除完映射表容量", len(mem.RlDB))
+}
+func ParseData(data types.Tx) *tp.CrossMessages {
+	cm := new(tp.CrossMessages)
+	err := json.Unmarshal(data, &cm)
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	if cm.Packages == nil {
+		return nil
+	} else {
+		return cm
+	}
+}
+
+//函数添加结束------------------------------------------------------------------
 // CheckTxWithInfo performs the same operation as CheckTx, but with extra meta data about the tx.
 // Currently this metadata is the peer who sent it,
 // used to prevent the tx from being gossiped back to them.
@@ -443,9 +702,6 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
-	// fmt.Println(retx1) //看看是否被阻隔
-	// var retx *tp.TX
-	// retx, _ = tp.NewTX(tx)
 
 	var (
 		memSize  = mem.Size()
@@ -496,16 +752,26 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	 * @Desc: check tx
 	 * @Date: 19.11.10
 	 */
+	//检验cm的合法性
+	if cm := ParseData(tx); cm != nil {
+		mem.logger.Error("接受到Cm消息")
+		if result := mem.CheckCrossMessage(cm); result != nil {
+			return result
+		}
+	} else {
 
-	accountLog := account.NewAccountLog(tx)
-	if accountLog == nil {
-		return errors.New("交易解析失败")
-	}
-	checkRes := accountLog.Check()
+		accountLog := account.NewAccountLog(tx)
+		if accountLog == nil {
+			return errors.New("交易解析失败")
+		}
+		checkRes := accountLog.Check()
 
-	if !checkRes {
-		return errors.New("不合法的交易")
+		if !checkRes {
+
+			return errors.New("不合法的交易")
+		}
 	}
+
 	//对addtx进行检验，如果是已经加入则直接返回
 	// WAL
 	if mem.wal != nil {
@@ -711,7 +977,8 @@ func (mem *Mempool) notifyTxsAvailable() {
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
 // transactions (~ all available transactions).
-func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
+func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) types.Txs {
+	//区块能取到最大的数量，最大gas值
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
 	// mem.logger.Error("reap txs")
@@ -727,23 +994,76 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64) types.Txs {
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
 	txs := make([]types.Tx, 0, mem.txs.Len())
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
+		//取交易
 		memTx := e.Value.(*mempoolTx)
+
 		// Check total size requirement
-		aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
-		if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
-			return txs
+		// 删除对应的txlist的relay_out交易
+		if cm := ParseData(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
+			//添加映射关系
+			//对txlist进行遍历，将relay_in的tx加入区块之中
+			var txlist []*tp.TX
+			var byte_txlist []types.Tx
+			for i := 0; i < len(cm.Txlist); i++ {
+				if cm.Txlist[i].Txtype == "relaytx" {
+					var tx *tp.TX
+					tx = cm.Txlist[i]
+					txlist = append(txlist, tx)
+					data, err := json.Marshal(tx)
+					if err != nil {
+						mem.logger.Error("reap 交易解析错误")
+						return nil
+					}
+					byte_txlist = append(byte_txlist, data)
+				}
+			}
+
+			total_data, err := json.Marshal(txlist)
+			if err != nil {
+				mem.logger.Error("reap 聚合交易解析错误")
+				return nil
+			}
+			aminoOverhead := types.ComputeAminoOverhead(total_data, 1)
+			if maxBytes > -1 && totalBytes+int64(len(total_data))+aminoOverhead > maxBytes {
+				return txs
+			}
+			//在这里如果交易通过核验，那么就可以确定要取该交易。那么此时，我们需要在这里对交易进行判断,加入映射表之中
+			//TODO:映射表的完善
+			mem.AddRelationTable(cm, height, txKey(memTx.tx))
+			totalBytes += int64(len(total_data)) + aminoOverhead
+			// Check total gas requirement.
+			// If maxGas is negative, skip this check.
+			// Since newTotalGas < masGas, which
+			// must be non-negative, it follows that this won't overflow.
+			// gasWanted是什么意思？？？是否需要生成所有的gasWanted？
+			//todo:GasWanted调研
+			newTotalGas := totalGas + memTx.gasWanted
+			if maxGas > -1 && newTotalGas > maxGas {
+				return txs
+			}
+			totalGas = newTotalGas
+			//做测试
+			txs = append(txs, byte_txlist...)
+		} else {
+			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
+			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
+				return txs
+			}
+			//在这里如果交易通过核验，那么就可以确定要取该交易。那么此时，我们需要在这里对交易进行判断
+
+			totalBytes += int64(len(memTx.tx)) + aminoOverhead
+			// Check total gas requirement.
+			// If maxGas is negative, skip this check.
+			// Since newTotalGas < masGas, which
+			// must be non-negative, it follows that this won't overflow.
+			newTotalGas := totalGas + memTx.gasWanted
+			if maxGas > -1 && newTotalGas > maxGas {
+				return txs
+			}
+			totalGas = newTotalGas
+			txs = append(txs, memTx.tx)
 		}
-		totalBytes += int64(len(memTx.tx)) + aminoOverhead
-		// Check total gas requirement.
-		// If maxGas is negative, skip this check.
-		// Since newTotalGas < masGas, which
-		// must be non-negative, it follows that this won't overflow.
-		newTotalGas := totalGas + memTx.gasWanted
-		if maxGas > -1 && newTotalGas > maxGas {
-			return txs
-		}
-		totalGas = newTotalGas
-		txs = append(txs, memTx.tx)
+
 	}
 	return txs
 }
@@ -775,6 +1095,50 @@ func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 // Update informs the mempool that the given txs were committed and can be discarded.
 // NOTE: this should be called *after* block is committed by consensus.
 // NOTE: unsafe; Lock/Unlock must be managed by caller
+func DetectTx(tx types.Tx) bool {
+	parsetx, _ := tp.NewTX(tx)
+	//说明是relay_out交易
+	if parsetx.Txtype == "relaytx" && parsetx.Sender != getShard() {
+		//将该条交易删除
+		return true
+	} else {
+		return false
+	}
+}
+func RlID(rl RelationTable) string {
+	heightHash := Sum([]byte(strconv.FormatInt(rl.CmHeight, 10)))
+	ID := append(heightHash, rl.CmHash...)
+	return fmt.Sprintf("%X", ID)
+}
+func (mem *Mempool) RemoveCm(height int64) []types.Tx {
+	CmsMap := make(map[string]struct{}, len(mem.RlDB))
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].CsHeight == height {
+			//说明在本次区块，该cm被打包了
+			//聚合
+			CmsMap[RlID(mem.RlDB[i])] = struct{}{}
+		}
+	}
+	txsLeft := make([]types.Tx, 0, mem.txs.Len())
+	for e := mem.txs.Front(); e != nil; e = e.Next() {
+		memTx := e.Value.(*mempoolTx)
+		// Remove the tx if it's already in a block.
+		if cm := ParseData(memTx.tx); cm != nil {
+			if _, ok := CmsMap[CmID(cm)]; ok {
+				// NOTE: we don't remove committed txs from the cache.
+				mem.removeTx(memTx.tx, e, false)
+				//固化到磁盘中
+
+				mem.RemoveRelationTable(CmID(cm))
+				continue
+			}
+		}
+
+		txsLeft = append(txsLeft, memTx.tx)
+	}
+	return txsLeft
+
+}
 func (mem *Mempool) Update(
 	height int64,
 	txs types.Txs,
@@ -792,13 +1156,17 @@ func (mem *Mempool) Update(
 		mem.postCheck = postCheck
 	}
 
-	// Add committed transactions to cache (if missing).
+	//	// Add committed transactions to cache (if missing).
 	for _, tx := range txs {
+		if DetectTx(tx) {
+			continue
+		}
 		_ = mem.cache.Push(tx)
 	}
-
+	//删除对应交易包
+	txsleft_cm := mem.RemoveCm(height)
 	// Remove committed transactions.
-	txsLeft := mem.removeTxs(txs)
+	txsLeft := mem.removeTxs(txsleft_cm)
 
 	// Either recheck non-committed txs to see if they became invalid
 	// or just notify there're some txs left.
@@ -824,6 +1192,10 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 	// Build a map for faster lookups.
 	txsMap := make(map[string]struct{}, len(txs))
 	for _, tx := range txs {
+		//主要是避免由cm产生的tx
+		if DetectTx(tx) {
+			continue
+		}
 		txsMap[string(tx)] = struct{}{}
 	}
 
@@ -871,10 +1243,22 @@ type mempoolTx struct {
 	// senders: PeerID -> bool
 	senders sync.Map
 }
+type mempoolCm struct {
+	height    int64             // height that this tx had been validated in
+	gasWanted int64             // amount of gas this tx states it will require
+	cm        *tp.CrossMessages //
+
+	// ids of peers who've sent us this tx (as a map for quick lookups).
+	// senders: PeerID -> bool
+	senders sync.Map
+}
 
 // Height returns the height for this transaction
 func (memTx *mempoolTx) Height() int64 {
 	return atomic.LoadInt64(&memTx.height)
+}
+func (memCm *mempoolCm) Height() int64 {
+	return atomic.LoadInt64(&memCm.height)
 }
 
 //--------------------------------------------------------------------------------

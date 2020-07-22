@@ -11,13 +11,13 @@ import (
 	"syscall"
 )
 
-func conver2cptx(cpTxs []tp.TX, height int64) tp.TX {
+func conver2cptx(cpCms []*tp.CrossMessages, height int64) tp.TX {
 
 	var content []string
 	var contentByte []byte
-	fmt.Println("cpTxs length is ", len(cpTxs))
-	for i := 0; i < len(cpTxs); i++ {
-		marshalTx, _ := json.Marshal(cpTxs[i])
+	fmt.Println("cpTxs length is ", len(cpCms))
+	for i := 0; i < len(cpCms); i++ {
+		marshalTx, _ := json.Marshal(cpCms[i])
 		contentByte = append(contentByte, marshalTx...)
 		content = append(content, string(marshalTx))
 	}
@@ -34,8 +34,8 @@ func getShard() string {
 	return v
 }
 
-func Sendcptx(tx tp.TX, flag int) {
-	name := "TT" + getShard() + "Node2:26657"
+func Sendcptx(tx tp.TX) {
+	name := getShard() + "_1:26657"
 	tx_package := []tp.TX{}
 	tx_package = append(tx_package, tx)
 	client := *myclient.NewHTTP(name, "/websocket")

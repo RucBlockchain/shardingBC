@@ -61,7 +61,7 @@ type Vote struct {
 	Signature        []byte        `json:"signature"`
 
 	// 在prevote阶段，当区块中包含跨片交易，则当前验证者对该交易生成一个新的签名
-	CrossTxSigs []identypes.VoteCrossTxSig `json:"cross_tx_sigs""` // [{TX_ID, signature}]
+	PartSig 		*identypes.PartSig
 }
 
 // CommitSig converts the Vote to a CommitSig.

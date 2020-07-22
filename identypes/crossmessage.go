@@ -18,15 +18,11 @@ type CrossMessages struct {
 	ConfirmPackSigs []byte    //对于这些包的签名
 }
 
-type PartSig struct {
-	PeerCrossSig []byte
-	Id           int64
-}
-
 type Package struct {
 	CrossMerkleRoot []byte
-	Height          int64
-	CmID            [32]byte
+	Height int64
+	CmID   [32]byte
+	SrcZone string
 }
 
 func (cm *CrossMessages) CheckMessages() bool {
