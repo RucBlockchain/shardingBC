@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/tendermint/tendermint/checkdb"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -162,9 +163,9 @@ func Sum(bz []byte) []byte {
 	return h[:]
 }
 func CmID(cm *tp.CrossMessages) string {
-	heightHash:=Sum([]byte(strconv.FormatInt(cm.Height,10)))
-	ID:= append(heightHash,cm.CrossMerkleRoot...)
-	return fmt.Sprintf("%X",ID)
+	heightHash := Sum([]byte(strconv.FormatInt(cm.Height, 10)))
+	ID := append(heightHash, cm.CrossMerkleRoot...)
+	return fmt.Sprintf("%X", ID)
 }
 
 // txKey is the fixed length array sha256 hash used as the key in maps.
@@ -188,7 +189,7 @@ type Mempool struct {
 	postCheck PostCheckFunc
 	//rDB          relaytxDB //relaylist
 	cmDB   CrossMessagesDB
-	RlDB	[]RelationTable
+	RlDB   []RelationTable
 	cmChan chan *tp.CrossMessages
 	// Track whether we're rechecking txs.
 	// These are not protected by a mutex and are expected to be mutated
@@ -288,18 +289,16 @@ func newcmDB() CrossMessagesDB {
 	return cmdb
 }
 func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
-	fmt.Println(tcm)
-	cm:=&CrossMessage{
+	cm := &CrossMessage{
 		Content: tcm,
 		Height:  0,
 	}
-	fmt.Println(cm)
 	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
 }
-func ParsePackages(data []byte)[]tp.Package{
+func ParsePackages(data []byte) []tp.Package {
 	var packs []tp.Package
 	err := json.Unmarshal(data, &packs)
-	if len(packs)==0{
+	if len(packs) == 0 {
 		return nil
 	}
 	if err != nil {
@@ -310,13 +309,11 @@ func ParsePackages(data []byte)[]tp.Package{
 func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 	//删除交易包
 	//对package进行解析
-	packs:=ParsePackages(tcm.Packages)
-	mem.logger.Error("解析包资源")
-	fmt.Println(len(packs))
+
+	packs := ParsePackages(tcm.Packages)
 	for j := 0; j < len(packs); j++ {
 		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
-
-			if mem.cmDB.CrossMessages[i].Content.Height == packs[i].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[i].CrossMerkleRoot) {
+			if mem.cmDB.CrossMessages[i].Content.Height == packs[j].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[j].CrossMerkleRoot) {
 				mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
 				i--
 
@@ -330,17 +327,17 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 	//检查cmDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送交易包，让其被确认
 
 	var scm []*tp.CrossMessages
-			for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
-				if mem.cmDB.CrossMessages != nil {
-						if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
-						scm = append(scm, mem.cmDB.CrossMessages[i].Content)
-						mem.cmDB.CrossMessages[i].Height += 1 //增加高度
-					} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
-						scm = append(scm, mem.cmDB.CrossMessages[i].Content)
-						mem.cmDB.CrossMessages[i].Height = 0
-					} else {
-						mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
-					}
+	for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
+		if mem.cmDB.CrossMessages != nil {
+			if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
+				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
+			} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
+				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
+				mem.cmDB.CrossMessages[i].Height = 0
+			} else {
+				mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
+			}
 		}
 	}
 	return scm
@@ -543,21 +540,22 @@ func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 
 //添加新的函数------------------------------------------------------------------
 //为了投票使用
-func (mem *Mempool)SearchPackageExist(pack tp.Package)bool{
-	_,ok:=mem.txsMap.Load(pack.CmID)
+func (mem *Mempool) SearchPackageExist(pack tp.Package) bool {
+	_, ok := mem.txsMap.Load(pack.CmID)
 	return ok
 }
-func (mem *Mempool)SyncRelationTable(pack tp.Package,height int64){
+func (mem *Mempool) SyncRelationTable(pack tp.Package, height int64) {
 	var rl RelationTable
-	rl=RelationTable{
+	rl = RelationTable{
 		CsHeight: height,
 		CmHeight: pack.Height,
 		CmHash:   pack.CrossMerkleRoot,
 		CmID:     pack.CmID,
 	}
-	rl.RlID=RlID(rl)
+	rl.RlID = RlID(rl)
 	mem.RlDB = append(mem.RlDB, rl)
 }
+
 //检查验证Cm的正确性
 func (mem *Mempool) ModifyCrossMessagelist(cm *tp.CrossMessages) {
 	mem.RemoveCrossMessagesDB(cm)
@@ -573,17 +571,12 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	if result := cm.CheckMessages(); !result {
 		return errors.New("聚合签名或者检验失败")
 	}
-	mem.logger.Error("完成检验cm")
 	//交易合法性检验
-	fmt.Println("cms交易集合数量",len(cm.Txlist))
-
 	for i := 0; i < len(cm.Txlist); i++ {
-		fmt.Println(cm.Txlist[i])
 		var tx types.Tx
 		tx, err = json.Marshal(cm.Txlist[i])
 		accountLog := account.NewAccountLog(tx)
 		if accountLog == nil {
-			fmt.Println("解析失败")
 			return errors.New("交易解析失败")
 		}
 		checkRes := accountLog.Check()
@@ -598,48 +591,89 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 
 	return nil
 }
+
 type RelationTable struct {
-	CsHeight int64
-	CmHeight int64
-	CmHash	 []byte
-	CmID	[32]byte
-	RlID	string
+	CsHeight       int64
+	CmHeight       int64
+	CmHash         []byte
+	CmID           [32]byte
+	RlID           string
+	Packages       []byte
+	ComfirmPackSig []byte
+	SrcZone        string
+	DesZone        string
 }
-func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages,height int64,cmID [32]byte) {
+
+func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [32]byte) {
 	//打包区块的高度Cs.Height|Cm.Height|Cm.Hash|Cm.ID
+
 	rl := RelationTable{
 		CsHeight: height,
 		CmHeight: cm.Height,
 		CmHash:   cm.CrossMerkleRoot,
 		CmID:     cmID,
+		SrcZone:  cm.SrcZone,
+		DesZone:  cm.DesZone,
 	}
+
 	rl.RlID = RlID(rl)
+	fmt.Println("添加映射表的id",rl.RlID)
 	mem.RlDB = append(mem.RlDB, rl)
 }
+
 //todo
-func (mem *Mempool)SearchRelationTable(Height int64)[]tp.Package{
+func (mem *Mempool) SearchRelationTable(Height int64) []tp.Package {
 	var packlist []tp.Package
-	for i := 0; i < len(mem.RlDB); i++{
-		if mem.RlDB[i].CsHeight==Height{
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].CsHeight == Height {
 			pack := tp.Package{
 				CrossMerkleRoot: mem.RlDB[i].CmHash,
 				Height:          mem.RlDB[i].CmHeight,
-				CmID:			 mem.RlDB[i].CmID,
+				CmID:            mem.RlDB[i].CmID,
 			}
 			packlist = append(packlist, pack)
 		}
 	}
 	return packlist
 }
-//删除映射表关系
-func (mem *Mempool)RemoveRelationTable(rlid string){
-		for i := 0; i < len(mem.RlDB); i++ {
-			if mem.RlDB[i].RlID == rlid{
-				mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
-				i--
-				break
-			}
+func (mem *Mempool) ModifyRelationTable(packages []byte, ConfirmPackSig []byte, Height int64) {
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].CsHeight == Height {
+			mem.RlDB[i].Packages = packages
+			mem.RlDB[i].ComfirmPackSig = ConfirmPackSig
 		}
+	}
+}
+
+//删除映射表关系
+func (mem *Mempool) RemoveRelationTable(rlid string) {
+	fmt.Println("删除映射表")
+	fmt.Println("映射表容量", len(mem.RlDB))
+	fmt.Println("本次删除映射表的选项是",rlid)
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].RlID == rlid {
+			//先固化到磁盘
+			cm := &tp.CrossMessages{
+				Txlist:          nil,
+				Sig:             nil,
+				Pubkeys:         nil,
+				CrossMerkleRoot: mem.RlDB[i].CmHash,
+				TreePath:        nil,
+				SrcZone:         mem.RlDB[i].SrcZone,
+				DesZone:         mem.RlDB[i].DesZone,
+				Height:          mem.RlDB[i].CmHeight,
+				Packages:        mem.RlDB[i].Packages,
+				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
+			}
+
+			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
+			checkdb.Save([]byte(CmID(cm)), cm) //存储
+			fmt.Println("存储", "root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)))
+			i--
+			break
+		}
+	}
+	fmt.Println("删除完映射表容量", len(mem.RlDB))
 }
 func ParseData(data types.Tx) *tp.CrossMessages {
 	cm := new(tp.CrossMessages)
@@ -647,7 +681,7 @@ func ParseData(data types.Tx) *tp.CrossMessages {
 	if err != nil {
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.Txlist == nil {
+	if cm.Packages == nil {
 		return nil
 	} else {
 		return cm
@@ -732,6 +766,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		checkRes := accountLog.Check()
 
 		if !checkRes {
+
 			return errors.New("不合法的交易")
 		}
 	}
@@ -941,7 +976,7 @@ func (mem *Mempool) notifyTxsAvailable() {
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
 // transactions (~ all available transactions).
-func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64,height int64) types.Txs {
+func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) types.Txs {
 	//区块能取到最大的数量，最大gas值
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
@@ -981,6 +1016,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64,height int64) type
 					byte_txlist = append(byte_txlist, data)
 				}
 			}
+
 			total_data, err := json.Marshal(txlist)
 			if err != nil {
 				mem.logger.Error("reap 聚合交易解析错误")
@@ -1058,38 +1094,40 @@ func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 // Update informs the mempool that the given txs were committed and can be discarded.
 // NOTE: this should be called *after* block is committed by consensus.
 // NOTE: unsafe; Lock/Unlock must be managed by caller
-func DetectTx(tx types.Tx)bool{
-	parsetx,_:=tp.NewTX(tx)
+func DetectTx(tx types.Tx) bool {
+	parsetx, _ := tp.NewTX(tx)
 	//说明是relay_out交易
-	if parsetx.Txtype=="relaytx" && parsetx.Sender!=getShard(){
+	if parsetx.Txtype == "relaytx" && parsetx.Sender != getShard() {
 		//将该条交易删除
 		return true
-	}else{
+	} else {
 		return false
 	}
 }
 func RlID(rl RelationTable) string {
-	heightHash:=Sum([]byte(strconv.FormatInt(rl.CmHeight,10)))
-	ID:= append(heightHash,rl.CmHash...)
-	return fmt.Sprintf("%X",ID)
+	heightHash := Sum([]byte(strconv.FormatInt(rl.CmHeight, 10)))
+	ID := append(heightHash, rl.CmHash...)
+	return fmt.Sprintf("%X", ID)
 }
-func (mem *Mempool)RemoveCm(height int64)[]types.Tx{
+func (mem *Mempool) RemoveCm(height int64) []types.Tx {
 	CmsMap := make(map[string]struct{}, len(mem.RlDB))
-	for i:=0;i<len(mem.RlDB);i++{
-		if mem.RlDB[i].CsHeight==height{
+	for i := 0; i < len(mem.RlDB); i++ {
+		if mem.RlDB[i].CsHeight == height {
 			//说明在本次区块，该cm被打包了
 			//聚合
-			CmsMap[RlID(mem.RlDB[i])]= struct{}{}
+			CmsMap[RlID(mem.RlDB[i])] = struct{}{}
 		}
 	}
 	txsLeft := make([]types.Tx, 0, mem.txs.Len())
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
 		// Remove the tx if it's already in a block.
-		if cm:=ParseData(memTx.tx);cm!=nil{
+		if cm := ParseData(memTx.tx); cm != nil {
 			if _, ok := CmsMap[CmID(cm)]; ok {
 				// NOTE: we don't remove committed txs from the cache.
 				mem.removeTx(memTx.tx, e, false)
+				//固化到磁盘中
+
 				mem.RemoveRelationTable(CmID(cm))
 				continue
 			}
@@ -1119,7 +1157,7 @@ func (mem *Mempool) Update(
 
 	//	// Add committed transactions to cache (if missing).
 	for _, tx := range txs {
-		if DetectTx(tx){
+		if DetectTx(tx) {
 			continue
 		}
 		_ = mem.cache.Push(tx)
@@ -1154,7 +1192,7 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 	txsMap := make(map[string]struct{}, len(txs))
 	for _, tx := range txs {
 		//主要是避免由cm产生的tx
-		if DetectTx(tx){
+		if DetectTx(tx) {
 			continue
 		}
 		txsMap[string(tx)] = struct{}{}

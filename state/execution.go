@@ -210,7 +210,12 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 	//resendTxs := blockExec.UpdateRelaytxDB() //检查状态数据库，没有及时确认的relayTxs需要重新发送relaytxs
 	resendMessages:=blockExec.UpdatecmDB()//检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
 	if len(resendMessages)>0{
-		fmt.Println("需要发送的cm",resendMessages)
+		for i:=0;i<len(resendMessages);i++{
+			fmt.Println("root",resendMessages[i].CrossMerkleRoot,"height",resendMessages[i].Height,"txlen",len(resendMessages[i].Txlist))
+			for j:=0;j<len(resendMessages[i].Txlist);j++{
+				fmt.Println(resendMessages[i].Txlist[j])
+			}
+		}
 	}
 	if flag {
 		//只有leader执行以下代码
@@ -324,6 +329,9 @@ func(blockExec *BlockExecutor)MergePackage(height int64)[]byte{
 	pack_data,_:=json.Marshal(packs)
 	return pack_data
 }
+func (blockExec *BlockExecutor)ModifyRelationTable(pk []byte,cfs []byte,height int64){
+	blockExec.mempool.ModifyRelationTable(pk,cfs,height)
+}
 func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
 	cpTxs := blockExec.mempool.GetAllCrossMessages()
 	return cpTxs
@@ -373,6 +381,7 @@ func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.Cros
 
 
 	if num > 0 {
+		fmt.Println("调用",num)
 		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
 
 	}

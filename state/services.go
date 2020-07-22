@@ -32,6 +32,7 @@ type Mempool interface {
 	UpdatecmDB() []*tp.CrossMessages
 	GetAllCrossMessages() []*tp.CrossMessages
 	SearchRelationTable(Height int64)[]tp.Package
+	ModifyRelationTable(packages []byte,cfs []byte,height int64)
 	SearchPackageExist(pack tp.Package)bool
 	SyncRelationTable(pack tp.Package,height int64)
 	Size() int
@@ -82,6 +83,7 @@ func (MockMempool) SearchRelationTable(Height int64) []tp.Package {
 	return pack
 }
 func (MockMempool)SyncRelationTable(tp tp.Package,height int64){}
+func (MockMempool)ModifyRelationTable(packages []byte,cfs []byte,height int64){}
 func (MockMempool) SearchPackageExist(tp tp.Package) bool {
 
 	return true

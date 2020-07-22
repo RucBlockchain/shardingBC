@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"syscall"
@@ -68,41 +70,62 @@ func getShard() string {
 	v, _ := syscall.Getenv("TASKID")
 	return v
 }
-func Checkdbtest(tx types.Tx) bool {
-	var retx *tp.TX
-	retx, _ = tp.NewTX(tx)
-	if consensusState.IsLeader() {
-		fmt.Println("leader") //leader才能判断
-		if retx.Txtype == "relaytx" {
-			shardname := getShard()
-			if shardname != retx.Sender {
-				dbtx := checkdb.Search(retx.ID)
-				if dbtx != nil {
-					if consensusState.IsLeader() {
-						name := dbtx.Sender + "_1:26657"
-						tx_package := []tp.TX{}
-						tx_package = append(tx_package, *dbtx)
-						for i := 0; i < len(tx_package); i++ {
-							client := *myclient.NewHTTP(name, "/websocket")
-							go client.BroadcastTxAsync(tx_package)
-						}
-					}
-					return true
-				}
+func Sum(bz []byte) []byte {
+	h := sha256.Sum256(bz)
+	return h[:]
+}
+func CmID(cm *tp.CrossMessages) string {
+	heightHash:=Sum([]byte(strconv.FormatInt(cm.Height,10)))
+	ID:= append(heightHash,cm.CrossMerkleRoot...)
+	return fmt.Sprintf("%X",ID)
+}
+func CheckDB(tx types.Tx) error {
+	if cm:=ParseData(tx);cm!=nil{
+		fmt.Println("收到",cm.Height,"root",cm.CrossMerkleRoot,"长度",len(cm.Txlist))
+		for i:=0;i<len(cm.Txlist);i++{
+			fmt.Println(cm.Txlist[i])
+		}
+		relaynum := 0
+		addnum:=0
+		for i:=0;i<len(cm.Txlist);i++{
+			if cm.Txlist[i].Txtype=="relaytx"{
+				relaynum+=1
+			}else if cm.Txlist[i].Txtype=="addtx"{
+				addnum+=1
 			}
 		}
-	} else {
-		fmt.Println("不是leader不做判断")
+		fmt.Println("relay交易数量",relaynum)
+		fmt.Println("addtx交易数量",addnum)
+		cmid:=CmID(cm)
+		fmt.Println("查询id",[]byte(cmid))
+		dbtx := checkdb.Search([]byte(cmid))
+		if dbtx!=nil{
+			name:=dbtx.SrcZone+"S1:26657"
+			tx_package := []*tp.CrossMessages{}
+			tx_package = append(tx_package, dbtx)
+			for i := 0; i < len(tx_package); i++ {
+				client := *myclient.NewHTTP(name, "/websocket")
+
+				go client.BroadcastCrossMessageAsync(tx_package)
+			}
+			fmt.Println("状态数据库返回")
+			return errors.New("状态数据库返回")
+		}else{
+			return nil
+		}
+
 	}
-	return false
+
+	return nil
 }
 func ParseData(data types.Tx)(*tp.CrossMessages){
 	cm:=new(tp.CrossMessages)
 	err:=json.Unmarshal(data,&cm)
+
 	if err!=nil{
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.Txlist==nil{
+	if cm.Packages==nil && cm.Txlist==nil{
 		return nil
 	}else{
 		return cm
@@ -119,8 +142,21 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 		//if Checkdbtest(tx) {
 		//	return nil, errors.New("状态数据库直接返回")
 		//}
-		err := mempool.CheckTx(tx, nil)
+		err := CheckDB(tx)
 		if err != nil {
+			return nil, err
+		}
+		err = mempool.CheckTx(tx, nil)
+		if err != nil {
+			if err==errors.New("不合法交易"){
+				if cm:=ParseData(tx);cm!=nil{
+					fmt.Println("交易cm不合法",cm)
+				}else{
+					tx1,_:=tp.NewTX(tx)
+					fmt.Println("交易tx不合法",tx1)
+				}
+			}
+			fmt.Println("checktx的结果",err)
 			return nil, err
 		}
 	//}

@@ -21,6 +21,7 @@ type Package struct {
 	CrossMerkleRoot []byte
 	Height int64
 	CmID   [32]byte
+	SrcZone string
 }
 
 func (cm *CrossMessages)CheckMessages()bool{

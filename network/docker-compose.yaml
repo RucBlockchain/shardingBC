@@ -1,38 +1,38 @@
 version: 2
 services:
   0S1:
-    image: 10.77.70.142:5000/tendermint:v0.4
+    image: tendermint:latest
     container_name: 0S1
     hostname: 0S1
     tty: true
     volumes:
-    - /home/centos/NFS500/network/0S1/config:/tendermint/config
+    - /root/NFS500/network/0S1/config:/tendermint/config
     environment:
     - TASKID=0
     - TASKINDEX=1
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=e548516b68adb5fc52d327e360397fb681f634d7@0S2:26656
+    - tendermint node --p2p.persistent_peers=1b6aedf56be8295fa186761b9acf5247daa2cac5@0S3:26656,9891dd14b8545ef419e0002ce816b6cd409ec40d@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
         - 0S1
   0S2:
-    image: 10.77.70.142:5000/tendermint:v0.4
+    image: tendermint:latest
     container_name: 0S2
     hostname: 0S2
     tty: true
     volumes:
-    - /home/centos/NFS500/network/0S2/config:/tendermint/config
+    - /root/NFS500/network/0S2/config:/tendermint/config
     environment:
     - TASKID=0
     - TASKINDEX=2
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=2dda64689cfa361014b97bb0e76cd2ee753a4015@0S1:26656
+    - tendermint node --p2p.persistent_peers=d12739be3584605af6a56a096291ba4b79e98e12@0S1:26656,d250b47c174b2ae51b6f13839e98efdca6f8dca9@0S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -40,40 +40,82 @@ services:
         - 0S2
     links:
     - 0S1
+  0S3:
+    image: tendermint:latest
+    container_name: 0S3
+    hostname: 0S3
+    tty: true
+    volumes:
+    - /root/NFS500/network/0S3/config:/tendermint/config
+    environment:
+    - TASKID=0
+    - TASKINDEX=3
+    entrypoint:
+    - sh
+    - -c
+    - tendermint node --p2p.persistent_peers=d12739be3584605af6a56a096291ba4b79e98e12@0S1:26656,d250b47c174b2ae51b6f13839e98efdca6f8dca9@0S4:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
+    networks:
+      tendermintnet1:
+        aliases:
+        - 0S3
+    links:
+    - 0S1
+  0S4:
+    image: tendermint:latest
+    container_name: 0S4
+    hostname: 0S4
+    tty: true
+    volumes:
+    - /root/NFS500/network/0S4/config:/tendermint/config
+    environment:
+    - TASKID=0
+    - TASKINDEX=4
+    entrypoint:
+    - sh
+    - -c
+    - tendermint node --p2p.persistent_peers=1b6aedf56be8295fa186761b9acf5247daa2cac5@0S3:26656,9891dd14b8545ef419e0002ce816b6cd409ec40d@0S2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
+    networks:
+      tendermintnet1:
+        aliases:
+        - 0S4
+    links:
+    - 0S3
 services:
   1S1:
-    image: 10.77.70.142:5000/tendermint:v0.4
+    image: tendermint:latest
     container_name: 1S1
     hostname: 1S1
     tty: true
     volumes:
-    - /home/centos/NFS500/network/1S1/config:/tendermint/config
+    - /root/NFS500/network/1S1/config:/tendermint/config
     environment:
     - TASKID=1
     - TASKINDEX=1
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=91c1c74c303dd7c62e5aa0829da00138f6f08be1@1S2:26656
+    - tendermint node --p2p.persistent_peers=4a2d3d99bd27424a137ae09fb92645764a6bb43f@1S3:26656,d189e08b0fddf3d4b367249262fe1513acc8d374@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
         - 1S1
   1S2:
-    image: 10.77.70.142:5000/tendermint:v0.4
+    image: tendermint:latest
     container_name: 1S2
     hostname: 1S2
     tty: true
     volumes:
-    - /home/centos/NFS500/network/1S2/config:/tendermint/config
+    - /root/NFS500/network/1S2/config:/tendermint/config
     environment:
     - TASKID=1
     - TASKINDEX=2
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=26796b2fc867bab60a25b3d62461bc2119f05543@1S1:26656
+    - tendermint node --p2p.persistent_peers=da160c2745eaa1b30efeea34f5017fc46072ca4a@1S1:26656,319b29d6295b3c700ccbff24de243043f89efe1d@1S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -81,6 +123,48 @@ services:
         - 1S2
     links:
     - 1S1
+  1S3:
+    image: tendermint:latest
+    container_name: 1S3
+    hostname: 1S3
+    tty: true
+    volumes:
+    - /root/NFS500/network/1S3/config:/tendermint/config
+    environment:
+    - TASKID=1
+    - TASKINDEX=3
+    entrypoint:
+    - sh
+    - -c
+    - tendermint node --p2p.persistent_peers=da160c2745eaa1b30efeea34f5017fc46072ca4a@1S1:26656,319b29d6295b3c700ccbff24de243043f89efe1d@1S4:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
+    networks:
+      tendermintnet1:
+        aliases:
+        - 1S3
+    links:
+    - 1S1
+  1S4:
+    image: tendermint:latest
+    container_name: 1S4
+    hostname: 1S4
+    tty: true
+    volumes:
+    - /root/NFS500/network/1S4/config:/tendermint/config
+    environment:
+    - TASKID=1
+    - TASKINDEX=4
+    entrypoint:
+    - sh
+    - -c
+    - tendermint node --p2p.persistent_peers=4a2d3d99bd27424a137ae09fb92645764a6bb43f@1S3:26656,d189e08b0fddf3d4b367249262fe1513acc8d374@1S2:26656
+      --moniker=`hostname` --proxy_app=persistent_kvstore
+    networks:
+      tendermintnet1:
+        aliases:
+        - 1S4
+    links:
+    - 1S3
 
 networks:
   tendermintnet1:

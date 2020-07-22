@@ -68,15 +68,15 @@ func (accountLog *AccountLog) Check() bool {
 		// logger.Error("支出方账户不存在")
 		return false
 	}
-	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0) {
-		// logger.Error("接收方账户不存在")
+	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
+		logger.Error("接收方账户不存在")
 		return false
 	}
 
 	if len(from) != 0 {
 		balanceFrom := _byte2digit(balanceFromStr)
 		if balanceFrom < amount {
-			// logger.Error("余额不足")
+			logger.Error("余额不足")
 			return false
 		}
 	}

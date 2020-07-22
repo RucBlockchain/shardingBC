@@ -199,7 +199,6 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 					ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
 				}
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
-				fmt.Println(string(ntx))
 				if err != nil {
 					fmt.Printf("failed to encode params: %v\n", err)
 					os.Exit(1)

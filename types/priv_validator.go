@@ -137,7 +137,6 @@ func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 //分割字符串得到相应的内容,默认容器名为：1_0 分片名_分片的index
 func ParseId()int64{
 
-	fmt.Println("i am here")
 
 	v, _ := syscall.Getenv("TASKID")
 	g, _ := syscall.Getenv("TASKINDEX")
@@ -150,7 +149,6 @@ func ParseId()int64{
 }
 func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte,vote *Vote)error{
 	vote.PartSig.Id = ParseId()
-	fmt.Println("节点id",vote.PartSig.Id)
 	vote.PartSig.PeerCrossSig = MerkleRoot
 	return nil
 }
