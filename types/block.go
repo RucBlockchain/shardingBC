@@ -50,12 +50,15 @@ type Block struct {
 // MakeBlock returns a new block with an empty header, except what can be
 // computed from itself.
 // It populates the same set of fields validated by ValidateBasic.
-func MakeBlock(height int64, txs []Tx, lastCommit *Commit, evidence []Evidence) *Block {
+func MakeBlock(height int64, txs []Tx, lastCommit *Commit, evidence []Evidence,pack_data []byte) *Block {
+	//在这里对交易进行排序
+	//并且将相关信息添加
 	block := &Block{
 		Shard: getShard(), 
 		Header: Header{
 			Height: height,
 			NumTxs: int64(len(txs)),
+			CmRelation:pack_data,
 		},
 		Data: Data{
 			Txs: txs,
@@ -70,6 +73,7 @@ func getShard()(string){
 	v, _ := syscall.Getenv("TASKID")
 	return v
 }
+
 /*
 func GetShard()(string){
     v := Config{}
@@ -412,6 +416,8 @@ type Header struct {
 	// consensus info
 	EvidenceHash    cmn.HexBytes `json:"evidence_hash"`    // evidence included in the block
 	ProposerAddress Address      `json:"proposer_address"` // original proposer of the block
+	CrossMerkleRoot cmn.HexBytes  `json:"cross_merkleroot"`
+	CmRelation   cmn.HexBytes	  `json:"cm_relation`
 }
 
 // Populate the Header with state-derived data.

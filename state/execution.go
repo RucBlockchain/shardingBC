@@ -1,10 +1,10 @@
 package state
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -115,9 +115,11 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 
 	// Fetch a limited amount of valid txs
 	maxDataBytes := types.MaxDataBytes(maxBytes, state.Validators.Size(), len(evidence))
-	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas)
-
-	return state.MakeBlock(height, txs, commit, evidence, proposerAddr)
+	//拿到相关的txs
+	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas,height)
+	Packages := blockExec.mempool.SearchRelationTable(height)
+	//将相关的txs进行
+	return state.MakeBlock(height, txs, commit, evidence, proposerAddr,Packages)
 }
 
 // ValidateBlock validates the given block against the given state.
@@ -202,160 +204,195 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 //------------------------------------------------------
 //检查是否有跨链交易产生，对其进行后续处理
-func (blockExec *BlockExecutor) CheckRelayTxs( /*line *myline.Line,*/ block *types.Block, flag bool) {
+func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 
-	fmt.Println("-------------Begin check Relay Txsc----------")
-	resendTxs := blockExec.UpdateRelaytxDB() //检查状态数据库，没有及时确认的relayTxs需要重新发送relaytxs
+	blockExec.logger.Error("-------------Begin check Cross Messages----------")
+	//resendTxs := blockExec.UpdateRelaytxDB() //检查状态数据库，没有及时确认的relayTxs需要重新发送relaytxs
+	resendMessages:=blockExec.UpdatecmDB()//检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
+	if len(resendMessages)>0{
+		for i:=0;i<len(resendMessages);i++{
+			fmt.Println("root",resendMessages[i].CrossMerkleRoot,"height",resendMessages[i].Height,"txlen",len(resendMessages[i].Txlist))
+			for j:=0;j<len(resendMessages[i].Txlist);j++{
+				fmt.Println(resendMessages[i].Txlist[j])
+			}
+		}
+	}
 	if flag {
 		//只有leader执行以下代码
-		var shard_send [][]tp.TX
-		shard_send = make([][]tp.TX, 16)
+		var shard_send [][]*tp.CrossMessages
+		//暂定有100个分片
+		shard_send = make([][]*tp.CrossMessages, 100)
 		//将需要跨片的交易按分片归类
-		for i := 0; i < len(resendTxs); i++ {
-			index := int(resendTxs[i].Receiver[0]) - 65
-			shard_send[index] = append(shard_send[index], resendTxs[i])
+		for i := 0; i < len(resendMessages); i++ {
+			//由于现在的Zone的名字改动了，所以现在不需要再减65
+			index,_:=strconv.Atoi(resendMessages[i].DesZone)
+			//index := int(resendMessages[i].DesZone[0]) - 65
+			shard_send[index] = append(shard_send[index], resendMessages[i])
 		}
 		var num int
 		num = 0
-		var tx_package []tp.TX
+		var tx_package []*tp.CrossMessages
 		for i := 0; i < len(shard_send); i++ {
 			if shard_send[i] != nil {
 				num = num + len(shard_send[i]) //发送到某分片所有跨片交易的数量，进行打包
 				tx_package = shard_send[i]
-				go blockExec.Send_Package(num, i, tx_package)
+				go blockExec.SendCrossMessages(num,tx_package)
 			}
 		}
-		fmt.Println("需要发送的CheckRelayTxs交易数量：", num)
+		fmt.Println("需要发送的CheckCrossMessages交易数量：", num)
 	}
 
 	//对当前提交的块检查，看是否有新的relayTxs产生，无需检查已经在provote阶段加入
-	receivetxs := blockExec.CheckCommitedBlock(block)
+	//无需检查，在consensus阶段已经发送了
+	//blockExec.CheckCommitedBlock(block)
 	if flag {
 		//只有leader节点发送交易
 		// if sendtxs != nil {
 		// 	blockExec.SendRelayTxs(sendtxs) //如果有relaytx,向其他分区发送交易（地址可以通过relaytx的格式解析）
 		// }
-		if receivetxs != nil {
-			blockExec.SendAddedRelayTxs(receivetxs) //如果该分区收到的relaytx已经add，向发送的分区回复
-		}
+		//if receivetxs != nil {
+		//	blockExec.SendAddedRelayTxs(receivetxs) //如果该分区收到的relaytx已经add，向发送的分区回复
+		//}
 		//每20个，更新一次checkpoint
 		if block.Height%20 == 0 {
-			cpTxs := blockExec.GetAllTxs()
-			cptx := conver2cptx(cpTxs, block.Height)
-			Sendcptx(cptx, 0) //TODO 改为一定要加入成功
+			cpCm := blockExec.GetAllCrossMessages()
+			cptx := conver2cptx(cpCm, block.Height)
+			Sendcptx(cptx) //TODO 改为一定要加入成功
 		}
 	}
 
 }
 
-func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block) []tp.TX { //寻找需要回复的tx
-	//检查block中所有的tx是否包含relay TX
-	//返回两种，新加入到分区的和已被确认的relaytx
-	fmt.Println("CheckCommitedBlock")
-	var receivetxs []tp.TX
-	if block.Data.Txs != nil {
-		for i := 0; i < len(block.Data.Txs); i++ {
+//func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block)  { //寻找需要回复的tx
+//	//检查block中所有的tx是否包含relay TX
+//	//返回两种，新加入到分区的和已被确认的relaytx
+//	blockExec.logger.Error("CheckCommitedBlock and check checkpoint")
+//	//var receivetxs []tp.TX
+//	if block.Data.Txs != nil {
+//		for i := 0; i < len(block.Data.Txs); i++ {
+//
+//			data := block.Data.Txs[i]
+//			encodeStr := hex.EncodeToString(data)
+//
+//			temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+//
+//			var t tp.TX
+//			json.Unmarshal(temptx, &t)
+//
+//			if t.Txtype == "tx" {
+//				continue
+//			}else if t.Txtype == "checkpoint" {
+//				continue
+//			}
+//			//else if t.Receiver == block.Shard && t.Txtype == "relaytx" {
+//			//	receivetxs = append(receivetxs, t)
+//			//}
+//			//由于addtx不进入共识流程，在这里就不需要再判断
+//			/*else if t.Txtype == "addtx" {
+//				blockExec.RemoveFromRelaytxDB(t)
+//				//continue
+//
+//			}*/
+//			//在共识过程就将relaytx加入list之中
+//			// } else if t.Txtype == "relaytx" {
+//			// 	if t.Sender == block.Shard {
+//			// 		t.Operate = 1
+//			// 		sendtxs = append(sendtxs, t)
+//			// 		blockExec.Add2RelaytxDB(t)
+//			// 	}
+//		}
+//		myline.Count = 0
+//	}
+//	return receivetxs
+//}
 
-			data := block.Data.Txs[i]
-			encodeStr := hex.EncodeToString(data)
-
-			temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
-			//fmt.Println(string(temptx))
-			var t tp.TX
-			json.Unmarshal(temptx, &t)
-
-			if t.Txtype == "tx" {
-				continue
-			} else if t.Txtype == "addtx" {
-				blockExec.RemoveFromRelaytxDB(t)
-				//continue
-
-			} else if t.Txtype == "checkpoint" {
-				continue
-			} else if t.Receiver == block.Shard && t.Txtype == "relaytx" {
-				receivetxs = append(receivetxs, t)
-			}
-			//在共识过程就将relaytx加入list之中
-			// } else if t.Txtype == "relaytx" {
-			// 	if t.Sender == block.Shard {
-			// 		t.Operate = 1
-			// 		sendtxs = append(sendtxs, t)
-			// 		blockExec.Add2RelaytxDB(t)
-			// 	}
-		}
-		myline.Count = 0
-	}
-	return receivetxs
+//func (blockExec *BlockExecutor) Add2RelaytxDB(tx tp.TX) {
+//	//fmt.Println("Add2RelaytxDB")
+//	blockExec.mempool.AddRelaytxDB(tx)
+//}
+//func (blockExec *BlockExecutor) RemoveFromRelaytxDB(tx tp.TX) {
+//	//fmt.Println("RemoveFromRelaytxDB")
+//	blockExec.mempool.RemoveRelaytxDB(tx)
+//}
+//func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
+//	resendTxs := blockExec.mempool.UpdaterDB()
+//	return resendTxs
+//}
+func (blockExec *BlockExecutor) SearchPackageExist(pack tp.Package) bool {
+	return blockExec.mempool.SearchPackageExist(pack)
 }
-
-func (blockExec *BlockExecutor) Add2RelaytxDB(tx tp.TX) {
-	//fmt.Println("Add2RelaytxDB")
-	blockExec.mempool.AddRelaytxDB(tx)
+func (BlockExecutor *BlockExecutor)SyncRelationTable(pack tp.Package,height int64){
+	BlockExecutor.mempool.SyncRelationTable(pack,height)
 }
-func (blockExec *BlockExecutor) RemoveFromRelaytxDB(tx tp.TX) {
-	//fmt.Println("RemoveFromRelaytxDB")
-	blockExec.mempool.RemoveRelaytxDB(tx)
+func(blockExec *BlockExecutor)MergePackage(height int64)[]byte{
+	packs:=blockExec.mempool.SearchRelationTable(height)
+	pack_data,_:=json.Marshal(packs)
+	return pack_data
 }
-func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
-	resendTxs := blockExec.mempool.UpdaterDB()
-	return resendTxs
+func (blockExec *BlockExecutor)ModifyRelationTable(pk []byte,cfs []byte,height int64){
+	blockExec.mempool.ModifyRelationTable(pk,cfs,height)
 }
-
-func (blockExec *BlockExecutor) GetAllTxs() []tp.TX {
-	cpTxs := blockExec.mempool.GetAllTxs()
+func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
+	cpTxs := blockExec.mempool.GetAllCrossMessages()
 	return cpTxs
 }
 
-func (blockExec *BlockExecutor) SendRelayTxs( /*line *myline.Line,*/ txs []tp.TX) {
-	fmt.Println("SendRelayTxs")
-	//暂时定义分片有4个
+func (blockExec *BlockExecutor) AddCrossMessagesDB(tcm *tp.CrossMessages) {
+	blockExec.mempool.AddCrossMessagesDB(tcm)
+}
+func (blockExec *BlockExecutor) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
+	//fmt.Println("RemoveFromRelaytxDB")
+	blockExec.mempool.RemoveCrossMessagesDB(tcm)
+}
+func (blockExec *BlockExecutor) UpdatecmDB() []*tp.CrossMessages {
+	resendMessages := blockExec.mempool.UpdatecmDB()
+	return resendMessages
+}
 
-	var shard_send [][]tp.TX
-	shard_send = make([][]tp.TX, 16)
+//func (blockExec *BlockExecutor) GetAllTxs() []tp.TX {
+//	cpTxs := blockExec.mempool.GetAllTxs()
+//	return cpTxs
+//}
+
+
+func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages) {
+	blockExec.logger.Error("SendCrossMessages")
+	var shard_send [][]*tp.CrossMessages
+	//暂定有100个分片
+	shard_send = make([][]*tp.CrossMessages, 100)
 	//将需要跨片的交易按分片归类
-	for i := 0; i < len(txs); i++ {
-		flag := int(txs[i].Receiver[0]) - 65
-		shard_send[flag] = append(shard_send[flag], txs[i])
+	for i := 0; i < len(resendMessages); i++ {
+		//由于现在的Zone的名字改动了，所以现在不需要再减65
+		index,_:=strconv.Atoi(resendMessages[i].DesZone)
+		shard_send[index] = append(shard_send[index], resendMessages[i])
 	}
-	var tx_package []tp.TX
-	//begin := time.Now()
+
+	var tx_package []*tp.CrossMessages
 	for i := 0; i < len(shard_send); i++ {
 		if shard_send[i] != nil {
 			num := len(shard_send[i]) //发送到某分片所有跨片交易的数量，进行打包
 			tx_package = shard_send[i]
-			go blockExec.Send_Package(num, i, tx_package)
+			go blockExec.SendCrossMessages(num,tx_package)
 
 		}
 	}
-	//end := time.Now().Sub(begin)
-	//fmt.Println("Send using time:", end)
 }
-func (blockExec *BlockExecutor) Send_Package(num int, i int, tx_package []tp.TX) {
-	var c2 *websocket.Conn
-	var rnd int
-	var key string
-	var index int
+func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.CrossMessages) {
+
 
 	if num > 0 {
-
-		if tx_package[0].Txtype == "addtx" {
-			key = tx_package[0].Sender
-		} else {
-			key = tx_package[0].Receiver
-		}
-		index = int(key[0]) - 65
-		blockExec.SendMessage(index, rnd, c2, tx_package)
+		fmt.Println("调用",num)
+		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
 
 	}
 }
 
 // sending tx to shard x
-func (blockExec *BlockExecutor) SendMessage(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
-
-	name := "TT" + string(index+65) + "Node1:26657"
-	// fmt.Println("name", name)
+func (blockExec *BlockExecutor) SendMessage(DesZone string,  tx_package []*tp.CrossMessages) {
+	//todo:需要随机选择一个节点
+	name := DesZone + "S1:26657"
 	client := *myclient.NewHTTP(name, "/websocket")
-	go client.BroadcastTxAsync(tx_package)
+	go client.BroadcastCrossMessageAsync(tx_package)
 }
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
 
@@ -405,33 +442,33 @@ func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Co
 	myline.Flag_conn[string(index+65)][rnd] = false //释放资源
 
 }
-
-func (blockExec *BlockExecutor) SendAddedRelayTxs( /*line *myline.Line,*/ txs []tp.TX) {
-	//向发送来的分片中返回确认消息
-	fmt.Println("SendAddedRelayTxs")
-	//暂时定义分片有4个
-	var shard_send [][]tp.TX
-	shard_send = make([][]tp.TX, 16)
-	//将需要跨片的交易按分片归类
-	for i := 0; i < len(txs); i++ {
-		flag := int(txs[i].Receiver[0]) - 65
-		txs[i].Txtype = "addtx"
-		txs[i].Operate = 1
-		result := checkdb.Search(txs[i].ID)
-		//取到聚合签名和公钥，赋值给即将发送的tx
-		txs[i].AggSig = result.AggSig
-		shard_send[flag] = append(shard_send[flag], txs[i])
-	}
-	var tx_package []tp.TX
-
-	for i := 0; i < len(shard_send); i++ {
-		if shard_send[i] != nil {
-			num := len(shard_send[i])
-			tx_package = shard_send[i]
-			go blockExec.Send_Package(num, i, tx_package)
-		}
-	}
-}
+//已经包含在消息里面，无需在进行这一步
+//func (blockExec *BlockExecutor) SendAddedRelayTxs( /*line *myline.Line,*/ txs []tp.TX) {
+//	//向发送来的分片中返回确认消息
+//	fmt.Println("SendAddedRelayTxs")
+//	//暂时定义分片有4个
+//	var shard_send [][]tp.TX
+//	shard_send = make([][]tp.TX, 16)
+//	//将需要跨片的交易按分片归类
+//	for i := 0; i < len(txs); i++ {
+//		flag := int(txs[i].Receiver[0]) - 65
+//		txs[i].Txtype = "addtx"
+//		txs[i].Operate = 1
+//		result := checkdb.Search(txs[i].ID)
+//		//取到聚合签名和公钥，赋值给即将发送的tx
+//		txs[i].AggSig = result.AggSig
+//		shard_send[flag] = append(shard_send[flag], txs[i])
+//	}
+//	var tx_package []tp.TX
+//
+//	for i := 0; i < len(shard_send); i++ {
+//		if shard_send[i] != nil {
+//			num := len(shard_send[i])
+//			tx_package = shard_send[i]
+//			go blockExec.Send_Package(num, i, tx_package)
+//		}
+//	}
+//}
 
 type RPCRequest struct {
 	JSONRPC  string          `json:"jsonrpc"`

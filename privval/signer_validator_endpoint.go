@@ -93,7 +93,11 @@ func (ve *SignerValidatorEndpoint) SignCrossTXVote(txs types.Txs, vote *types.Vo
 	defer ve.mtx.Unlock()
 	return ve.signer.SignCrossTXVote(txs, vote)
 }
-
+func (ve *SignerValidatorEndpoint) SigCrossMerkleRoot(SigCrossMerkleRoot []byte, vote *types.Vote) error {
+	ve.mtx.Lock()
+	defer ve.mtx.Unlock()
+	return ve.signer.SigCrossMerkleRoot(SigCrossMerkleRoot, vote)
+}
 // SignProposal implements PrivValidator.
 func (ve *SignerValidatorEndpoint) SignProposal(chainID string, proposal *types.Proposal) error {
 	ve.mtx.Lock()

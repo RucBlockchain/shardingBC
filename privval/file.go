@@ -140,6 +140,10 @@ type FilePV struct {
 	LastSignState FilePVLastSignState
 }
 
+func (pv *FilePV) SigCrossMerkleRoot(MerkleRoot []byte, vote *types.Vote) error {
+	return nil
+}
+
 // GenFilePV generates a new validator with randomly generated private key
 // and sets the filePaths, but does not call Save().
 func GenFilePV(keyFilePath, stateFilePath string) *FilePV {
@@ -275,7 +279,7 @@ func (pv *FilePV)  SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 		}
 	}
 
-	vote.CrossTxSigs = append(vote.CrossTxSigs, CTxSigs...)
+	//vote.CrossTxSigs = append(vote.CrossTxSigs, CTxSigs...)
 	return nil
 }
 

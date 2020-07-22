@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"fmt"
+	tp "github.com/tendermint/tendermint/identypes"
 	"math"
 	"reflect"
 	"sync"
@@ -184,6 +185,7 @@ type PeerState interface {
 
 // Send new mempool txs to peer.
 func (memR *MempoolReactor) broadcastTxRoutine(peer p2p.Peer) {
+
 	if !memR.config.Broadcast {
 		return
 	}
@@ -198,59 +200,64 @@ func (memR *MempoolReactor) broadcastTxRoutine(peer p2p.Peer) {
 		// This happens because the CElement we were looking at got garbage
 		// collected (removed). That is, .NextWait() returned nil. Go ahead and
 		// start from the beginning.
-		if next == nil {
+		if next == nil{
 			select {
 			case <-memR.Mempool.TxsWaitChan(): // Wait until a tx is available
 				if next = memR.Mempool.TxsFront(); next == nil {
 					continue
 				}
+
 			case <-peer.Quit():
 				return
 			case <-memR.Quit():
 				return
 			}
 		}
+		//发送
+			memTx := next.Value.(*mempoolTx)
 
-		memTx := next.Value.(*mempoolTx)
-
-		// make sure the peer is up to date
-		peerState, ok := peer.Get(types.PeerStateKey).(PeerState)
-		if !ok {
-			// Peer does not have a state yet. We set it in the consensus reactor, but
-			// when we add peer in Switch, the order we call reactors#AddPeer is
-			// different every time due to us using a map. Sometimes other reactors
-			// will be initialized before the consensus reactor. We should wait a few
-			// milliseconds and retry.
-			time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
-			continue
-		}
-		if peerState.GetHeight() < memTx.Height()-1 { // Allow for a lag of 1 block
-			time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
-			continue
-		}
-
-		// ensure peer hasn't already sent us this tx
-		if _, ok := memTx.senders.Load(peerID); !ok {
-			// send memTx
-			msg := &TxMessage{Tx: memTx.tx}
-			success := peer.Send(MempoolChannel, cdc.MustMarshalBinaryBare(msg))
-			if !success {
+			// make sure the peer is up to date
+			peerState, ok := peer.Get(types.PeerStateKey).(PeerState)
+			if !ok {
+				// Peer does not have a state yet. We set it in the consensus reactor, but
+				// when we add peer in Switch, the order we call reactors#AddPeer is
+				// different every time due to us using a map. Sometimes other reactors
+				// will be initialized before the consensus reactor. We should wait a few
+				// milliseconds and retry.
 				time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
 				continue
 			}
+			if peerState.GetHeight() < memTx.Height()-1 { // Allow for a lag of 1 block
+				time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
+				continue
+			}
+
+			// ensure peer hasn't already sent us this tx
+			if _, ok := memTx.senders.Load(peerID); !ok {
+				// send memTx
+				msg := &TxMessage{Tx: memTx.tx}
+				success := peer.Send(MempoolChannel, cdc.MustMarshalBinaryBare(msg))
+				if !success {
+					time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
+					continue
+				}
+			}
+
+			select {
+			case <-next.NextWaitChan():
+				// see the start of the for loop for nil check
+				next = next.Next()
+			case <-peer.Quit():
+				return
+			case <-memR.Quit():
+				return
+
+
+			}
 		}
 
-		select {
-		case <-next.NextWaitChan():
-			// see the start of the for loop for nil check
-			next = next.Next()
-		case <-peer.Quit():
-			return
-		case <-memR.Quit():
-			return
-		}
-	}
 }
+
 
 //-----------------------------------------------------------------------------
 // Messages
@@ -281,4 +288,7 @@ type TxMessage struct {
 // String returns a string representation of the TxMessage.
 func (m *TxMessage) String() string {
 	return fmt.Sprintf("[TxMessage %v]", m.Tx)
+}
+type CmMessage struct {
+	Cm *tp.CrossMessages
 }

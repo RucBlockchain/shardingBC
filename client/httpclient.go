@@ -184,23 +184,33 @@ func unmarshalResponseBytes(cdc *amino.Codec, responseBytes []byte, result inter
 	return result, nil
 }
 
-//tx数组传入
-func (c *HTTP) broadcastTX(route string, tx []tp.TX) {
+//对所有的交易包进行发送传入
+func (c *HTTP) broadcastCrossMessages(route string, cms []*tp.CrossMessages) {
 
-	for i := 0; i < len(tx); i++ {
-		data, _ := json.Marshal(tx[i])
+	for i := 0; i < len(cms); i++ {
+		data, _ := json.Marshal(cms[i])
 		result := new(ResultBroadcastTx)
 		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
 
 	}
-
 }
 
 //传入tx数组进行broadcast
-func (c *HTTP) BroadcastTxAsync(tx []tp.TX) {
-	go c.broadcastTX("broadcast_tx_async", tx)
+func (c *HTTP) BroadcastCrossMessageAsync(cms []*tp.CrossMessages) {
+	go c.broadcastCrossMessages("broadcast_tx_async", cms)
 }
+func (c *HTTP) BroadcastTxAsync(txs []tp.TX) {
+	go c.broadcastTX("broadcast_tx_async", txs)
+}
+func (c *HTTP) broadcastTX(route string, cms []tp.TX) {
 
+	for i := 0; i < len(cms); i++ {
+		data, _ := json.Marshal(cms[i])
+		result := new(ResultBroadcastTx)
+		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
+
+	}
+}
 // func (c *HTTP) Status() (*ctypes.ResultStatus, error) {
 // 	result := new(ctypes.ResultStatus)
 // 	_, err := c.rpc.Call("status", map[string]interface{}{}, result)

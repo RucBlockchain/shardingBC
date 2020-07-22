@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 
 	//"strings"
 	"sync"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/tendermint/tendermint/checkdb"
 	cfg "github.com/tendermint/tendermint/config"
 	cstypes "github.com/tendermint/tendermint/consensus/types"
 	tp "github.com/tendermint/tendermint/identypes"
@@ -1363,68 +1363,122 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 		}
 	}
 }
-
+func JudgeCrossMessage(cm *tp.CrossMessages)bool{
+	for i:=0;i<len(cm.Txlist);i++{
+		if cm.Txlist[i].Txtype=="relaytx"{
+			return false
+		}else {
+			fmt.Println("addtx")
+			fmt.Println(cm.Txlist[i])
+		}
+	}
+	return true
+}
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 	if len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
-
-		voteSet := cs.Votes.Precommits(cs.CommitRound)
-
-		if len(voteSet.CrossTxSigs) > 0 {
-
-			var Participants []tp.Participant
-
-			for k := 0; k < len(cs.Validators.Validators); k++ { //拿公钥
-				var Participant tp.Participant
-				Participant.Address = cs.Validators.Validators[k].Copy().Address.Bytes()
-				Participant.Pubkey = cs.Validators.Validators[k].PubKey.Bytes()
-				Participants = append(Participants, Participant)
-			}
-			for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
-				encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
-
-				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
-
-				var tx tp.TX
-				json.Unmarshal(temptx, &tx)
-				if tx.Txtype == "relaytx" && tx.Sender == getShard() {
-
-					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
-						if tx.ID == voteSet.CrossTxSigs[j].TxId {
-							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
-							tx.AggSig.Participants = Participants
-						}
-
-					}
-					tx.Operate = 1
-					cs.blockExec.Add2RelaytxDB(tx)
-					//将tx将入relaylist之中
-				} else if tx.Txtype == "relaytx" && tx.Receiver == getShard() {
-					//添加聚合签名
-
-					for j := 0; j < len(voteSet.CrossTxSigs); j++ {
-						if tx.ID == voteSet.CrossTxSigs[j].TxId {
-							tx.AggSig.Signature = voteSet.CrossTxSigs[j].CrossTxSig
-							tx.AggSig.Participants = Participants
-						}
-					}
-
-					tx.Txtype = "addtx"
-					tx.Operate = 1
-					// cs.Logger.Error("将addtx添加入状态数据库之中")
-					checkdb.Save(tx.ID, &tx)
-					// cs.blockExec.Add2RelaytxDB(tx) //addtx
-				}
-			}
-			cs.Logger.Error("===============pubkey end and tx sig end=================")
+		voteSet := cs.Votes.Prevotes(cs.CommitRound)
+		if len(voteSet.PartSigs)==0{
+			return nil
 		}
+		var ids = make([]int64,len(voteSet.PartSigs))
+		var sigs = make([][]byte,len(voteSet.PartSigs))
+
+		for i:=0;i<len(voteSet.PartSigs);i++{
+			ids = append(ids, voteSet.PartSigs[i].Id)
+			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
+		}
+		//TODO:引入聚合签名接口
+		//var threshold int
+		//threshold = len(voteSet.PartSigs)*2/3
+		//fmt.Println(len(voteSet.PartSigs))
+		//var err error
+		//voteSet.CrossMerkleSigs,err = bls.SignatureRecovery(threshold,nil,ids)
+		//if err!=nil{
+		//	cs.Logger.Error("Aggregate error")
+		//	return err
+		//}
+		//生成跨片消息包保存在relaylist之中
+		cms := cs.ClassifyTxFromBlock(cs.ProposalBlock.Txs)
+
+		for i:=0;i<len(cms);i++{
+			cms[i].Sig = voteSet.CrossMerkleSigs
+			if cms[i].Txlist[0].Sender == getShard(){
+				cms[i].DesZone = cms[i].Txlist[0].Receiver
+				cms[i].SrcZone = cms[i].Txlist[0].Sender
+			}else{
+				cms[i].DesZone = cms[i].Txlist[0].Sender
+				cms[i].SrcZone = cms[i].Txlist[0].Receiver
+			}
+			cms[i].Height=cs.ProposalBlock.Height
+			//存入realylist之中
+
+			if !JudgeCrossMessage(cms[i]){
+				cs.blockExec.AddCrossMessagesDB(cms[i])
+			}else{
+				fmt.Println("全是addtx")
+				var tcm []*tp.CrossMessages
+				tcm = append(tcm, cms[i])
+				//是否要发送？
+				go cs.blockExec.SendCrossMessages(8080,tcm)
+				//固化到磁盘之中
+			}
+			cs.blockExec.ModifyRelationTable(cs.blockExec.MergePackage(cs.Height),cs.ProposalBlock.CmRelation,cs.Height)
+		}
+
 		return nil
 	}
 
 }
+func ParsePackages(data []byte)[]tp.Package{
+	var packs []tp.Package
+	err := json.Unmarshal(data, &packs)
+	if len(packs)==0{
+		return nil
+	}
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	return packs
+}
+//需要完善基础功能，不然无法做测试
+func (cs *ConsensusState)ClassifyTxFromBlock(txs types.Txs)[]*tp.CrossMessages{
+	var cms []*tp.CrossMessages
+	var txlist []*tp.TX
+	for i:=0;i<len(txs);i++{
+		encodeStr := hex.EncodeToString(txs[i])
+		temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
 
+		var tx *tp.TX
+		json.Unmarshal(temptx, &tx)
+		if tx.Txtype=="relaytx" {
+			tx.Operate=1
+			if tx.Receiver==getShard(){
+				tx.Txtype="addtx"
+			}
+			txlist = append(txlist, tx)
+		}
+	}
+	if len(txlist)>0{
+		name:=strconv.FormatInt(time.Now().UnixNano(), 10)
+		cm :=&tp.CrossMessages{
+			Txlist:          txlist[:],
+			Sig:             nil,
+			Pubkeys:         nil,
+			CrossMerkleRoot: []byte(name),
+			TreePath:        nil,
+			SrcZone:         "0",
+			DesZone:         "1",
+			Height:          cs.Height,
+			Packages:		cs.blockExec.MergePackage(cs.Height),
+			ConfirmPackSigs:cs.ProposalBlock.CmRelation,
+		}
+		cms = append(cms, cm)
+	}
+	return cms
+}
 // If we have the block AND +2/3 commits for it, finalize.
 func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 	logger := cs.Logger.With("height", height)
@@ -1584,167 +1638,7 @@ func (cs *ConsensusState) IsLeader() (flag bool) {
 	return flag
 }
 
-/*
-func (cs *ConsensusState) reactorViaCheckpoint(height int64) {
 
-	//一次checkpoint,更新
-	cpTxs := cs.CheckBlockTxInfo(height)
-	cpTxs = Sendtxs(cpTxs) //TODO需要在分布式环境下测试
-	cptx := conver2cptx(cpTxs, height)
-	Sendcptx(cptx, 0) //TODO 改为一定要加入成功
-}
-
-//有checkpoint过程
-func (cs *ConsensusState) CheckBlockTxInfo(maxHeight int64) []tp.TX {
-	//input:最后一个区块高度
-	var tblock *types.Block
-	//从后往前遍历区块，直到找到checkpoint记录
-	var waitComTxs []tp.TX //待确认的tx数组
-	var delTxs []tp.TX     //待删除的tx
-	flag := true
-	var lastCheckHeight int64 //上一次checkpoint的高度
-	lastCheckHeight = 0
-	for i := maxHeight; i > lastCheckHeight; i-- {
-		tblock = cs.blockStore.LoadBlock(i) //TODO
-
-		//从最后一个区块开始遍历block数组
-		if tblock.Data.Txs != nil {
-			for i := 0; i < len(tblock.Data.Txs); i++ {
-
-				data := tblock.Data.Txs[i]
-				//遍历每个tblock中的TX
-
-				encodeStr := hex.EncodeToString(data)
-				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
-
-				var t tp.TX
-				json.Unmarshal(temptx, &t)
-				if t.Txtype == "relaytx" {
-
-					if t.Sender == tblock.Shard {
-						//如果是relaytx，并且是当前分片发起的，则加入到带确认数组
-						waitComTxs = append(waitComTxs, t)
-
-					}
-				} else if t.Txtype == "addtx" {
-					//如果是addtx
-					delTxs = append(delTxs, t) //删除数组中对应的tx，用ID查找
-				} else if t.Txtype == "checkpoint" {
-					if flag {
-						lastCheckHeight, _ = strconv.ParseInt(t.Sender, 10, 64) //得到上一次检查点高度,保证只更新一次
-						flag = false
-					}
-					content_tmp := strings.Split(t.Content, ";;")
-					for j := 0; j < len(content_tmp); j++ {
-						var cpt tp.TX
-						json.Unmarshal([]byte(content_tmp[j]), &cpt)
-						waitComTxs = append(waitComTxs, cpt) //TODO
-					}
-					fmt.Println("length of waitComTxs is ", len(waitComTxs), "lastCheckHeight", lastCheckHeight)
-				}
-			}
-		}
-
-	}
-	var cpTxs []tp.TX
-	cpTxs = removeAddedTxs(waitComTxs, delTxs)
-	for _, tx := range cpTxs {
-		cs.blockExec.Add2RelaytxDB(tx)
-	}
-	return cpTxs
-	//返回所有未确认的tx，后续需要重新发送这些交易
-
-}
-
-func conver2cptx(cpTxs []tp.TX, height int64) tp.TX {
-
-	var content []string
-	fmt.Println("cpTxs length is ", len(cpTxs))
-	for i := 0; i < len(cpTxs); i++ {
-		marshalTx, _ := json.Marshal(cpTxs[i])
-		content = append(content, string(marshalTx))
-	}
-	cptx := &tp.TX{
-		Txtype:   "checkpoint",
-		Sender:   strconv.FormatInt(height, 10), //用sender记录高度
-		Receiver: "",
-		ID:       sha256.Sum256([]byte("checkpoint")),
-		Content:  strings.Join(content, ";;")}
-	return *cptx
-}
-
-func Send_message(tx tp.TX) {
-	res, _ := json.Marshal(tx)
-	paramsJSON, err := json.Marshal(map[string]interface{}{"tx": res})
-	if err != nil {
-		fmt.Printf("failed to encode params: %v\n", err)
-		os.Exit(1)
-	}
-	rawParamsJSON := json.RawMessage(paramsJSON)
-	rc := &RPCRequest{
-		JSONRPC: "2.0",
-		ID:      "tm-bench",
-		Method:  "broadcast_tx_async",
-		Params:  rawParamsJSON,
-	}
-	c, rnd := myline.UseConnect(tx.Receiver, "ip")
-	c.WriteJSON(rc)
-	myline.Flag_conn[tx.Receiver][rnd] = false
-}
-func Sendtxs(cptxs []tp.TX) []tp.TX {
-
-	for i := 0; i < len(cptxs); i++ {
-		go Send_message(cptxs[i])
-	}
-
-	return cptxs
-
-}
-
-func removeAddedTxs(waitComTxs []tp.TX, delTxs []tp.TX) []tp.TX {
-	var cpTxs []tp.TX
-	flag := true
-	for i := 0; i < len(waitComTxs); i++ {
-		for j := 0; j < len(delTxs); j++ {
-			if waitComTxs[i].ID == delTxs[j].ID {
-				flag = false
-				break
-			}
-		}
-		if flag {
-			cpTxs = append(cpTxs, waitComTxs[i])
-		}
-	}
-	return cpTxs
-}
-
-func Sendcptx(tx tp.TX, flag int) {
-
-	res, _ := json.Marshal(tx)
-	fmt.Println("-----------------sendcheckpointtx-----------------------")
-	paramsJSON, err := json.Marshal(map[string]interface{}{"tx": res})
-	if err != nil {
-		fmt.Printf("failed to encode params: %v\n", err)
-		os.Exit(1)
-	}
-	rawParamsJSON := json.RawMessage(paramsJSON)
-	rc := &RPCRequest{
-		JSONRPC: "2.0",
-		ID:      "tm-bench",
-		Method:  "broadcast_tx_async",
-		Params:  rawParamsJSON,
-	}
-	if (flag_conn == false) {
-		name := getIp() + ":26657"
-		c, _, _ := myline.Connect(name)
-		c.WriteJSON(rc)
-		flag_conn = true
-	}
-	c, _ := myline.UseConnect("Localhost", "localhost")
-	c.WriteJSON(rc)
-	myline.Flag_conn["Localhost"][0] = false
-}
-*/
 
 //-------------------------------------------------------------------------
 
@@ -1981,8 +1875,8 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 				var t tp.TX
 				json.Unmarshal(temptx, &t)
 				if t.Txtype == "checkpoint" {
-					allTxs := cs.blockExec.GetAllTxs()
-					added = compareRelaylist(t, allTxs)
+					allCms := cs.blockExec.GetAllCrossMessages()
+					added = compareRelaylist(t, allCms)
 
 					//如果是checkpoint，检查是否一致
 					break
@@ -2100,11 +1994,11 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 
 //验证list是否相同的函数
 //TODO 目前是要求全部相同，后续是否改成包含关系
-func compareRelaylist(t tp.TX, allTxs []tp.TX) (result bool) {
+func compareRelaylist(t tp.TX, allCms []*tp.CrossMessages) (result bool) {
 	var contentByte []byte
-	for i := 0; i < len(allTxs); i++ {
-		//得到本身的relaylist的数据
-		marshalTx, _ := json.Marshal(allTxs[i])
+	for i := 0; i < len(allCms); i++ {
+		//得到本身的CrossMessages的数据
+		marshalTx, _ := json.Marshal(allCms[i])
 		contentByte = append(contentByte, marshalTx...)
 	}
 
@@ -2116,7 +2010,38 @@ func compareRelaylist(t tp.TX, allTxs []tp.TX) (result bool) {
 	}
 	return result
 }
+func ParseId()int64{
 
+	v, _ := syscall.Getenv("TASKID")
+	g, _ := syscall.Getenv("TASKINDEX")
+	Shard, _ := strconv.Atoi(v)
+	Index, _ := strconv.Atoi(g)
+	var id int64
+	id = int64(Shard*500+Index)
+	return id
+}
+func (cs *ConsensusState)JudgeBlockPakcages()bool{
+	packs := ParsePackages(cs.ProposalBlock.CmRelation)
+	//说明该区块没有跨片交易
+	if len(packs)==0{
+		fmt.Println("没有包，无需同步")
+		return true
+	}
+	for i:=0;i<len(packs);i++{
+		if !cs.blockExec.SearchPackageExist(packs[i]) {
+			return false
+		}
+	}
+
+	//做同步relationtable操作
+	if !cs.isLeader(){
+		fmt.Println("普通节点做同步")
+		for i:=0;i<len(packs);i++{
+			cs.blockExec.SyncRelationTable(packs[i],cs.ProposalBlock.Height)
+		}
+	}
+	return true
+}
 func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, header types.PartSetHeader) (*types.Vote, error) {
 	// Flush the WAL. Otherwise, we may not recompute the same vote to sign, and the privValidator will refuse to sign anything.
 	cs.wal.FlushAndSync()
@@ -2124,10 +2049,10 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	addr := cs.privValidator.GetPubKey().Address()
 	valIndex, _ := cs.Validators.GetByAddress(addr)
 
-	crossTxNum := 0
-	if cs.ProposalBlock != nil && cs.ProposalBlock.Txs != nil {
-		crossTxNum = len(cs.ProposalBlock.Txs)
-	}
+	//crossTxNum := 0
+	//if cs.ProposalBlock != nil && cs.ProposalBlock.Txs != nil {
+	//	crossTxNum = len(cs.ProposalBlock.Txs)
+	//}
 
 	vote := &types.Vote{
 		ValidatorAddress: addr,
@@ -2137,46 +2062,54 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		Timestamp:        cs.voteTime(),
 		Type:             type_,
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
-		CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
+		PartSig:          &tp.PartSig{PeerCrossSig: nil, Id:0},
+		//CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
 	}
 	//在precommit阶段，核验addtx
-	if type_ == types.PrecommitType && hash != nil {
-		for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
-			encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
+	//if type_ == types.PrecommitType && hash != nil {
+	//	for i := 0; i < len(cs.ProposalBlock.Txs); i++ {
+	//		encodeStr := hex.EncodeToString(cs.ProposalBlock.Txs[i])
+	//
+	//		temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+	//
+	//		var tx tp.TX
+	//		json.Unmarshal(temptx, &tx)
+	//		if tx.Txtype=="addtx"{
+	//			//bls.AggragateVerify(tx.AggSig.Signature,tx.Content,tx.AggSig.Participants)核验
+	//			if true {
+	//				continue
+	//			}else{
+	//				vote.BlockID=types.BlockID{Hash: nil, PartsHeader: header}
+	//				break
+	//			}
+	//		}
+	//
+	//	}
+	//}
+		//这里是对跨片进行签名
+	if type_ == types.PrevoteType && hash != nil && vote.BlockID.Hash != nil{
+		//还要进行验证如果打包cm不在自己的mempool之中，说明leader作恶，需要投反对票
+		//交易池没有该交易并且不是leader，那么就需要判断是否存在
+			if !cs.JudgeBlockPakcages(){
+				cs.Logger.Error("在mempool未找到对应交易，投反对票")
+				vote.BlockID.Hash=nil//投反对票
+			}else{
+				err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, vote)
+				vote.PartSig.Id = ParseId()
+				vote.PartSig.PeerCrossSig = cs.ProposalBlock.CrossMerkleRoot[:]
+				// log for DEBUG
+				cs.Logger.Error("=============== crossTx Sig ===============\n")
 
-			temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
+				cs.Logger.Error("=============== Sig End ===============")
 
-			var tx tp.TX
-			json.Unmarshal(temptx, &tx)
-			if tx.Txtype=="addtx"{
-				//bls.AggragateVerify(tx.AggSig.Signature,tx.Content,tx.AggSig.Participants)核验
-				if true {
-					continue
-				}else{
-					vote.BlockID=types.BlockID{Hash: nil, PartsHeader: header}
-					break
+				if err != nil {
+					cs.Logger.Error("generate cross traction signature error, ", err)
 				}
 			}
 
-		}
-	}
-		//是否是在precommit阶段进行签名,加上条件
-	if type_ == types.PrecommitType && hash != nil && vote.BlockID.Hash != nil{
 		// prevote阶段对每条跨片交易生成签名
 		// 没有想好怎么处理这里的错误
-		err := cs.privValidator.SignCrossTXVote(cs.ProposalBlock.Txs, vote)
 
-		// log for DEBUG
-		cs.Logger.Debug("=============== crossTx Sig ===============\n")
-
-		for _, csig := range vote.CrossTxSigs {
-			cs.Logger.Debug(fmt.Sprint("sig: ", csig.CrossTxSig))
-		}
-		cs.Logger.Debug("=============== Sig End ===============")
-
-		if err != nil {
-			cs.Logger.Error("generate cross traction signature error, ", err)
-		}
 	}
 
 	err := cs.privValidator.SignVote(cs.state.ChainID, vote)
