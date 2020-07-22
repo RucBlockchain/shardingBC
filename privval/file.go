@@ -141,6 +141,11 @@ type FilePV struct {
 }
 
 func (pv *FilePV) SigCrossMerkleRoot(MerkleRoot []byte, vote *types.Vote) error {
+	if signature, err := pv.Key.PrivKey.Sign(MerkleRoot); err != nil {
+		return nil
+	} else {
+		vote.PartSig.PeerCrossSig = signature
+	}
 	return nil
 }
 
@@ -257,7 +262,7 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 }
 
 // Implements PrivValidator.
-func (pv *FilePV)  SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
+func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 	var successNo, errorNo int
 	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
 	for _, txdata := range (txs) {

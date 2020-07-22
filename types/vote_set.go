@@ -51,6 +51,7 @@ type P2PID string
 
 	NOTE: Assumes that the sum total of voting power does not exceed MaxUInt64.
 */
+
 type VoteSet struct {
 	chainID string
 	height  int64
@@ -58,15 +59,15 @@ type VoteSet struct {
 	type_   SignedMsgType
 	valSet  *ValidatorSet
 
-	mtx           sync.Mutex
-	votesBitArray *cmn.BitArray
-	votes         []*Vote                    // Primary votes to share
-	sum           int64                      // Sum of voting power for seen votes, discounting conflicts
-	maj23         *BlockID                   // First 2/3 majority seen
-	votesByBlock  map[string]*blockVotes     // string(blockHash|blockParts) -> blockVotes
-	peerMaj23s    map[P2PID]BlockID          // Maj23 for each peer
-	PartSigs      []*identypes.PartSig//暂存收到的节点签名
-	CrossMerkleSigs   []byte //聚合以后的签名
+	mtx             sync.Mutex
+	votesBitArray   *cmn.BitArray
+	votes           []*Vote                // Primary votes to share
+	sum             int64                  // Sum of voting power for seen votes, discounting conflicts
+	maj23           *BlockID               // First 2/3 majority seen
+	votesByBlock    map[string]*blockVotes // string(blockHash|blockParts) -> blockVotes
+	peerMaj23s      map[P2PID]BlockID      // Maj23 for each peer
+	PartSigs        []*identypes.PartSig   //暂存收到的节点签名
+	CrossMerkleSigs []byte                 //聚合以后的签名
 }
 
 // Constructs a new VoteSet struct used to accumulate votes for given height/round.
@@ -219,12 +220,12 @@ func (voteSet *VoteSet) getVote(valIndex int, blockKey string) (vote *Vote, ok b
 func (voteSet *VoteSet) addVerifiedVote(vote *Vote, blockKey string, votingPower int64) (added bool, conflicting *Vote) {
 	valIndex := vote.ValidatorIndex
 	//把vote的跨片交易签名加入voteset中
-	if vote.Type == PrevoteType && vote.PartSig.Id!=0{
+	if vote.Type == PrevoteType && vote.PartSig.Id != 0 {
 		part := &identypes.PartSig{
 			PeerCrossSig: vote.PartSig.PeerCrossSig[:],
 			Id:           vote.PartSig.Id,
 		}
-		voteSet.PartSigs = append(voteSet.PartSigs,part)
+		voteSet.PartSigs = append(voteSet.PartSigs, part)
 	}
 
 	// Already exists in voteSet.votes?

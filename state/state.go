@@ -11,7 +11,6 @@ import (
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 	"github.com/tendermint/tendermint/version"
-
 )
 
 // database keys
@@ -143,8 +142,8 @@ func (state State) MakeBlock(
 ) (*types.Block, *types.PartSet) {
 
 	// Build base block with block data.
-	pack_data,_:=json.Marshal(Packages)
-	block := types.MakeBlock(height, txs, commit, evidence,pack_data)
+	pack_data, _ := json.Marshal(Packages)
+	block := types.MakeBlock(height, txs, commit, evidence, pack_data)
 
 	// Set time.
 	var timestamp time.Time
@@ -164,19 +163,16 @@ func (state State) MakeBlock(
 	)
 	//解压
 
+	// 生成cross merkle root value
+	if rootTree, err := types.GenerateMerkleTree(txs); err == nil {
+		block.CrossMerkleRoot = rootTree.RootTree.ComputeRootHash()
+	} else {
+		fmt.Errorf("can't generate cross merkle tree, err: %v", err)
+	}
+
 	return block, block.MakePartSet(types.BlockPartSizeBytes)
 }
-func ParsePackages(data []byte)[]tp.Package{
-	var packs []tp.Package
-	err := json.Unmarshal(data, &packs)
-	if len(packs)==0{
-		return nil
-	}
-	if err != nil {
-		fmt.Println("ParseData Wrong")
-	}
-	return packs
-}
+
 // MedianTime computes a median time for a given Commit (based on Timestamp field of votes messages) and the
 // corresponding validator set. The computed time is always between timestamps of
 // the votes sent by honest processes, i.e., a faulty processes can not arbitrarily increase or decrease the
@@ -244,7 +240,7 @@ func MakeGenesisState(genDoc *types.GenesisDoc) (State, error) {
 		validatorSet = types.NewValidatorSet(validators)
 		nextValidatorSet = types.NewValidatorSet(validators).CopyIncrementProposerPriority(1)
 	}
-	
+
 	return State{
 		Version: initStateVersion,
 		ChainID: genDoc.ChainID,

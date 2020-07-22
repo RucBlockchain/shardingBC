@@ -6,8 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/checkdb"
+	"github.com/tendermint/tendermint/crypto/merkle"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -310,8 +310,7 @@ func ParsePackages(data []byte) []tp.Package {
 func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 	//删除交易包
 	//对package进行解析
-
-	packs := ParsePackages(tcm.Packages)
+	packs := tcm.Packages
 	for j := 0; j < len(packs); j++ {
 		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
 			if mem.cmDB.CrossMessages[i].Content.Height == packs[j].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[j].CrossMerkleRoot) {
@@ -569,7 +568,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	//由于上层已经锁了，在这里不用锁
 	//检验包的正确性
 	mem.logger.Error("检验cm")
-	if result := cm.CheckMessages(); !result {
+	if result := mem.CheckCrossMessageSig(cm); !result {
 		return errors.New("聚合签名或者检验失败")
 	}
 	//交易合法性检验
@@ -618,7 +617,7 @@ func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [3
 	}
 
 	rl.RlID = RlID(rl)
-	fmt.Println("添加映射表的id",rl.RlID)
+	fmt.Println("添加映射表的id", rl.RlID)
 	mem.RlDB = append(mem.RlDB, rl)
 }
 
@@ -650,7 +649,7 @@ func (mem *Mempool) ModifyRelationTable(packages []byte, ConfirmPackSig []byte, 
 func (mem *Mempool) RemoveRelationTable(rlid string) {
 	fmt.Println("删除映射表")
 	fmt.Println("映射表容量", len(mem.RlDB))
-	fmt.Println("本次删除映射表的选项是",rlid)
+	fmt.Println("本次删除映射表的选项是", rlid)
 	for i := 0; i < len(mem.RlDB); i++ {
 		if mem.RlDB[i].RlID == rlid {
 			//先固化到磁盘
@@ -659,14 +658,13 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 				Sig:             nil,
 				Pubkeys:         nil,
 				CrossMerkleRoot: mem.RlDB[i].CmHash,
-				TreePath:        nil,
+				TreePath:        "",
 				SrcZone:         mem.RlDB[i].SrcZone,
 				DesZone:         mem.RlDB[i].DesZone,
 				Height:          mem.RlDB[i].CmHeight,
-				Packages:        mem.RlDB[i].Packages,
+				Packages:        tp.ParsePackages(mem.RlDB[i].Packages),
 				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
 			}
-
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
 			checkdb.Save([]byte(CmID(cm)), cm) //存储
 			fmt.Println("存储", "root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)))
@@ -1005,16 +1003,13 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			var txlist []*tp.TX
 			var byte_txlist []types.Tx
 			for i := 0; i < len(cm.Txlist); i++ {
-				if cm.Txlist[i].Txtype == "relaytx" {
-					var tx *tp.TX
-					tx = cm.Txlist[i]
-					txlist = append(txlist, tx)
-					data, err := json.Marshal(tx)
-					if err != nil {
-						mem.logger.Error("reap 交易解析错误")
-						return nil
-					}
-					byte_txlist = append(byte_txlist, data)
+				tmp_tx, err := tp.NewTX(cm.Txlist[i])
+				if err != nil {
+					mem.logger.Error("Unmarshall tp.TX error, err: ", err)
+				}
+				if tmp_tx.Txtype == "relaytx" {
+					txlist = append(txlist, tmp_tx)
+					byte_txlist = append(byte_txlist, cm.Txlist[i])
 				}
 			}
 
@@ -1345,13 +1340,13 @@ func (nopTxCache) Push(types.Tx) bool { return true }
 func (nopTxCache) Remove(types.Tx)    {}
 
 // 检查CrossMessage交易，检查tree path，但不验证tree root签名
-func (mem *Mempool) CheckCrossMessageSig(m []byte) bool {
-	cm, err := tp.CrossMessageFromByteSlices(m)
-	if err != nil {
-		return false
-	}
-
+func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 	// 检验参数
+	if cm == nil {
+		return true
+	}
+	// 检验门限签名的合法性
+	// todo
 
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist

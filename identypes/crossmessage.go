@@ -3,6 +3,7 @@ package identypes
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type CrossMessages struct {
@@ -18,11 +19,28 @@ type CrossMessages struct {
 	ConfirmPackSigs []byte    //对于这些包的签名
 }
 
+type PartSig struct {
+	PeerCrossSig []byte
+	Id           int64
+}
+
 type Package struct {
 	CrossMerkleRoot []byte
-	Height int64
-	CmID   [32]byte
-	SrcZone string
+	Height          int64
+	CmID            [32]byte
+	SrcZone         string
+}
+
+func ParsePackages(data []byte) []Package {
+	var packs []Package
+	err := json.Unmarshal(data, &packs)
+	if len(packs) == 0 {
+		return nil
+	}
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	return packs
 }
 
 func (cm *CrossMessages) CheckMessages() bool {

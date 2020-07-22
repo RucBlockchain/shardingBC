@@ -118,7 +118,10 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	//拿到相关的txs
 	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas,height)
 	Packages := blockExec.mempool.SearchRelationTable(height)
-	//将相关的txs进行
+	//将相关的txs进行排序
+	txs = types.HandleSortTx(txs)
+	// TODO 更新交易的operate属性
+
 	return state.MakeBlock(height, txs, commit, evidence, proposerAddr,Packages)
 }
 
