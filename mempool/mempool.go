@@ -1371,8 +1371,6 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 
 	if cm == nil {
 		return true
-	}else {
-		return true
 	}
 	// 检验门限签名的合法性
 	// todo
