@@ -103,7 +103,7 @@ func (pv *MockPV) SignProposal(chainID string, proposal *Proposal) error {
 func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
 	var successNo, errorNo int
 	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
-	for _, txdata := range (txs) {
+	for _, txdata := range txs {
 		tx, err := identypes.NewTX(txdata)
 		if err != nil {
 			return err
@@ -147,7 +147,11 @@ func ParseId() int64 {
 }
 func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte, vote *Vote) error {
 	vote.PartSig.Id = ParseId()
-	vote.PartSig.PeerCrossSig = MerkleRoot
+	if sign, err := pv.privKey.Sign(MerkleRoot); err == nil {
+		vote.PartSig.PeerCrossSig = sign
+	} else {
+		return err
+	}
 	return nil
 }
 
