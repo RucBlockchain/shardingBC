@@ -15,11 +15,23 @@ func ClassifyTx(txs Txs) map[string]Txs {
 	buckets := make(map[string]Txs)
 	for _, txbyte := range (txs) {
 		tx, err := identypes.NewTX(txbyte)
+		if tx.Txtype=="relaytx" && tx.Sender==getShard(){
+			tx.Operate=1
+		}
+		if tx.Txtype=="relaytx" && tx.Receiver==getShard(){
+			tx.Txtype="addtx"
+		}
 		if err != nil {
 			panic(err)
 			continue
 		}
-		des := tx.Receiver
+		des:=""
+		if tx.Txtype=="addtx"{
+			des = tx.Sender
+		}else if tx.Txtype=="relaytx"{
+			des = tx.Receiver
+		}
+
 		if _, ok := buckets[des]; ok {
 			buckets[des] = append(buckets[des], tx.Data())
 		} else {

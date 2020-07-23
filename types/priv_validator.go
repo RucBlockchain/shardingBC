@@ -143,7 +143,6 @@ func ParseId() int64 {
 	Index, _ := strconv.Atoi(g)
 	var id int64
 	id = int64(Shard*500 + Index)
-	fmt.Println(id)
 	return id
 }
 func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte, vote *Vote) error {

@@ -294,24 +294,16 @@ func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
 		Content: tcm,
 		Height:  0,
 	}
+	//fmt.Println("加入cmdb","root:",cm.Content.CrossMerkleRoot," height",cm.Content.Height,"对方要删除的packages",cm.Content.Packages)
 	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
-}
-func ParsePackages(data []byte) []tp.Package {
-	var packs []tp.Package
-	err := json.Unmarshal(data, &packs)
-	if len(packs) == 0 {
-		return nil
-	}
-	if err != nil {
-		fmt.Println("ParseData Wrong")
-	}
-	return packs
+	//fmt.Println("添加CmDB，容量为",len(mem.cmDB.CrossMessages))
 }
 func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 	//删除交易包
 	//对package进行解析
 	packs := tcm.Packages
 	for j := 0; j < len(packs); j++ {
+		//fmt.Println("收到要删除的包",packs[j])
 		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
 			if mem.cmDB.CrossMessages[i].Content.Height == packs[j].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[j].CrossMerkleRoot) {
 				mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
@@ -321,6 +313,7 @@ func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 			}
 		}
 	}
+	//fmt.Println("CmDB还剩:",len(mem.cmDB.CrossMessages))
 
 }
 func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
@@ -571,23 +564,24 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	if result := mem.CheckCrossMessageSig(cm); !result {
 		return errors.New("聚合签名或者检验失败")
 	}
+	mem.ModifyCrossMessagelist(cm)
 	//交易合法性检验
 	for i := 0; i < len(cm.Txlist); i++ {
-		var tx types.Tx
-		tx, err = json.Marshal(cm.Txlist[i])
-		accountLog := account.NewAccountLog(tx)
+		accountLog := account.NewAccountLog(cm.Txlist[i])
 		if accountLog == nil {
+			fmt.Println("交易解析失败")
 			return errors.New("交易解析失败")
 		}
 		checkRes := accountLog.Check()
 
 		if !checkRes {
-			fmt.Println("不合法")
+			fmt.Println("dd")
 			return errors.New("不合法的交易")
 		}
 	}
+	//fmt.Println("交易合法性检验通过")
 	//删除对应的CrossList内容
-	mem.ModifyCrossMessagelist(cm)
+
 
 	return nil
 }
@@ -617,7 +611,9 @@ func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [3
 	}
 
 	rl.RlID = RlID(rl)
-	fmt.Println("添加映射表的id", rl.RlID)
+	//fmt.Println("新添加的映射表"," csheight",rl.CsHeight," cmheight",rl.CmHeight," cmhash:",
+	//	rl.CmHash," 发送方: ",rl.SrcZone," 接受方:",rl.DesZone," rlid: ",rl.RlID," packages:",tp.ParsePackages(rl.Packages),
+	//)
 	mem.RlDB = append(mem.RlDB, rl)
 }
 
@@ -641,15 +637,19 @@ func (mem *Mempool) ModifyRelationTable(packages []byte, ConfirmPackSig []byte, 
 		if mem.RlDB[i].CsHeight == Height {
 			mem.RlDB[i].Packages = packages
 			mem.RlDB[i].ComfirmPackSig = ConfirmPackSig
+			//fmt.Println("修改映射表"," csheight",mem.RlDB[i].CsHeight," cmheight",mem.RlDB[i].CmHeight," cmhash:",
+			//	mem.RlDB[i].CmHash," 发送方: ",mem.RlDB[i].SrcZone," 接受方:",mem.RlDB[i].DesZone,"rlid",mem.RlDB[i].RlID,
+			//	"packages",tp.ParsePackages(mem.RlDB[i].Packages),
+			//)
 		}
 	}
+
 }
 
 //删除映射表关系
 func (mem *Mempool) RemoveRelationTable(rlid string) {
-	fmt.Println("删除映射表")
-	fmt.Println("映射表容量", len(mem.RlDB))
-	fmt.Println("本次删除映射表的选项是", rlid)
+	//fmt.Println("映射表容量", len(mem.RlDB))
+	//fmt.Println("本次删除映射表的选项是", rlid)
 	for i := 0; i < len(mem.RlDB); i++ {
 		if mem.RlDB[i].RlID == rlid {
 			//先固化到磁盘
@@ -664,23 +664,39 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 				Height:          mem.RlDB[i].CmHeight,
 				Packages:        tp.ParsePackages(mem.RlDB[i].Packages),
 				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
-			}
+		}
+
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
+			//cmid,_:=json.Marshal(CmID(cm)
 			checkdb.Save([]byte(CmID(cm)), cm) //存储
-			fmt.Println("存储", "root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)))
+			//fmt.Println("存储", "root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages)
 			i--
 			break
 		}
 	}
-	fmt.Println("删除完映射表容量", len(mem.RlDB))
+	//fmt.Println("删除完映射表容量", len(mem.RlDB))
 }
-func ParseData(data types.Tx) *tp.CrossMessages {
+func ParseData(data types.Tx) (*tp.CrossMessages) {
 	cm := new(tp.CrossMessages)
 	err := json.Unmarshal(data, &cm)
 	if err != nil {
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.Packages == nil {
+	if cm.CrossMerkleRoot==nil{
+
+		return nil
+	} else {
+		return cm
+	}
+}
+func ParseData1(data types.Tx) (*tp.CrossMessages) {
+	cm := new(tp.CrossMessages)
+	err := json.Unmarshal(data, &cm)
+	if err != nil {
+		fmt.Println("ParseData Wrong")
+	}
+	if cm.CrossMerkleRoot==nil{
+
 		return nil
 	} else {
 		return cm
@@ -725,8 +741,25 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			return ErrPreCheck{err}
 		}
 	}
-	// CACHE
+	if cm := ParseData(tx); cm != nil {
+		mem.logger.Error("接受到Cm消息")
+		if result := mem.CheckCrossMessage(cm); result != nil {
+			return result
+		}
+	} else {
 
+		accountLog := account.NewAccountLog(tx)
+		if accountLog == nil {
+			return errors.New("交易解析失败")
+		}
+		checkRes := accountLog.Check()
+
+		if !checkRes {
+			fmt.Println("aa")
+			return errors.New("不合法的交易")
+		}
+	}
+	// CACHE
 	if !mem.cache.Push(tx) {
 		// Record a new sender for a tx we've already seen.
 		// Note it's possible a tx is still in the cache but no longer in the mempool
@@ -751,24 +784,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	 * @Date: 19.11.10
 	 */
 	//检验cm的合法性
-	if cm := ParseData(tx); cm != nil {
-		mem.logger.Error("接受到Cm消息")
-		if result := mem.CheckCrossMessage(cm); result != nil {
-			return result
-		}
-	} else {
 
-		accountLog := account.NewAccountLog(tx)
-		if accountLog == nil {
-			return errors.New("交易解析失败")
-		}
-		checkRes := accountLog.Check()
-
-		if !checkRes {
-
-			return errors.New("不合法的交易")
-		}
-	}
 
 	//对addtx进行检验，如果是已经加入则直接返回
 	// WAL
@@ -979,7 +995,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	//区块能取到最大的数量，最大gas值
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
-	// mem.logger.Error("reap txs")
+	mem.logger.Error("reap txs")
 	for atomic.LoadInt32(&mem.rechecking) > 0 {
 		// TODO: Something better?
 		time.Sleep(time.Millisecond * 10)
@@ -997,7 +1013,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 		// Check total size requirement
 		// 删除对应的txlist的relay_out交易
-		if cm := ParseData(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
+		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
 			//添加映射关系
 			//对txlist进行遍历，将relay_in的tx加入区块之中
 			var txlist []*tp.TX
@@ -1008,7 +1024,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 					mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 				}
 				if tmp_tx.Txtype == "relaytx" {
-					txlist = append(txlist, tmp_tx)
 					byte_txlist = append(byte_txlist, cm.Txlist[i])
 				}
 			}
@@ -1092,8 +1107,9 @@ func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 // NOTE: unsafe; Lock/Unlock must be managed by caller
 func DetectTx(tx types.Tx) bool {
 	parsetx, _ := tp.NewTX(tx)
+	//fmt.Println("该区块的tx",parsetx)
 	//说明是relay_out交易
-	if parsetx.Txtype == "relaytx" && parsetx.Sender != getShard() {
+	if parsetx.Txtype == "relaytx" && parsetx.Receiver == getShard() {
 		//将该条交易删除
 		return true
 	} else {
@@ -1105,7 +1121,7 @@ func RlID(rl RelationTable) string {
 	ID := append(heightHash, rl.CmHash...)
 	return fmt.Sprintf("%X", ID)
 }
-func (mem *Mempool) RemoveCm(height int64) []types.Tx {
+func (mem *Mempool) RemoveCm(height int64) {
 	CmsMap := make(map[string]struct{}, len(mem.RlDB))
 	for i := 0; i < len(mem.RlDB); i++ {
 		if mem.RlDB[i].CsHeight == height {
@@ -1114,7 +1130,6 @@ func (mem *Mempool) RemoveCm(height int64) []types.Tx {
 			CmsMap[RlID(mem.RlDB[i])] = struct{}{}
 		}
 	}
-	txsLeft := make([]types.Tx, 0, mem.txs.Len())
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
 		// Remove the tx if it's already in a block.
@@ -1127,11 +1142,11 @@ func (mem *Mempool) RemoveCm(height int64) []types.Tx {
 				mem.RemoveRelationTable(CmID(cm))
 				continue
 			}
-		}
 
-		txsLeft = append(txsLeft, memTx.tx)
+		}else{
+
+		}
 	}
-	return txsLeft
 
 }
 func (mem *Mempool) Update(
@@ -1156,13 +1171,14 @@ func (mem *Mempool) Update(
 		if DetectTx(tx) {
 			continue
 		}
+		//fmt.Println("push交易")
+
 		_ = mem.cache.Push(tx)
 	}
 	//删除对应交易包
-	txsleft_cm := mem.RemoveCm(height)
+	mem.RemoveCm(height)
 	// Remove committed transactions.
-	txsLeft := mem.removeTxs(txsleft_cm)
-
+	txsLeft := mem.removeTxs(txs)
 	// Either recheck non-committed txs to see if they became invalid
 	// or just notify there're some txs left.
 	if len(txsLeft) > 0 {
@@ -1186,17 +1202,26 @@ func (mem *Mempool) Update(
 func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 	// Build a map for faster lookups.
 	txsMap := make(map[string]struct{}, len(txs))
+
 	for _, tx := range txs {
 		//主要是避免由cm产生的tx
 		if DetectTx(tx) {
 			continue
 		}
-		txsMap[string(tx)] = struct{}{}
+		tx1,_:=tp.NewTX(tx)
+		if tx1.Operate==1 && tx1.Txtype=="relaytx"&&tx1.Sender==getShard(){
+			tx1.Operate=0
+			txdata,_:=json.Marshal(tx1)
+			txsMap[string(txdata)] = struct{}{}
+		}else {
+			txsMap[string(tx)] = struct{}{}
+		}
 	}
 
 	txsLeft := make([]types.Tx, 0, mem.txs.Len())
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
+
 		// Remove the tx if it's already in a block.
 		if _, ok := txsMap[string(memTx.tx)]; ok {
 			// NOTE: we don't remove committed txs from the cache.
@@ -1204,6 +1229,7 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 
 			continue
 		}
+
 		txsLeft = append(txsLeft, memTx.tx)
 	}
 	return txsLeft
@@ -1342,7 +1368,10 @@ func (nopTxCache) Remove(types.Tx)    {}
 // 检查CrossMessage交易，检查tree path，但不验证tree root签名
 func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 	// 检验参数
+
 	if cm == nil {
+		return true
+	}else {
 		return true
 	}
 	// 检验门限签名的合法性

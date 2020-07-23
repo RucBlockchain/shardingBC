@@ -82,27 +82,36 @@ func CmID(cm *tp.CrossMessages) string {
 
 func CheckDB(tx types.Tx) error {
 	if cm := ParseData(tx); cm != nil {
-		fmt.Println("收到", cm.Height, "root", cm.CrossMerkleRoot, "长度", len(cm.Txlist))
-		for i := 0; i < len(cm.Txlist); i++ {
-			fmt.Println(cm.Txlist[i])
+		if cm.SrcZone==getShard(){
+			//收到状态数据库的回执f
+			fmt.Println("收到回执并且执行删除",cm.Packages)
+			mempool.ModifyCrossMessagelist(cm)
+			//return errors.New("回执删除")
 		}
-		relaynum := 0
-		addnum := 0
-		for i := 0; i < len(cm.Txlist); i++ {
-			tx, _ := tp.NewTX(cm.Txlist[i])
-			if tx.Txtype == "relaytx" {
-				relaynum += 1
-			} else if tx.Txtype == "addtx" {
-				addnum += 1
-			}
-		}
-		fmt.Println("relay交易数量", relaynum)
-		fmt.Println("addtx交易数量", addnum)
+		//fmt.Println("收到", cm.Height, "root", cm.CrossMerkleRoot,"本片要删除的包",cm.Packages)
+		//relaynum := 0
+		//addnum := 0
+		//for i := 0; i < len(cm.Txlist); i++ {
+		//	tx, _ := tp.NewTX(cm.Txlist[i])
+		//	fmt.Println(tx)
+		//	if tx.Txtype == "relaytx" {
+		//		relaynum += 1
+		//	} else if tx.Txtype == "addtx" {
+		//		addnum += 1
+		//	}
+		//}
+		//fmt.Println("relay交易数量", relaynum)
+		//fmt.Println("addtx交易数量", addnum)
 		cmid := CmID(cm)
-		fmt.Println("查询id", []byte(cmid))
+		//fmt.Println("查询id", []byte(cmid))
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
+
 			name := dbtx.SrcZone + "S1:26657"
+			fmt.Println("发送",name)
+			fmt.Println("回执crossmessage","packages:",dbtx.Packages," 对方的height",dbtx.Height," cmroot",
+			dbtx.CrossMerkleRoot,
+		)
 			tx_package := []*tp.CrossMessages{}
 			tx_package = append(tx_package, dbtx)
 			for i := 0; i < len(tx_package); i++ {
@@ -127,7 +136,7 @@ func ParseData(data types.Tx) (*tp.CrossMessages) {
 	if err != nil {
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.Packages == nil && cm.Txlist == nil {
+	if cm.Height==0 && cm.Txlist==nil{
 		return nil
 	} else {
 		return cm
@@ -155,6 +164,7 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 				fmt.Println("交易cm不合法", cm)
 			} else {
 				tx1, _ := tp.NewTX(tx)
+
 				fmt.Println("交易tx不合法", tx1)
 			}
 		}

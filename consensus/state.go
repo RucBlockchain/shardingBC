@@ -3,12 +3,9 @@ package consensus
 import (
 	"bytes"
 	"fmt"
-	"github.com/tendermint/tendermint/crypto/bls"
 	"net"
 	"reflect"
 	"runtime/debug"
-	"strconv"
-
 	//"strings"
 	"sync"
 	"time"
@@ -1374,66 +1371,75 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
-
+//共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	// 只有leader能做
 	if !cs.isLeader() {
 		return nil
 	}
-
-	if cs.ProposalBlock != nil || len(cs.ProposalBlock.Txs) == 0 {
+	voteSet := cs.Votes.Prevotes(cs.CommitRound)
+	packdata:=cs.blockExec.MergePackage(cs.Height)
+	packs:=ParsePackages(packdata)
+	if /*cs.ProposalBlock != nil || */len(packs)==0 && len(cs.ProposalBlock.Txs)==0{
 		return nil
 	} else {
-		voteSet := cs.Votes.Prevotes(cs.CommitRound)
-		if len(voteSet.PartSigs) == 0 {
+		if len(cs.ProposalBlock.Txs)==0 && len(packs)!=0{
+			//fmt.Println("调用ModifyRelationTable")
+			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
+
 		var ids = make([]int64, len(voteSet.PartSigs))
 		var sigs = make([][]byte, len(voteSet.PartSigs))
-
 		for i := 0; i < len(voteSet.PartSigs); i++ {
 			ids = append(ids, voteSet.PartSigs[i].Id)
 			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
 		}
 		//TODO:引入聚合签名接口
-		var threshold int // 系统参数 外部获取
-		threshold = len(voteSet.PartSigs) * 2 / 3
+		//var threshold int // 系统参数 外部获取
+		//threshold = len(voteSet.PartSigs) * 2 / 3
 		var err error
-		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
-		if err != nil {
-			cs.Logger.Error("Aggregate error")
-			return err
-		}
-		//生成跨片消息包保存在relaylist之中
-		//cms := cs.ClassifyTxFromBlock(cs.ProposalBlock.Txs)
+		//CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 
+		//if err != nil {
+		//	fmt.Println(err)
+		//	fmt.Println("聚合签名错误")
+		//	cs.Logger.Error("Aggregate error")
+		//	return err
+		//}
 		// 重新生成merkle tree
+		CrossMerkleSig := []byte("")
 		mts, err := types.GenerateMerkleTree(cs.ProposalBlock.Txs)
 		if err != nil {
 			return err
 		}
-
+		//fmt.Println("调用存入")
+		var txs types.Txs
+		txs=cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,
-			cs.ProposalBlock.Txs,
+			txs,
 			CrossMerkleSig,
 			cs.privValidator.GetPubKey().Bytes(),
 			cs.Height)
 
 		for i := 0; i < len(cms); i++ {
 			//存入realylist之中
+			cms[i].Packages=packs
 			if !JudgeCrossMessage(cms[i]) {
+				//fmt.Println("存入")
 				cs.blockExec.AddCrossMessagesDB(cms[i])
 			} else {
-				fmt.Println("全是addtx")
+				//fmt.Println("全是addtx")
 				var tcm []*tp.CrossMessages
 				tcm = append(tcm, cms[i])
 				//是否要发送？
 				go cs.blockExec.SendCrossMessages(8080, tcm)
 				//固化到磁盘之中
 			}
-			cs.blockExec.ModifyRelationTable(cs.blockExec.MergePackage(cs.Height), cs.ProposalBlock.CmRelation, cs.Height)
-		}
 
+		}
+		//fmt.Println("调用ModifyRelationTable")
+		cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 		return nil
 	}
 
@@ -1979,22 +1985,11 @@ func compareRelaylist(t tp.TX, allCms []*tp.CrossMessages) (result bool) {
 	}
 	return result
 }
-func ParseId() int64 {
-
-	v, _ := syscall.Getenv("TASKID")
-	g, _ := syscall.Getenv("TASKINDEX")
-	Shard, _ := strconv.Atoi(v)
-	Index, _ := strconv.Atoi(g)
-	var id int64
-	id = int64(Shard*500 + Index)
-	return id
-}
 
 func (cs *ConsensusState) JudgeBlockPakcages() bool {
 	packs := ParsePackages(cs.ProposalBlock.CmRelation)
 	//说明该区块没有跨片交易
 	if len(packs) == 0 {
-		fmt.Println("没有包，无需同步")
 		return true
 	}
 
@@ -2006,7 +2001,6 @@ func (cs *ConsensusState) JudgeBlockPakcages() bool {
 
 	//做同步relationtable操作
 	if !cs.isLeader() {
-		fmt.Println("普通节点做同步")
 		for i := 0; i < len(packs); i++ {
 			cs.blockExec.SyncRelationTable(packs[i], cs.ProposalBlock.Height)
 		}
