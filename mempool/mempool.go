@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/tendermint/tendermint/checkdb"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"strconv"
 	"sync"
@@ -582,7 +583,6 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	//fmt.Println("交易合法性检验通过")
 	//删除对应的CrossList内容
 
-
 	return nil
 }
 
@@ -664,7 +664,7 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 				Height:          mem.RlDB[i].CmHeight,
 				Packages:        tp.ParsePackages(mem.RlDB[i].Packages),
 				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
-		}
+			}
 
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
 			//cmid,_:=json.Marshal(CmID(cm)
@@ -676,26 +676,26 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 	}
 	//fmt.Println("删除完映射表容量", len(mem.RlDB))
 }
-func ParseData(data types.Tx) (*tp.CrossMessages) {
+func ParseData(data types.Tx) *tp.CrossMessages {
 	cm := new(tp.CrossMessages)
 	err := json.Unmarshal(data, &cm)
 	if err != nil {
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.CrossMerkleRoot==nil{
+	if cm.CrossMerkleRoot == nil {
 
 		return nil
 	} else {
 		return cm
 	}
 }
-func ParseData1(data types.Tx) (*tp.CrossMessages) {
+func ParseData1(data types.Tx) *tp.CrossMessages {
 	cm := new(tp.CrossMessages)
 	err := json.Unmarshal(data, &cm)
 	if err != nil {
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.CrossMerkleRoot==nil{
+	if cm.CrossMerkleRoot == nil {
 
 		return nil
 	} else {
@@ -784,7 +784,6 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	 * @Date: 19.11.10
 	 */
 	//检验cm的合法性
-
 
 	//对addtx进行检验，如果是已经加入则直接返回
 	// WAL
@@ -1143,7 +1142,7 @@ func (mem *Mempool) RemoveCm(height int64) {
 				continue
 			}
 
-		}else{
+		} else {
 
 		}
 	}
@@ -1208,12 +1207,12 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 		if DetectTx(tx) {
 			continue
 		}
-		tx1,_:=tp.NewTX(tx)
-		if tx1.Operate==1 && tx1.Txtype=="relaytx"&&tx1.Sender==getShard(){
-			tx1.Operate=0
-			txdata,_:=json.Marshal(tx1)
+		tx1, _ := tp.NewTX(tx)
+		if tx1.Operate == 1 && tx1.Txtype == "relaytx" && tx1.Sender == getShard() {
+			tx1.Operate = 0
+			txdata, _ := json.Marshal(tx1)
 			txsMap[string(txdata)] = struct{}{}
-		}else {
+		} else {
 			txsMap[string(tx)] = struct{}{}
 		}
 	}
@@ -1368,14 +1367,24 @@ func (nopTxCache) Remove(types.Tx)    {}
 // 检查CrossMessage交易，检查tree path，但不验证tree root签名
 func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 	// 检验参数
-
 	if cm == nil {
 		return true
-	}else {
-		return true
 	}
+
 	// 检验门限签名的合法性
-	// todo
+	if cm.Pubkeys == nil || cm.ConfirmPackSigs == nil {
+		mem.logger.Error("CrossMessage包的pubkey或签名为空")
+		return false
+	}
+
+	pubkey, err := bls.GetPubkeyFromByte(cm.Pubkeys)
+	if err != nil {
+		mem.logger.Error("验证CrossMessage的ConfirmPackSigs出错，err: ", err)
+		return false
+	}
+	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.ConfirmPackSigs); !res {
+		return false
+	}
 
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
