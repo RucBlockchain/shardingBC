@@ -13,22 +13,19 @@ import (
 func ClassifyTx(txs Txs) map[string]Txs {
 	// TODO string类型转换为枚举型
 	buckets := make(map[string]Txs)
-	for _, txbyte := range (txs) {
+	for _, txbyte := range txs {
 		tx, err := identypes.NewTX(txbyte)
-		if tx.Txtype=="relaytx" && tx.Sender==getShard(){
-			tx.Operate=1
-		}
-		if tx.Txtype=="relaytx" && tx.Receiver==getShard(){
-			tx.Txtype="addtx"
-		}
 		if err != nil {
-			panic(err)
 			continue
 		}
-		des:=""
-		if tx.Txtype=="addtx"{
+
+		// 更新交易数据，可优化
+		tx.UpdateTx()
+
+		des := ""
+		if tx.Txtype == "addtx" {
 			des = tx.Sender
-		}else if tx.Txtype=="relaytx"{
+		} else if tx.Txtype == "relaytx" {
 			des = tx.Receiver
 		}
 
@@ -60,17 +57,17 @@ func HandleSortTx(txs Txs) Txs {
 	// newTxs先放入跨片交易
 	//newTxs := Txs{}
 	newTxs := txs[:0]
-	for shard, listval := range (buckets) {
+	for shard, listval := range buckets {
 		if shard == cShard {
 			continue
 		}
-		for _, tx := range (listval) {
+		for _, tx := range listval {
 			newTxs = append(newTxs, tx)
 		}
 	}
 
 	// 将当前分片的片内交易放在txs末尾
-	for _, tx := range (buckets[cShard]) {
+	for _, tx := range buckets[cShard] {
 		newTxs = append(newTxs, tx)
 	}
 
@@ -89,10 +86,10 @@ func GenerateMerkleTree(txs Txs) (*merkle.TxMerkleTree, error) {
 	shardtrees := make(map[string]*merkle.SimpleMerkleTree)
 
 	// 依次为每一个分片的交易生成merkle tree
-	for shard, tmptxs := range (buckets) {
+	for shard, tmptxs := range buckets {
 		// 取出交易
 		tmplist := make([][]byte, 0, len(tmptxs))
-		for _, tx := range (tmptxs) {
+		for _, tx := range tmptxs {
 			tmplist = append(tmplist, tx)
 		}
 
@@ -143,7 +140,7 @@ func ClassifyTxFromBlock(mts *merkle.TxMerkleTree,
 	// 生成最终的merkle tree
 	//mts, err := GenerateMerkleTree(txs)
 
-	for shard, listval := range (buckets) {
+	for shard, listval := range buckets {
 		if shard == cShard || shard == "" {
 			// 当前桶为片内交易
 			continue

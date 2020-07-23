@@ -69,7 +69,7 @@ type TX struct {
 	// 当交易类型为relayTX时有用，其余类型为空跳过即可
 
 	//AggSig AggregateSig
-	Height  int // 记录该条跨片交易被共识的区块高度
+	Height int // 记录该条跨片交易被共识的区块高度
 }
 
 func NewTX(data []byte) (*TX, error) {
@@ -87,11 +87,18 @@ func NewTX(data []byte) (*TX, error) {
 
 // 处理跨片交易的后程，修改交易属性
 func (tx *TX) UpdateTx() {
-	if tx.Receiver != getShard() && tx.Txtype != "relaytx" {
+	if tx == nil {
 		return
 	}
+	// 如果交易类型为relaytx 且 发送方是本分片，则该交易为relay_in，修改operate值为1
+	if tx.Txtype == "relaytx" && tx.Sender == getShard() {
+		tx.Operate = 1
+	}
 
-	tx.Operate = 1
+	// 如果交易类型为relayTx 且 接收方是本分片，则修改交易类型为addtx
+	if tx.Txtype == "relaytx" && tx.Receiver == getShard() {
+		tx.Txtype = "addtx"
+	}
 }
 
 func (tx *TX) Data() []byte {
