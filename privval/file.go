@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/identypes"
 	"io/ioutil"
+	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/ed25519"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
@@ -152,7 +154,12 @@ func (pv *FilePV) SigCrossMerkleRoot(MerkleRoot []byte, vote *types.Vote) error 
 // GenFilePV generates a new validator with randomly generated private key
 // and sets the filePaths, but does not call Save().
 func GenFilePV(keyFilePath, stateFilePath string) *FilePV {
-	privKey := ed25519.GenPrivKey()
+	threshold := 3
+	if s, found := syscall.Getenv("THRESHOLD"); found {
+		threshold, _ = strconv.Atoi(s)
+	}
+	privKey := bls.GenSubPrivKey(threshold)
+	//privKey := ed25519.GenPrivKey()
 
 	return &FilePV{
 		Key: FilePVKey{
@@ -265,7 +272,7 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 func (pv *FilePV) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
 	var successNo, errorNo int
 	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
-	for _, txdata := range (txs) {
+	for _, txdata := range txs {
 		tx, err := identypes.NewTX(txdata)
 		if err != nil {
 			return err

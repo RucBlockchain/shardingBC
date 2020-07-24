@@ -1,6 +1,7 @@
 package cryptoAmino
 
 import (
+	"github.com/tendermint/tendermint/crypto/bls"
 	"reflect"
 
 	amino "github.com/tendermint/go-amino"
@@ -30,6 +31,7 @@ func init() {
 	// TODO: Have amino provide a way to go from concrete struct to route directly.
 	// Its currently a private API
 	nameTable[reflect.TypeOf(ed25519.PubKeyEd25519{})] = ed25519.PubKeyAminoName
+	nameTable[reflect.TypeOf(bls.PubKeyBLS{})] = bls.PubKeyAminoName
 	nameTable[reflect.TypeOf(secp256k1.PubKeySecp256k1{})] = secp256k1.PubKeyAminoName
 	nameTable[reflect.TypeOf(multisig.PubKeyMultisigThreshold{})] = multisig.PubKeyMultisigThresholdAminoRoute
 }
@@ -48,6 +50,8 @@ func RegisterAmino(cdc *amino.Codec) {
 	cdc.RegisterInterface((*crypto.PubKey)(nil), nil)
 	cdc.RegisterConcrete(ed25519.PubKeyEd25519{},
 		ed25519.PubKeyAminoName, nil)
+	cdc.RegisterConcrete(bls.PubKeyBLS{},
+		bls.PubKeyAminoName, nil)
 	cdc.RegisterConcrete(secp256k1.PubKeySecp256k1{},
 		secp256k1.PubKeyAminoName, nil)
 	cdc.RegisterConcrete(multisig.PubKeyMultisigThreshold{},
@@ -58,6 +62,8 @@ func RegisterAmino(cdc *amino.Codec) {
 		ed25519.PrivKeyAminoName, nil)
 	cdc.RegisterConcrete(secp256k1.PrivKeySecp256k1{},
 		secp256k1.PrivKeyAminoName, nil)
+	cdc.RegisterConcrete(bls.PrivKeyBLS{},
+		bls.PrivKeyAminoName, nil)
 }
 
 func PrivKeyFromBytes(privKeyBytes []byte) (privKey crypto.PrivKey, err error) {

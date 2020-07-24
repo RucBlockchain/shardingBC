@@ -145,6 +145,7 @@ func ParseId() int64 {
 	id = int64(Shard*500 + Index)
 	return id
 }
+
 func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte, vote *Vote) error {
 	vote.PartSig.Id = ParseId()
 	if sign, err := pv.privKey.Sign(MerkleRoot); err == nil {

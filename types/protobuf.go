@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"reflect"
 	"time"
 
@@ -22,12 +23,14 @@ const (
 const (
 	ABCIPubKeyTypeEd25519   = "ed25519"
 	ABCIPubKeyTypeSecp256k1 = "secp256k1"
+	ABCIPubKeyTypeBLS       = "bls"
 )
 
 // TODO: Make non-global by allowing for registration of more pubkey types
 var ABCIPubKeyTypesToAminoNames = map[string]string{
 	ABCIPubKeyTypeEd25519:   ed25519.PubKeyAminoName,
 	ABCIPubKeyTypeSecp256k1: secp256k1.PubKeyAminoName,
+	ABCIPubKeyTypeBLS:       bls.PubKeyAminoName,
 }
 
 //-------------------------------------------------------
@@ -107,6 +110,11 @@ func (tm2pb) PubKey(pubKey crypto.PubKey) abci.PubKey {
 	case secp256k1.PubKeySecp256k1:
 		return abci.PubKey{
 			Type: ABCIPubKeyTypeSecp256k1,
+			Data: pk[:],
+		}
+	case bls.PubKeyBLS:
+		return abci.PubKey{
+			Type: ABCIPubKeyTypeBLS,
 			Data: pk[:],
 		}
 	default:
@@ -202,6 +210,10 @@ func (pb2tm) PubKey(pubKey abci.PubKey) (crypto.PubKey, error) {
 				len(pubKey.Data), secp256k1.PubKeySecp256k1Size)
 		}
 		var pk secp256k1.PubKeySecp256k1
+		copy(pk[:], pubKey.Data)
+		return pk, nil
+	case ABCIPubKeyTypeBLS:
+		var pk bls.PubKeyBLS
 		copy(pk[:], pubKey.Data)
 		return pk, nil
 	default:

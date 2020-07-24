@@ -3,6 +3,7 @@ package multisig
 import (
 	amino "github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
@@ -23,4 +24,6 @@ func init() {
 		ed25519.PubKeyAminoName, nil)
 	cdc.RegisterConcrete(secp256k1.PubKeySecp256k1{},
 		secp256k1.PubKeyAminoName, nil)
+	cdc.RegisterConcrete(bls.PubKeyBLS{},
+		bls.PubKeyAminoName, nil)
 }

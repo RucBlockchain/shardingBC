@@ -7,6 +7,7 @@ import (
 	"go.dedis.ch/kyber/v3/pairing/bn256"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/kyber/v3/util/random"
+	"math/rand"
 )
 
 // =========================================================
@@ -27,7 +28,9 @@ func Master(x kyber.Scalar, d int) Polynome {
 	p[0] = x
 
 	for i := 0; i < d; i++ {
-		p[i+1], _ = bls.NewKeyPair(bn256_suite, random.New())
+		tmp := rand.New(rand.NewSource(int64(i)))
+		cipher1 := random.New(tmp)
+		p[i+1], _ = bls.NewKeyPair(bn256_suite, cipher1)
 	}
 	return p
 }
@@ -39,7 +42,7 @@ func (p Polynome) GetValue(idx int64) (kyber.Scalar, error) {
 }
 
 func (p Polynome) getValue(suite *bn256.Suite, idx int64) (kyber.Scalar, error) {
-	if (p == nil) {
+	if p == nil {
 		return nil, errors.New("多项式不能为空")
 	}
 
@@ -47,14 +50,14 @@ func (p Polynome) getValue(suite *bn256.Suite, idx int64) (kyber.Scalar, error) 
 		suite = bn256.NewSuite()
 	}
 
-	res := suite.G2().Scalar().Set(p[0])
+	res := suite.G2().Scalar().One().Set(p[0])
 	base := suite.G2().Scalar().One()
-	idxScalar := suite.G2().Scalar().SetInt64(idx)
+	idxScalar := suite.G2().Scalar().One().SetInt64(idx)
 	for i := 1; i < len(p); i++ {
 		base.Mul(base, idxScalar) // x^i = x^i-1 * x
-		tmp := suite.G2().Scalar()
-		tmp.Mul(p[i], tmp) // a_i * x_i ^ i
-		res.Add(res, tmp)  // res += a_i * x_i ^ i
+		tmp := suite.G2().Scalar().One()
+		tmp = tmp.Mul(p[i], base) // a_i * x_i ^ i
+		res = res.Add(res, tmp)   // res += a_i * x_i ^ i
 	}
 
 	return res, nil
@@ -99,12 +102,12 @@ func recovery(suite *bn256.Suite, ys [][]byte, xs []int64) ([]byte, error) {
 	aScalar.One() // a := 1
 
 	// calulate a
-	for _, x := range (xs) {
+	for _, x := range xs {
 		tmp := suite.G1().Scalar().SetInt64(int64(x))
 		aScalar.Mul(aScalar, tmp) // a *= x
 	}
 
-	for i, y := range (ys) {
+	for i, y := range ys {
 		tmpRes := suite.G1().Point()
 		if err := tmpRes.UnmarshalBinary(y); err != nil {
 			return nil, errors.New(fmt.Sprintf("第%v个签名还原错误，具体原因: %v", i+1, err.Error()))
