@@ -3,9 +3,12 @@ package consensus
 import (
 	"bytes"
 	"fmt"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"net"
 	"reflect"
 	"runtime/debug"
+	"strconv"
+
 	//"strings"
 	"sync"
 	"time"
@@ -1371,6 +1374,7 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
+
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	// 只有leader能做
@@ -1378,12 +1382,12 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		return nil
 	}
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
-	packdata:=cs.blockExec.MergePackage(cs.Height)
-	packs:=ParsePackages(packdata)
-	if /*cs.ProposalBlock != nil || */len(packs)==0 && len(cs.ProposalBlock.Txs)==0{
+	packdata := cs.blockExec.MergePackage(cs.Height)
+	packs := ParsePackages(packdata)
+	if /*cs.ProposalBlock != nil || */ len(packs) == 0 && len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
-		if len(cs.ProposalBlock.Txs)==0 && len(packs)!=0{
+		if len(cs.ProposalBlock.Txs) == 0 && len(packs) != 0 {
 			//fmt.Println("调用ModifyRelationTable")
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
@@ -1395,27 +1399,30 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			ids = append(ids, voteSet.PartSigs[i].Id)
 			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
 		}
-		//TODO:引入聚合签名接口
-		//var threshold int // 系统参数 外部获取
-		//threshold = len(voteSet.PartSigs) * 2 / 3
+		//引入聚合签名接口
+		var threshold int // 系统参数 外部获取
+		if s, found := syscall.Getenv("THRESHOLD"); found {
+			threshold, _ = strconv.Atoi(s)
+		} else {
+			threshold = 3
+		}
 		var err error
-		//CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
-
-		//if err != nil {
-		//	fmt.Println(err)
-		//	fmt.Println("聚合签名错误")
-		//	cs.Logger.Error("Aggregate error")
-		//	return err
-		//}
+		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
+		//CrossMerkleSig := []byte("")
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("聚合签名错误")
+			cs.Logger.Error("Aggregate error")
+			return err
+		}
 		// 重新生成merkle tree
-		CrossMerkleSig := []byte("")
 		mts, err := types.GenerateMerkleTree(cs.ProposalBlock.Txs)
 		if err != nil {
 			return err
 		}
 		//fmt.Println("调用存入")
 		var txs types.Txs
-		txs=cs.ProposalBlock.Txs[:]
+		txs = cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,
 			txs,
 			CrossMerkleSig,
@@ -1424,7 +1431,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 		for i := 0; i < len(cms); i++ {
 			//存入realylist之中
-			cms[i].Packages=packs
+			cms[i].Packages = packs
 			if !JudgeCrossMessage(cms[i]) {
 				//fmt.Println("存入")
 				cs.blockExec.AddCrossMessagesDB(cms[i])
