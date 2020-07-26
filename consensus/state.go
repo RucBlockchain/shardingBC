@@ -1409,6 +1409,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		var err error
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		//CrossMerkleSig := []byte("")
+		cs.Logger.Info("sigs: ", sigs)
+		cs.Logger.Info("ids: ", ids)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("聚合签名错误")

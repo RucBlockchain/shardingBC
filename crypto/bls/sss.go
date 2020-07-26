@@ -77,7 +77,7 @@ func SignatureRecovery(threshold int, sigs [][]byte, ids []int64) ([]byte, error
 		return nil, errors.New("签名或者id不能为空")
 	}
 	if len(sigs) <= threshold {
-		return nil, errors.New("签名个数少于阈值")
+		return nil, errors.New(fmt.Sprintf("签名个数少于阈值, expected: %v, actual: %v", threshold, len(sigs)))
 	}
 
 	if len(sigs) == 1 {
