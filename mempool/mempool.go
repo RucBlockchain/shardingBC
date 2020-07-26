@@ -1379,10 +1379,11 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 
 	pubkey, err := bls.GetPubkeyFromByte(cm.Pubkeys)
 	if err != nil {
-		mem.logger.Error("验证CrossMessage的ConfirmPackSigs出错，err: ", err)
+		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
 		return false
 	}
 	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.ConfirmPackSigs); !res {
+		mem.logger.Error("验证CrossMessage的ConfirmPackSigs出错，err: ", err)
 		return false
 	}
 

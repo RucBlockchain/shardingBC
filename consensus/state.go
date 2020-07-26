@@ -1425,6 +1425,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			return err
 		}
 		//fmt.Println("调用存入")
+		fmt.Println("分片公钥: ", bls.GetShardPubkey())
 		var txs types.Txs
 		txs = cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,
