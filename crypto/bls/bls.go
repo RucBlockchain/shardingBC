@@ -77,8 +77,10 @@ func (privKey PrivKeyBLS) Sign(msg []byte) ([]byte, error) {
 
 // PubKey gets the corresponding public key from the private key.
 func (privKey PrivKeyBLS) PubKey() crypto.PubKey {
+	pubkeyBytes := make([]byte, len(privKey))
+	copy(pubkeyBytes, privKey)
 	priv := bn256_suite.G2().Scalar().One()
-	if err := priv.UnmarshalBinary(privKey); err != nil {
+	if err := priv.UnmarshalBinary(pubkeyBytes); err != nil {
 		return nil
 	}
 	pub := bn256_suite.G2().Point().Mul(priv, nil)
@@ -192,11 +194,8 @@ func (pubKey PubKeyBLS) Equals(other crypto.PubKey) bool {
 
 func GetPubkeyFromByte(data []byte) (*PubKeyBLS, error) {
 	//pub := bn256_suite.G2().Point()
-	tmpdata := make([]byte, len(data), cap(data))
-	if err := cdc.UnmarshalBinaryBare(data, &tmpdata); err != nil {
-		return nil, err
-	}
-	pub := PubKeyBLS(tmpdata)
+	pub := PubKeyBLS{}
+	cdc.MustUnmarshalBinaryBare(data, &pub)
 	return &pub, nil
 }
 

@@ -26,6 +26,9 @@ func TestGetPubkeyFromByte(t *testing.T) {
 	assert.Nil(t, err, err)
 	assert.NotNil(t, newpub, "公钥byte反序列失败")
 	assert.True(t, pub.Equals(newpub), "序列化前后数据不一致")
+
+	pub, err = bls.GetPubkeyFromByte(bls.GetShardPubkey())
+	t.Log(pub)
 }
 
 func TestSignatureRecovery(t *testing.T) {

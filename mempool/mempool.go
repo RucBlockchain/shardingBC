@@ -1371,12 +1371,6 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		return true
 	}
 
-	// 检验门限签名的合法性
-	if cm.Pubkeys == nil || cm.ConfirmPackSigs == nil {
-		mem.logger.Error("CrossMessage包的pubkey或签名为空")
-		return false
-	}
-
 	pubkey, err := bls.GetPubkeyFromByte(cm.Pubkeys)
 	if err != nil {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
