@@ -133,6 +133,18 @@ func genPrivKey(rander io.Reader) PrivKeyBLS {
 	return PrivKeyBLS(data)
 }
 
+func GetShardPubkey() []byte {
+	priv_byte := genPrivKey(crypto.CReader())
+
+	priv := bn256_suite.G2().Scalar().One()
+	if err := priv.UnmarshalBinary(priv_byte); err != nil {
+		return nil
+	}
+	data, _ := priv.MarshalBinary()
+
+	return PrivKeyBLS(data).PubKey().Bytes()
+}
+
 //-------------------------------------
 
 var _ crypto.PubKey = PubKeyBLS{}
