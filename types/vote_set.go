@@ -87,6 +87,7 @@ func NewVoteSet(chainID string, height int64, round int, type_ SignedMsgType, va
 		maj23:         nil,
 		votesByBlock:  make(map[string]*blockVotes, valSet.Size()),
 		peerMaj23s:    make(map[P2PID]BlockID),
+		PartSigs:      make([]*identypes.PartSig, 0, 10),
 	}
 }
 

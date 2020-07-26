@@ -1393,8 +1393,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			return nil
 		}
 
-		var ids = make([]int64, len(voteSet.PartSigs))
-		var sigs = make([][]byte, len(voteSet.PartSigs))
+		var ids = make([]int64, 0, len(voteSet.PartSigs))
+		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
 		for i := 0; i < len(voteSet.PartSigs); i++ {
 			ids = append(ids, voteSet.PartSigs[i].Id)
 			sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
@@ -1407,6 +1407,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			threshold = 3
 		}
 		var err error
+		fmt.Println(sigs)
+		fmt.Println(ids)
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		//CrossMerkleSig := []byte("")
 		cs.Logger.Info("sigs: ", sigs)
@@ -1428,7 +1430,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		cms := types.ClassifyTxFromBlock(mts,
 			txs,
 			CrossMerkleSig,
-			cs.privValidator.GetPubKey().Bytes(),
+			bls.GetShardPubkey(),
 			cs.Height)
 
 		for i := 0; i < len(cms); i++ {
