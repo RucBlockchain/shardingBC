@@ -1376,11 +1376,14 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
 		return false
 	}
-	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.ConfirmPackSigs); !res {
-		mem.logger.Error("验证CrossMessage的ConfirmPackSigs出错，err: ", err)
+	fmt.Println("sig: ", cm.Sig)
+	fmt.Println("root: ", cm.CrossMerkleRoot)
+	fmt.Println("pub: ", cm.Pubkeys)
+	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.Sig); !res {
+		mem.logger.Error("验证CrossMessage的signature出错, ",cm )
 		return false
 	}
-
+	fmt.Println("门限签名验证通过！")
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
 

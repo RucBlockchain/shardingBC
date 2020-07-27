@@ -1410,9 +1410,6 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		fmt.Println(sigs)
 		fmt.Println(ids)
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
-		//CrossMerkleSig := []byte("")
-		cs.Logger.Info("sigs: ", sigs)
-		cs.Logger.Info("ids: ", ids)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("聚合签名错误")
@@ -1424,7 +1421,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		if err != nil {
 			return err
 		}
-		//fmt.Println("调用存入")
+		fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
+		fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
 		fmt.Println("分片公钥: ", bls.GetShardPubkey())
 		var txs types.Txs
 		txs = cs.ProposalBlock.Txs[:]
@@ -1433,7 +1431,6 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			CrossMerkleSig,
 			bls.GetShardPubkey(),
 			cs.Height)
-
 		for i := 0; i < len(cms); i++ {
 			//存入realylist之中
 			cms[i].Packages = packs
