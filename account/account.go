@@ -65,7 +65,7 @@ func (accountLog *AccountLog) Check() bool {
 	balanceToStr := _getState([]byte(to))
 	balanceFromStr := _getState([]byte(from))
 
-	if len(from) != 0 && balanceFromStr == nil {
+	if len(from) != 0 && balanceFromStr == nil && accountLog.TxType!="init"{
 		fmt.Println("支出方账户不存在")
 		// logger.Error("支出方账户不存在")
 		return false
@@ -79,7 +79,7 @@ func (accountLog *AccountLog) Check() bool {
 	if len(from) != 0 {
 		balanceFrom := _byte2digit(balanceFromStr)
 		if balanceFrom < amount {
-			fmt.Println("余额不足")
+			fmt.Println(balanceFrom)
 			logger.Error("余额不足")
 			return false
 		}
@@ -165,7 +165,7 @@ func _parseTx(tx []byte) *AccountLog {
 	args := strings.Split(string(txArgs.Content), "_")
 	// fmt.Println(args)
 	if len(args) != 4 { //因为添加时间戳参数，所以个数应该是4个
-		//fmt.Println("参数个数错误")
+		fmt.Println("参数个数错误")
 		// logger.Error("参数个数错误")
 		return nil
 	}

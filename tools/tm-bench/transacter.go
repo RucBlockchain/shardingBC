@@ -95,11 +95,17 @@ func (t *transacter) Start() error {
 		}
 		t.conns[i] = c
 	}
-
+	t.startingWg.Add(t.Connections)
+	//发送init交易保证不会出现支付方还没被确认
+	for i := 0; i < t.Connections; i++ {
+		go t.sendLoop(i, t.flag,false)
+	}
+	t.startingWg.Wait()
+	time.Sleep(1*time.Second)
 	t.startingWg.Add(t.Connections)
 	t.endingWg.Add(2 * t.Connections)
 	for i := 0; i < t.Connections; i++ {
-		go t.sendLoop(i, t.flag)
+		go t.sendLoop(i, t.flag,true)
 		go t.receiveLoop(i)
 	}
 
@@ -140,11 +146,11 @@ func (t *transacter) receiveLoop(connIndex int) {
 }
 
 // sendLoop generates transactions at a given rate.
-func (t *transacter) sendLoop(connIndex int, index int) {
-	initfinish :=false
+func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 	started := false
 	// Close the starting waitgroup, in the event that this fails to start
 	defer func() {
+
 		if !started {
 			t.startingWg.Done()
 		}
@@ -160,9 +166,44 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 		}
 		return err
 	})
-
 	logger := t.logger.With("addr", c.RemoteAddr())
+	if init==false{
+		now := time.Now()
+		if !started {
+			t.startingWg.Done()
+			started = true
+		}
+		for i := 0; i < t.Rate; i++ {
+			var ntx []byte
+			ntx = t.generateTx(t.shard, i)
 
+			//fmt.Println(string(ntx))
+			paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
+			if err != nil {
+				fmt.Printf("failed to encode params: %v\n", err)
+				os.Exit(1)
+			}
+			rawParamsJSON := json.RawMessage(paramsJSON)
+
+			c.SetWriteDeadline(now.Add(sendTimeout))
+			err = c.WriteJSON(rpctypes.RPCRequest{
+				JSONRPC: "2.0",
+				ID:      rpctypes.JSONRPCStringID("tm-bench"),
+				Method:  t.BroadcastTxMethod,
+				Params:  rawParamsJSON,
+			})
+			if err != nil {
+				err = errors.Wrap(err,
+					fmt.Sprintf("txs send failed on connection #%d", connIndex))
+				t.connsBroken[connIndex] = true
+				logger.Error(err.Error())
+				return
+			}
+			// cache the time.Now() reads to save time.
+		}
+		//fmt.Println("发送完毕")
+		return
+	}
 	var txNumber = 1
 
 	pingsTicker := time.NewTicker(pingPeriod)
@@ -189,15 +230,10 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 			//rate是每秒发送消息的数量
 			for i := 0; i < t.Rate; i++ {
 				var ntx []byte
-				if initfinish == false {
-					// if i >= 100 {
-					// 	break //第一秒钟，有几笔交易就产生多少账户
-					// }
-					ntx = t.generateTx(t.shard, i)
 
-				} else {
-					ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
-				}
+				ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
+
+				//fmt.Println(string(ntx))
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
 				if err != nil {
 					fmt.Printf("failed to encode params: %v\n", err)
@@ -231,7 +267,6 @@ func (t *transacter) sendLoop(connIndex int, index int) {
 
 				txNumber++
 			}
-			initfinish =true
 			timeToSend := time.Since(startTime)
 			logger.Info(fmt.Sprintf("sent %d transactions", numTxSent), "took", timeToSend)
 			if timeToSend < 1*time.Second {

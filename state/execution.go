@@ -217,6 +217,8 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 	//		fmt.Println("发送cm消息","cmhash：",resendMessages[i].CrossMerkleRoot,"height：",resendMessages[i].Height,
 	//			"packages：",resendMessages[i].Packages)
 	//	}
+	//}else{
+	//	fmt.Println("没有待发送的交易")
 	//}
 	if flag {
 		//只有leader执行以下代码

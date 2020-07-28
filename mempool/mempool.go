@@ -565,7 +565,11 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	if result := mem.CheckCrossMessageSig(cm); !result {
 		return errors.New("聚合签名或者检验失败")
 	}
-	mem.ModifyCrossMessagelist(cm)
+	if len(cm.Packages)>0{
+		//mem.logger.Error("待删除包数量非0，删除对应的包")
+		mem.ModifyCrossMessagelist(cm)
+	}
+	//mem.logger.Error("修改cmdb完成")
 	//交易合法性检验
 	for i := 0; i < len(cm.Txlist); i++ {
 		accountLog := account.NewAccountLog(cm.Txlist[i])
@@ -576,7 +580,6 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 		checkRes := accountLog.Check()
 
 		if !checkRes {
-			fmt.Println("dd")
 			return errors.New("不合法的交易")
 		}
 	}
@@ -665,11 +668,11 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 				Packages:        tp.ParsePackages(mem.RlDB[i].Packages),
 				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
 			}
-
+			//fmt.Println(string(cm))
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
 			//cmid,_:=json.Marshal(CmID(cm)
 			checkdb.Save([]byte(CmID(cm)), cm) //存储
-			//fmt.Println("存储", "root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages)
+			//fmt.Println("存储", "CrossMerkleRoot root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages)
 			i--
 			break
 		}
@@ -755,7 +758,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		checkRes := accountLog.Check()
 
 		if !checkRes {
-			fmt.Println("aa")
+			fmt.Println(string(tx))
 			return errors.New("不合法的交易")
 		}
 	}
@@ -1208,6 +1211,7 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 			continue
 		}
 		tx1, _ := tp.NewTX(tx)
+		//如果operate=1且relaytx且还是本分片的交易，则是在本次区块产生的时候
 		if tx1.Operate == 1 && tx1.Txtype == "relaytx" && tx1.Sender == getShard() {
 			tx1.Operate = 0
 			txdata, _ := json.Marshal(tx1)
@@ -1216,7 +1220,7 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 			txsMap[string(tx)] = struct{}{}
 		}
 	}
-
+	//A tm-bench A->B op=0
 	txsLeft := make([]types.Tx, 0, mem.txs.Len())
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
@@ -1376,14 +1380,14 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
 		return false
 	}
-	fmt.Println("sig: ", cm.Sig)
-	fmt.Println("root: ", cm.CrossMerkleRoot)
-	fmt.Println("pub: ", cm.Pubkeys)
+	//fmt.Println("sig: ", cm.Sig)
+	//fmt.Println("root: ", cm.CrossMerkleRoot)
+	//fmt.Println("pub: ", cm.Pubkeys)
 	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.Sig); !res {
 		mem.logger.Error("验证CrossMessage的signature出错, ",cm )
 		return false
 	}
-	fmt.Println("门限签名验证通过！")
+	//fmt.Println("门限签名验证通过！")
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
 

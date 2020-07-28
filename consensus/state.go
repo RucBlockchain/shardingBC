@@ -1384,6 +1384,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
 	packdata := cs.blockExec.MergePackage(cs.Height)
 	packs := ParsePackages(packdata)
+	//fmt.Println("本次打包的交易为",packs)
 	if /*cs.ProposalBlock != nil || */ len(packs) == 0 && len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
@@ -1392,7 +1393,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
-
+		//for _,tx:= range cs.ProposalBlock.Txs{
+		//	fmt.Println("遍历",string(tx))
+		//}
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
 		for i := 0; i < len(voteSet.PartSigs); i++ {
@@ -1406,9 +1409,10 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		} else {
 			threshold = 3
 		}
+
 		var err error
-		fmt.Println(sigs)
-		fmt.Println(ids)
+		//fmt.Println(sigs)
+		//fmt.Println(ids)
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
 			fmt.Println(err)
@@ -1421,9 +1425,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
-		fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
-		fmt.Println("分片公钥: ", bls.GetShardPubkey())
+		//fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
+		//fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
+		//fmt.Println("分片公钥: ", bls.GetShardPubkey())
 		var txs types.Txs
 		txs = cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,

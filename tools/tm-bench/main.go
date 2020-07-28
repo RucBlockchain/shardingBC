@@ -39,7 +39,7 @@ func main() {
 	var durationInt, txsRate, connections, txSize, relayrate int
 	var verbose bool
 	var outputFormat, broadcastTxMethod, allshard string
-	//var shard
+	var shard string
 	flagSet := flag.NewFlagSet("tm-bench", flag.ExitOnError)
 	//初始化数值
 	flagSet.IntVar(&connections, "c", 1, "Connections to keep open per endpoint")
@@ -47,10 +47,10 @@ func main() {
 	flagSet.IntVar(&txsRate, "r", 1000, "Txs per second to send in a connection")
 	flagSet.IntVar(&txSize, "s", 250, "The size of a transaction in bytes, must be greater than or equal to 40.")
 	flagSet.StringVar(&outputFormat, "output-format", "plain", "Output format: plain or json")
-	//flagSet.StringVar(&shard, "shard", "A", "shard of tendermint")
+	flagSet.StringVar(&shard, "shard", "0", "now shard of tendermint")
 	flagSet.IntVar(&relayrate, "rate", 2, "relay rate")
 
-	flagSet.StringVar(&allshard, "as", "A,B,C,D", "shard of tendermint")
+	flagSet.StringVar(&allshard, "as", "0,1,2,3", "shard of tendermint")
 	flagSet.StringVar(&broadcastTxMethod, "broadcast-tx-method", "async", "Broadcast method: async (no guarantees; fastest), sync (ensures tx is checked) or commit (ensures tx is checked and committed; slowest)")
 	flagSet.BoolVar(&verbose, "v", false, "Verbose output")
 	flagSet.Usage = func() {
@@ -122,7 +122,7 @@ Examples:
 		connections,
 		txsRate,
 		txSize,
-		//shard,
+		shard,
 		allSahrd,
 		relayrate,
 		"broadcast_tx_"+broadcastTxMethod)
@@ -163,6 +163,7 @@ Examples:
 			initialHeight,
 			timeStart,
 			durationInt,
+			int64(txsRate),
 		)
 		if err != nil {
 			printErrorAndExit(err.Error())
@@ -210,7 +211,7 @@ func startTransacters(
 	connections,
 	txsRate int,
 	txSize int,
-	//shard string,
+	shard string,
 	allshard []string,
 	relayrate int,
 	broadcastTxMethod string) []*transacter {
@@ -221,7 +222,6 @@ func startTransacters(
 	iwg.Add(len(endpoints))
 	//先创建账户
 	for i, e := range endpoints {
-		shard := allshard[i]
 		flag := 0
 		t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
 		t.SetLogger(logger)

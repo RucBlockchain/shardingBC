@@ -899,7 +899,7 @@ func (wsc *wsConnection) readRoutine() {
 				calculate_time = calculate_time.Add(time_spend)
 				calculate_count++
 				if calculate_count%1000 == 0 {
-					fmt.Println("1000笔交易花费时间", time.Now().Sub(calculate_time))
+					//fmt.Println("1000笔交易花费时间", time.Now().Sub(calculate_time))
 					calculate_time = time.Now()
 				}
 				wsc.WriteRPCResponse(types.NewRPCSuccessResponse(wsc.cdc, request.ID, result))

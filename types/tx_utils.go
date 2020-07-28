@@ -159,7 +159,6 @@ func ClassifyTxFromBlock(mts *merkle.TxMerkleTree,
 			pubkey,
 			mts.RootTree.ComputeRootHash(),
 			treepath, cShard, shard, height)
-
 		cms = append(cms, cm)
 	}
 	return cms

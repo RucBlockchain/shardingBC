@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	//"github.com/go-kit/kit/metrics"
 	"math"
 	"os"
 	"time"
@@ -25,9 +26,13 @@ func calculateStatistics(
 	minHeight int64,
 	timeStart time.Time,
 	duration int,
+	plustx int64,
 ) (*statistics, error) {
-	timeEnd := timeStart.Add(time.Duration(duration) * time.Second)
-
+		//fmt.Println(timeStart)
+	timesub,_:=time.ParseDuration("-1s")
+		timeStart=timeStart.Add(timesub)
+	//timeStart=timeStart.Add(time.Second)
+	timeEnd := timeStart.Add(time.Duration(duration+1) * time.Second)
 	stats := &statistics{
 		BlocksThroughput: metrics.NewHistogram(metrics.NewUniformSample(1000)),
 		TxsThroughput:    metrics.NewHistogram(metrics.NewUniformSample(1000)),
@@ -61,9 +66,9 @@ func calculateStatistics(
 		//t2 = blockMeta.Header.Time
 		//fmt.Println(i)
 		//fmt.Println(blockMeta)
-		//fmt.Println("blockMeta.Header.NumTxs",blockMeta.Header.NumTxs)
 		//fmt.Println("blockMeta.Header.Time",blockMeta.Header.Time)
 		//fmt.Println("blockMeta.Header.Height",blockMeta.Header.Height)
+		//fmt.Println("blockMeta.Header.NumTxs",blockMeta.Header.NumTxs)
 		// check if block was created after timeStart
 		if blockMeta.Header.Time.Before(timeStart) {
 			break
@@ -73,6 +78,11 @@ func calculateStatistics(
 		if blockMeta.Header.Time.After(timeEnd) {
 			continue
 		}
+		//fmt.Println("start",timeStart)
+		//fmt.Println("end",timeEnd)
+
+
+
 		sec := secondsSinceTimeStart(timeStart, blockMeta.Header.Time)
 
 		// increase number of blocks for that second
@@ -83,6 +93,7 @@ func calculateStatistics(
 
 		logger.Debug(fmt.Sprintf("%d txs at block height %d", blockMeta.Header.NumTxs, blockMeta.Header.Height))
 	}
+	numTxsPerSec[0]+=plustx
 	//fmt.Println("sum:",sum)
 	//time1 := t1.Sub(t2).Seconds()
 	//tps := sum / time1

@@ -1,7 +1,9 @@
 package identypes
 
+import "syscall"
+
 func getShard() string {
-	return "A"
-	//v, _ := syscall.Getenv("TASKID")
-	//return v
+
+	v, _ := syscall.Getenv("TASKID")
+	return v
 }
