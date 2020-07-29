@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"syscall"
 )
 
 type CrossMessages struct {
@@ -17,6 +18,7 @@ type CrossMessages struct {
 	Height          int64     //标志时刻
 	Packages        []Package //应该回复删除什么包
 	ConfirmPackSigs []byte    //对于这些包的签名
+	SrcIndex	    string
 }
 
 type PartSig struct {
@@ -29,8 +31,13 @@ type Package struct {
 	Height          int64
 	CmID            [32]byte
 	SrcZone         string
+	DesZone 		string
+	SrcIndex        string
 }
-
+func GetIndex()string{
+	g, _ := syscall.Getenv("TASKINDEX")
+	return g
+}
 func ParsePackages(data []byte) []Package {
 	var packs []Package
 	err := json.Unmarshal(data, &packs)
@@ -71,6 +78,7 @@ func NewCrossMessage(txs [][]byte,
 		DesZone:         DesZone,
 		Height:          Height,
 		Packages:        make([]Package, 0, 10),
+		SrcIndex:        GetIndex(),
 		ConfirmPackSigs: nil,
 	}
 }

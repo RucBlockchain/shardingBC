@@ -37,7 +37,7 @@ type Mempool interface {
 	SyncRelationTable(pack tp.Package,height int64)
 	Size() int
 	CheckTx(types.Tx, func(*abci.Response)) error
-	CheckTxWithInfo(types.Tx, func(*abci.Response), mempool.TxInfo) error
+	CheckTxWithInfo(types.Tx, func(*abci.Response), mempool.TxInfo,bool) error
 	ReapMaxBytesMaxGas(maxBytes, maxGas int64,height int64) types.Txs
 	Update(int64, types.Txs, mempool.PreCheckFunc, mempool.PostCheckFunc) error
 	Flush()
@@ -61,7 +61,7 @@ func (MockMempool) CheckTx(_ types.Tx, _ func(*abci.Response)) error {
 	return nil
 }
 func (MockMempool) CheckTxWithInfo(_ types.Tx, _ func(*abci.Response),
-	_ mempool.TxInfo) error {
+	_ mempool.TxInfo,_ bool) error {
 	return nil
 }
 func (MockMempool) ReapMaxBytesMaxGas(_, _ int64,_ int64) types.Txs { return types.Txs{} }

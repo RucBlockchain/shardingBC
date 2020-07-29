@@ -1377,10 +1377,6 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
-	// 只有leader能做
-	if !cs.isLeader() {
-		return nil
-	}
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
 	packdata := cs.blockExec.MergePackage(cs.Height)
 	packs := ParsePackages(packdata)
@@ -1389,7 +1385,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		return nil
 	} else {
 		if len(cs.ProposalBlock.Txs) == 0 && len(packs) != 0 {
-			//fmt.Println("调用ModifyRelationTable")
+			fmt.Println("调用ModifyRelationTable")
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
@@ -1438,15 +1434,19 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		for i := 0; i < len(cms); i++ {
 			//存入realylist之中
 			cms[i].Packages = packs
+			//为什么要判断cm？
 			if !JudgeCrossMessage(cms[i]) {
 				//fmt.Println("存入")
 				cs.blockExec.AddCrossMessagesDB(cms[i])
 			} else {
+				if cs.isLeader(){
+					var tcm []*tp.CrossMessages
+					tcm = append(tcm, cms[i])
+					//是否要发送？
+					go cs.blockExec.SendCrossMessages(8080, tcm)
+				}
 				//fmt.Println("全是addtx")
-				var tcm []*tp.CrossMessages
-				tcm = append(tcm, cms[i])
-				//是否要发送？
-				go cs.blockExec.SendCrossMessages(8080, tcm)
+
 				//固化到磁盘之中
 			}
 

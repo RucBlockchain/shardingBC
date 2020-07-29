@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/tendermint/tendermint/checkdb"
+	myclient "github.com/tendermint/tendermint/client"
 	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"strconv"
@@ -326,7 +327,8 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 			if mem.cmDB.CrossMessages[i].Height == 0 { //第一次高度为0就发布
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
-			} else if (mem.cmDB.CrossMessages[i].Height == 10) || (mem.cmDB.CrossMessages[i].Height == 20) {
+				//考虑如何进行合理分化
+			} else if (mem.cmDB.CrossMessages[i].Height == 20) {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height = 0
 			} else {
@@ -528,8 +530,65 @@ func (mem *Mempool) CmsWaitChan() <-chan struct{} {
 // cb: A callback from the CheckTx command.
 //     It gets called from another goroutine.
 // CONTRACT: Either cb will get called, or err returned.
+func (mem *Mempool)CheckDB(tx types.Tx) string {
+	if cm := ParseData(tx); cm != nil {
+		if cm.SrcZone==getShard(){
+			//收到状态数据库的回执f
+			//fmt.Println("收到回执并且执行删除",cm.Packages)
+			mem.ModifyCrossMessagelist(cm)
+			return "回执"
+		}
+		//fmt.Println("收到", cm.Height, "root", cm.CrossMerkleRoot,"SrcZone",cm.SrcZone,"DesZone",cm.DesZone)
+		//relaynum := 0
+		//addnum := 0
+		//for i := 0; i < len(cm.Txlist); i++ {
+		//	tx, _ := tp.NewTX(cm.Txlist[i])
+		//	fmt.Println(tx)
+		//	if tx.Txtype == "relaytx" {
+		//		relaynum += 1
+		//	} else if tx.Txtype == "addtx" {
+		//		addnum += 1
+		//	}
+		//}
+		//fmt.Println("relay交易数量", relaynum)
+		//fmt.Println("addtx交易数量", addnum)
+		cmid := CmID(cm)
+		//fmt.Println("查询id", []byte(cmid))
+		dbtx := checkdb.Search([]byte(cmid))
+		if dbtx != nil {
+			name := dbtx.SrcZone + "S"+cm.SrcIndex+":26657"
+				fmt.Println("发送",name)
+				fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot",
+				dbtx.CrossMerkleRoot,"SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
+			)
+			tx_package := []*tp.CrossMessages{}
+			tx_package = append(tx_package, dbtx)
+			for i := 0; i < len(tx_package); i++ {
+				client := *myclient.NewHTTP(name, "/websocket")
+
+				go client.BroadcastCrossMessageAsync(tx_package)
+			}
+			//fmt.Println("状态数据库返回")
+			return "状态数据库返回"
+		} else {
+			return ""
+		}
+
+	}
+
+	return ""
+}
 func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
-	return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID})
+	status:=mem.CheckDB(tx)
+	if status=="回执"{
+		//fmt.Println("回执同步")
+		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},true)
+	}else if status==""{
+		//fmt.Println("cm处理")
+		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},false)
+	}else {
+		return errors.New("状态数据库返回")
+	}
 }
 
 //添加新的函数------------------------------------------------------------------
@@ -545,6 +604,8 @@ func (mem *Mempool) SyncRelationTable(pack tp.Package, height int64) {
 		CmHeight: pack.Height,
 		CmHash:   pack.CrossMerkleRoot,
 		CmID:     pack.CmID,
+		SrcZone:  pack.SrcZone,
+		DesZone:  pack.DesZone,
 	}
 	rl.RlID = RlID(rl)
 	mem.RlDB = append(mem.RlDB, rl)
@@ -561,7 +622,7 @@ func (mem *Mempool) CheckCrossMessage(cm *tp.CrossMessages) error {
 func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) {
 	//由于上层已经锁了，在这里不用锁
 	//检验包的正确性
-	mem.logger.Error("检验cm")
+	//mem.logger.Error("检验cm")
 	if result := mem.CheckCrossMessageSig(cm); !result {
 		return errors.New("聚合签名或者检验失败")
 	}
@@ -583,7 +644,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 			return errors.New("不合法的交易")
 		}
 	}
-	//fmt.Println("交易合法性检验通过")
+	//mem.logger.Error("交易合法性检验通过")
 	//删除对应的CrossList内容
 
 	return nil
@@ -599,6 +660,7 @@ type RelationTable struct {
 	ComfirmPackSig []byte
 	SrcZone        string
 	DesZone        string
+	SrcIndex       string
 }
 
 func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [32]byte) {
@@ -611,6 +673,7 @@ func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [3
 		CmID:     cmID,
 		SrcZone:  cm.SrcZone,
 		DesZone:  cm.DesZone,
+		SrcIndex: cm.SrcIndex,
 	}
 
 	rl.RlID = RlID(rl)
@@ -629,6 +692,9 @@ func (mem *Mempool) SearchRelationTable(Height int64) []tp.Package {
 				CrossMerkleRoot: mem.RlDB[i].CmHash,
 				Height:          mem.RlDB[i].CmHeight,
 				CmID:            mem.RlDB[i].CmID,
+				SrcZone:         mem.RlDB[i].SrcZone,
+				DesZone:         mem.RlDB[i].DesZone,
+				SrcIndex:        mem.RlDB[i].SrcIndex,
 			}
 			packlist = append(packlist, pack)
 		}
@@ -664,6 +730,7 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 				TreePath:        "",
 				SrcZone:         mem.RlDB[i].SrcZone,
 				DesZone:         mem.RlDB[i].DesZone,
+				SrcIndex:        mem.RlDB[i].SrcIndex,
 				Height:          mem.RlDB[i].CmHeight,
 				Packages:        tp.ParsePackages(mem.RlDB[i].Packages),
 				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
@@ -672,7 +739,7 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
 			//cmid,_:=json.Marshal(CmID(cm)
 			checkdb.Save([]byte(CmID(cm)), cm) //存储
-			//fmt.Println("存储", "CrossMerkleRoot root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages)
+			//fmt.Println("存储", "CrossMerkleRoot root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages,"Srczone",cm.SrcZone,"Deszone",cm.DesZone)
 			i--
 			break
 		}
@@ -715,7 +782,7 @@ func getShard() string {
 	return v
 }
 
-func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo) (err error) {
+func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo,checkdb bool) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
@@ -745,9 +812,11 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		}
 	}
 	if cm := ParseData(tx); cm != nil {
-		mem.logger.Error("接受到Cm消息")
-		if result := mem.CheckCrossMessage(cm); result != nil {
-			return result
+		//mem.logger.Error("接受到Cm消息")
+		if !checkdb{
+			if result := mem.CheckCrossMessage(cm); result != nil {
+				return result
+			}
 		}
 	} else {
 
@@ -758,10 +827,10 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		checkRes := accountLog.Check()
 
 		if !checkRes {
-			fmt.Println(string(tx))
 			return errors.New("不合法的交易")
 		}
 	}
+	//mem.logger.Error("交易合法性检验通过")mo
 	// CACHE
 	if !mem.cache.Push(tx) {
 		// Record a new sender for a tx we've already seen.
@@ -900,14 +969,37 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 				tx:        tx,
 			}
 			memTx.senders.Store(peerID, true)
-			mem.addTx(memTx)
-			mem.logger.Info("Added good transaction",
-				"tx", TxID(tx),
-				"res", r,
-				"height", memTx.height,
-				"total", mem.Size(),
-			)
-			mem.notifyTxsAvailable()
+			if cm:=ParseData(memTx.tx);cm!=nil{
+				if cm.SrcZone==getShard(){
+					//说明是回执
+					//fmt.Println("收到回执，进行同步")
+					mem.addTx(memTx)
+					var txs types.Txs
+					txs = append(txs, memTx.tx)
+					//fmt.Println("同步完成,进行删除")
+					mem.removeTxs(txs)
+					mem.cache.Remove(tx)
+				}else{
+					//fmt.Println("广播cm消息")
+					mem.addTx(memTx)
+					mem.logger.Info("Added good transaction",
+						"tx", TxID(tx),
+						"res", r,
+						"height", memTx.height,
+						"total", mem.Size(),
+					)
+					mem.notifyTxsAvailable()
+				}
+			}else{
+				mem.addTx(memTx)
+				mem.logger.Info("Added good transaction",
+					"tx", TxID(tx),
+					"res", r,
+					"height", memTx.height,
+					"total", mem.Size(),
+				)
+				mem.notifyTxsAvailable()
+			}
 		} else {
 			// ignore bad transaction
 			mem.logger.Info("Rejected bad transaction", "tx", TxID(tx), "res", r, "err", postCheckErr)

@@ -32,7 +32,7 @@ func calculateStatistics(
 	timesub,_:=time.ParseDuration("-1s")
 		timeStart=timeStart.Add(timesub)
 	//timeStart=timeStart.Add(time.Second)
-	timeEnd := timeStart.Add(time.Duration(duration+1) * time.Second)
+	timeEnd := timeStart.Add(time.Duration(duration) * time.Second)
 	stats := &statistics{
 		BlocksThroughput: metrics.NewHistogram(metrics.NewUniformSample(1000)),
 		TxsThroughput:    metrics.NewHistogram(metrics.NewUniformSample(1000)),

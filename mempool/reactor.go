@@ -168,9 +168,18 @@ func (memR *MempoolReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 	switch msg := msg.(type) {
 	case *TxMessage:
 		peerID := memR.ids.GetForPeer(src)
-		err := memR.Mempool.CheckTxWithInfo(msg.Tx, nil, TxInfo{PeerID: peerID})
-		if err != nil {
-			memR.Logger.Info("Could not check tx", "tx", TxID(msg.Tx), "err", err)
+		if cm:=ParseData(msg.Tx);cm!=nil{
+			//说明是回执
+			if cm.SrcZone==getShard(){
+				memR.Mempool.ModifyCrossMessagelist(cm)
+			}else{
+				memR.Mempool.CheckTxWithInfo(msg.Tx, nil, TxInfo{PeerID: peerID},false)
+			}
+		}else{
+			err := memR.Mempool.CheckTxWithInfo(msg.Tx, nil, TxInfo{PeerID: peerID},false)
+			if err!=nil{
+				memR.Logger.Info("Could not check tx", "tx", TxID(msg.Tx), "err", err)
+			}
 		}
 		// broadcasting happens from go routines per peer
 	default:
@@ -215,7 +224,7 @@ func (memR *MempoolReactor) broadcastTxRoutine(peer p2p.Peer) {
 		}
 		//发送
 			memTx := next.Value.(*mempoolTx)
-
+			//fmt.Println("同步回执",string(memTx.tx))
 			// make sure the peer is up to date
 			peerState, ok := peer.Get(types.PeerStateKey).(PeerState)
 			if !ok {
