@@ -1470,7 +1470,7 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 	if cm == nil {
 		return true
 	}
-
+	fmt.Println("收到的cm待检验",*cm)
 	pubkey, err := bls.GetPubkeyFromByte(cm.Pubkeys)
 	if err != nil {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
