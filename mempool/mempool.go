@@ -328,7 +328,7 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
 				//考虑如何进行合理分化
-			} else if (mem.cmDB.CrossMessages[i].Height == 20) {
+			} else if (mem.cmDB.CrossMessages[i].Height == 2) {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height = 0
 			} else {
@@ -539,29 +539,15 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 			mem.ModifyCrossMessagelist(cm)
 			return "回执"
 		}
-		//fmt.Println("收到", string(tx))
-		//relaynum := 0
-		//addnum := 0
-		//for i := 0; i < len(cm.Txlist); i++ {
-		//	tx, _ := tp.NewTX(cm.Txlist[i])
-		//	fmt.Println(tx)
-		//	if tx.Txtype == "relaytx" {
-		//		relaynum += 1
-		//	} else if tx.Txtype == "addtx" {
-		//		addnum += 1
-		//	}
-		//}
-		//fmt.Println("relay交易数量", relaynum)
-		//fmt.Println("addtx交易数量", addnum)
+		//fmt.Println("收到", "SrcZone",cm.SrcZone,"DesZone",cm.DesZone,"Height",cm.Height)
+
 		cmid := CmID(cm)
-		//fmt.Println("查询id", []byte(cmid))
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
 			name := dbtx.SrcZone + "S"+cm.SrcIndex+":26657"
-				fmt.Println("发送",name)
-				fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot",
-				dbtx.CrossMerkleRoot,"SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
-			)
+			//	fmt.Println("发送",name)
+			//	fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
+			//)
 			tx_package := []*tp.CrossMessages{}
 			tx_package = append(tx_package, dbtx)
 			for i := 0; i < len(tx_package); i++ {
@@ -631,7 +617,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	}
 	if len(cm.Packages)>0{
 		//mem.logger.Error("待删除包数量非0，删除对应的包")
-		mem.ModifyCrossMessagelist(cm)
+		//mem.ModifyCrossMessagelist(cm)
 	}
 	//mem.logger.Error("修改cmdb完成")
 	//交易合法性检验
@@ -973,37 +959,16 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 				tx:        tx,
 			}
 			memTx.senders.Store(peerID, true)
-			if cm:=ParseData(memTx.tx);cm!=nil{
-				if cm.SrcZone==getShard(){
-					//说明是回执
-					//fmt.Println("收到回执，进行同步")
-					mem.addTx(memTx)
-					var txs types.Txs
-					txs = append(txs, memTx.tx)
-					//fmt.Println("同步完成,进行删除")
-					mem.removeTxs(txs)
-					mem.cache.Remove(tx)
-				}else{
-					//fmt.Println("广播cm消息")
-					mem.addTx(memTx)
-					mem.logger.Info("Added good transaction",
-						"tx", TxID(tx),
-						"res", r,
-						"height", memTx.height,
-						"total", mem.Size(),
-					)
-					mem.notifyTxsAvailable()
-				}
-			}else{
-				mem.addTx(memTx)
-				mem.logger.Info("Added good transaction",
-					"tx", TxID(tx),
-					"res", r,
-					"height", memTx.height,
-					"total", mem.Size(),
-				)
-				mem.notifyTxsAvailable()
-			}
+
+			mem.addTx(memTx)
+			mem.logger.Info("Added good transaction",
+				"tx", TxID(tx),
+				"res", r,
+				"height", memTx.height,
+				"total", mem.Size(),
+			)
+			mem.notifyTxsAvailable()
+
 		} else {
 			// ignore bad transaction
 			mem.logger.Info("Rejected bad transaction", "tx", TxID(tx), "res", r, "err", postCheckErr)
@@ -1112,6 +1077,13 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		// Check total size requirement
 		// 删除对应的txlist的relay_out交易
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
+				if cm.SrcZone==getShard(){
+					//fmt.Println("移除回执")
+					var txs types.Txs
+					txs = append(txs, memTx.tx)
+					mem.removeTxs(txs)
+					continue
+				}
 			//添加映射关系
 			//对txlist进行遍历，将relay_in的tx加入区块之中
 			var txlist []*tp.TX
@@ -1470,7 +1442,7 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 	if cm == nil {
 		return true
 	}
-	fmt.Println("收到的cm待检验",*cm)
+	//fmt.Println("收到的cm待检验",*cm)
 	pubkey, err := bls.GetPubkeyFromByte(cm.Pubkeys)
 	if err != nil {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
@@ -1486,7 +1458,7 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		fmt.Println( cm.Pubkeys)
 		return false
 	}
-	fmt.Println("门限签名验证通过！")
+	//fmt.Println("门限签名验证通过！")
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
 

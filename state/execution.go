@@ -214,35 +214,23 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 	resendMessages:=blockExec.UpdatecmDB()//检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
 	//if len(resendMessages)>0{
 	//	for i:=0;i<len(resendMessages);i++{
-	//		fmt.Println("发送cm消息","cmhash：",resendMessages[i].CrossMerkleRoot,"height：",resendMessages[i].Height,
-	//			"packages：",resendMessages[i].Packages)
+	//		fmt.Println("height：",resendMessages[i].Height, "SrcZone",resendMessages[i].SrcZone,"DesZone",resendMessages[i].DesZone)
 	//	}
 	//}else{
 	//	fmt.Println("没有待发送的交易")
 	//}
 	if flag {
 		//只有leader执行以下代码
-		var shard_send [][]*tp.CrossMessages
-		//暂定有100个分片
-		shard_send = make([][]*tp.CrossMessages, 100)
 		//将需要跨片的交易按分片归类
 		for i := 0; i < len(resendMessages); i++ {
+			var tx_package []*tp.CrossMessages
 			//由于现在的Zone的名字改动了，所以现在不需要再减65
-			index,_:=strconv.Atoi(resendMessages[i].DesZone)
-			//index := int(resendMessages[i].DesZone[0]) - 65
-			shard_send[index] = append(shard_send[index], resendMessages[i])
+			tx_package = append(tx_package, resendMessages[i])
+			go blockExec.SendCrossMessages(1,tx_package)
 		}
-		var num int
-		num = 0
-		var tx_package []*tp.CrossMessages
-		for i := 0; i < len(shard_send); i++ {
-			if shard_send[i] != nil {
-				num = num + len(shard_send[i]) //发送到某分片所有跨片交易的数量，进行打包
-				tx_package = shard_send[i]
-				go blockExec.SendCrossMessages(num,tx_package)
-			}
-		}
-		fmt.Println("需要发送的CheckCrossMessages交易数量：", num)
+
+
+		fmt.Println("需要发送的CheckCrossMessages交易数量：", len(resendMessages))
 	}
 
 	//对当前提交的块检查，看是否有新的relayTxs产生，无需检查已经在provote阶段加入
@@ -257,7 +245,7 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 		//	blockExec.SendAddedRelayTxs(receivetxs) //如果该分区收到的relaytx已经add，向发送的分区回复
 		//}
 		//每20个，更新一次checkpoint
-		if block.Height%20 == 0 {
+		if block.Height%5 == 0 {
 			cpCm := blockExec.GetAllCrossMessages()
 			cptx := conver2cptx(cpCm, block.Height)
 			Sendcptx(cptx) //TODO 改为一定要加入成功
@@ -385,7 +373,6 @@ func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.Cros
 
 	if num > 0 {
 		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
-
 	}
 }
 
@@ -393,7 +380,9 @@ func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.Cros
 func (blockExec *BlockExecutor) SendMessage(DesZone string,  tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
 	name := DesZone + "S1:26657"
+	//fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
+	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
 	go client.BroadcastCrossMessageAsync(tx_package)
 }
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {

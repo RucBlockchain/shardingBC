@@ -39,6 +39,7 @@ func Sendcptx(tx tp.TX) {
 	tx_package := []tp.TX{}
 	tx_package = append(tx_package, tx)
 	client := *myclient.NewHTTP(name, "/websocket")
+	//fmt.Println("发送ckp")
 	go client.BroadcastTxAsync(tx_package)
 
 }

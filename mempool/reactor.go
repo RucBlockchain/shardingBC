@@ -171,6 +171,7 @@ func (memR *MempoolReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) {
 		if cm:=ParseData(msg.Tx);cm!=nil{
 			//说明是回执
 			if cm.SrcZone==getShard(){
+				//fmt.Println("系统内部回执删除")
 				memR.Mempool.ModifyCrossMessagelist(cm)
 			}else{
 				memR.Mempool.CheckTxWithInfo(msg.Tx, nil, TxInfo{PeerID: peerID},false)
@@ -224,6 +225,7 @@ func (memR *MempoolReactor) broadcastTxRoutine(peer p2p.Peer) {
 		}
 		//发送
 			memTx := next.Value.(*mempoolTx)
+
 			//fmt.Println("同步回执",string(memTx.tx))
 			// make sure the peer is up to date
 			peerState, ok := peer.Get(types.PeerStateKey).(PeerState)
@@ -246,6 +248,7 @@ func (memR *MempoolReactor) broadcastTxRoutine(peer p2p.Peer) {
 				// send memTx
 				msg := &TxMessage{Tx: memTx.tx}
 				success := peer.Send(MempoolChannel, cdc.MustMarshalBinaryBare(msg))
+
 				if !success {
 					time.Sleep(peerCatchupSleepIntervalMS * time.Millisecond)
 					continue
