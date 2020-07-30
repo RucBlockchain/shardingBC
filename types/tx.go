@@ -85,7 +85,8 @@ func (txs Txs) Bytes() [][]byte {
 	l := len(txs)
 	bzs := make([][]byte, l)
 	for i := 0; i < l; i++ {
-		bzs[i] = txs[i]
+		bzs[i] = make([]byte, len(txs[i]))
+		copy(bzs[i], txs[i])
 	}
 
 	return bzs

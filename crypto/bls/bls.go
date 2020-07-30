@@ -147,6 +147,12 @@ func GetShardPubkey() []byte {
 	return PrivKeyBLS(data).PubKey().Bytes()
 }
 
+func TmpGetSign(msg []byte) ([]byte, error) {
+	priv := genPrivKey(crypto.CReader())
+	sig, err := priv.Sign(msg)
+	return sig, err
+}
+
 //-------------------------------------
 
 var _ crypto.PubKey = PubKeyBLS{}

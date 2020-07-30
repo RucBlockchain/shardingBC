@@ -1385,7 +1385,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		return nil
 	} else {
 		if len(cs.ProposalBlock.Txs) == 0 && len(packs) != 0 {
-			fmt.Println("调用ModifyRelationTable")
+			//fmt.Println("调用ModifyRelationTable")
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
@@ -1407,7 +1407,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		}
 
 		var err error
-		//fmt.Println(sigs)
+		fmt.Println(len(sigs))
 		//fmt.Println(ids)
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
@@ -1416,11 +1416,20 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cs.Logger.Error("Aggregate error")
 			return err
 		}
+
+
 		// 重新生成merkle tree
 		mts, err := types.GenerateMerkleTree(cs.ProposalBlock.Txs)
 		if err != nil {
 			return err
 		}
+		                // tmp 直接生成最终签名以验证
+                origin_sig, err := bls.TmpGetSign(mts.RootTree.ComputeRootHash())
+                if err != nil{
+                        fmt.Println("生成最终签名出错." ,err)
+                }
+		fmt.Println("root对比", bytes.Equal(cs.ProposalBlock.CrossMerkleRoot, mts.RootTree.ComputeRootHash()))
+		fmt.Println("验证结果:", bytes.Equal(origin_sig, CrossMerkleSig))
 		//fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
 		//fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
 		//fmt.Println("分片公钥: ", bls.GetShardPubkey())

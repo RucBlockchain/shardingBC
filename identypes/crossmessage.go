@@ -68,11 +68,11 @@ func NewCrossMessage(txs [][]byte,
 	treepath string,
 	srcZone, DesZone string,
 	Height int64) *CrossMessages {
-	return &CrossMessages{
+	cm := &CrossMessages{
 		Txlist:          txs,
-		Sig:             signature,
-		Pubkeys:         pubkey,
-		CrossMerkleRoot: crossMerkleRoot,
+		Sig:             make([]byte, len(signature)),
+		Pubkeys:         make([]byte, len(pubkey)),
+		CrossMerkleRoot: make([]byte, len(crossMerkleRoot)),
 		TreePath:        treepath,
 		SrcZone:         srcZone,
 		DesZone:         DesZone,
@@ -81,6 +81,11 @@ func NewCrossMessage(txs [][]byte,
 		SrcIndex:        GetIndex(),
 		ConfirmPackSigs: nil,
 	}
+	copy(cm.Sig, signature)
+	copy(cm.Pubkeys, pubkey)
+	copy(cm.CrossMerkleRoot, crossMerkleRoot)
+
+	return cm
 }
 
 func CrossMessageFromByteSlices(msg []byte) (*CrossMessages, error) {

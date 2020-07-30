@@ -534,11 +534,12 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 	if cm := ParseData(tx); cm != nil {
 		if cm.SrcZone==getShard(){
 			//收到状态数据库的回执f
+			fmt.Println("收到回执", string(tx))
 			//fmt.Println("收到回执并且执行删除",cm.Packages)
 			mem.ModifyCrossMessagelist(cm)
 			return "回执"
 		}
-		//fmt.Println("收到", cm.Height, "root", cm.CrossMerkleRoot,"SrcZone",cm.SrcZone,"DesZone",cm.DesZone)
+		fmt.Println("收到", string(tx))
 		//relaynum := 0
 		//addnum := 0
 		//for i := 0; i < len(cm.Txlist); i++ {
@@ -581,12 +582,13 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 	status:=mem.CheckDB(tx)
 	if status=="回执"{
-		//fmt.Println("回执同步")
+		fmt.Println("回执同步")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},true)
 	}else if status==""{
-		//fmt.Println("cm处理")
+		fmt.Println("cm处理")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},false)
 	}else {
+		fmt.Println("状态数据库返回")
 		return errors.New("状态数据库返回")
 	}
 }
@@ -624,6 +626,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	//检验包的正确性
 	//mem.logger.Error("检验cm")
 	if result := mem.CheckCrossMessageSig(cm); !result {
+
 		return errors.New("聚合签名或者检验失败")
 	}
 	if len(cm.Packages)>0{
@@ -815,6 +818,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb{
 			if result := mem.CheckCrossMessage(cm); result != nil {
+				fmt.Println(string(tx))
 				return result
 			}
 		}
