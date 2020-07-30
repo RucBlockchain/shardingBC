@@ -117,6 +117,13 @@ func TestBlsUse(t *testing.T) {
 	t.Log(sig)
 
 	assert.True(t, public.VerifyBytes(msg, sig), "验证签名失败")
+
+	// 测试公钥序列化后能否验证
+	pubByte := public.Bytes()
+	pub_r, err := bls.GetPubkeyFromByte(pubByte)
+	assert.Nil(t, err)
+
+	assert.True(t, pub_r.VerifyBytes(msg, sig))
 }
 
 func TestGenPrivKey(t *testing.T) {

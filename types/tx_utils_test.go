@@ -34,11 +34,15 @@ func TestGenerateMerkleTree(t *testing.T) {
 	t.Log("tree: ", smt)
 	t.Log("root hash: ", smt.RootTree.ComputeRootHash())
 	totaltxs := 0
-	for _, val := range (smt.ShardTrees) {
+	for _, val := range smt.ShardTrees {
 		totaltxs += val.Total
 	}
 	assert.True(t, TxNum == totaltxs)
 
+	for i := 0; i < 100; i++ {
+		tmp, _ := GenerateMerkleTree(txs)
+		assert.True(t, bytes.Equal(tmp.RootTree.ComputeRootHash(), smt.RootTree.ComputeRootHash()), i)
+	}
 }
 
 func TestHandleSortTxInConsenses(t *testing.T) {
@@ -48,7 +52,7 @@ func TestHandleSortTxInConsenses(t *testing.T) {
 	randTxs := randTX(txNum)
 
 	t.Log("[handleTxSorts] 排序前")
-	for _, data := range (randTxs) {
+	for _, data := range randTxs {
 		tx, _ := identypes.NewTX(data)
 		t.Log(tx)
 	}
@@ -56,7 +60,7 @@ func TestHandleSortTxInConsenses(t *testing.T) {
 	randTxs1 := HandleSortTx(randTxs)
 
 	t.Log("[handleTxSorts] 排序后")
-	for _, data := range (randTxs1) {
+	for _, data := range randTxs1 {
 		tx, _ := identypes.NewTX(data)
 		t.Log(tx)
 	}
@@ -66,14 +70,14 @@ func TestHandleSortTxInConsenses(t *testing.T) {
 
 func TestClassifyTx(t *testing.T) {
 	tuNum := 30
-	_ = randTX(tuNum)
+	txs := randTX(tuNum)
 
 	start := time.Now()
-	buckets := ClassifyTx(nil) // todo 类型转换
+	buckets := ClassifyTx(txs) // todo 类型转换
 	t.Logf("%v个交易分类耗时：%v", tuNum, time.Now().Sub(start).String())
 
-	for shard, data := range (buckets) {
-		for _, tx := range (data) {
+	for shard, data := range buckets {
+		for _, tx := range data {
 			tx, _ := identypes.NewTX(tx)
 			assert.True(t, tx.Receiver == shard, "%v tx in %v shard", tx.Receiver, shard)
 			t.Log(tx)
@@ -96,7 +100,7 @@ func TestClassifyTxFromBlock(t *testing.T) {
 // 随机生成一定数量的relaytx和addtx
 func randTX(txNum int) Txs {
 	res := make([]Tx, txNum, txNum)
-	destination := []string{"A", "B", "C", "D", "E", ""}
+	destination := []string{"A", "B", "C", "D", "E"}
 	txtype := []string{"addtx", "relaytx", ""}
 	for i := 0; i < txNum; i++ {
 		//tmpdes := destination[rand.Intn(5)] // [0-n)

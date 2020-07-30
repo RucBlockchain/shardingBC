@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 	"syscall"
- //       "io/ioutil"
- //       "encoding/json"
-//	"path/filepath"
+	"time"
+	//       "io/ioutil"
+	//       "encoding/json"
+	//	"path/filepath"
 
 	"github.com/pkg/errors"
 
@@ -39,26 +39,25 @@ const (
 // Block defines the atomic unit of a Tendermint blockchain.
 type Block struct {
 	mtx        sync.Mutex
-	Shard	   string
+	Shard      string
 	Header     `json:"header"`
 	Data       `json:"data"`
 	Evidence   EvidenceData `json:"evidence"`
 	LastCommit *Commit      `json:"last_commit"`
 }
 
-
 // MakeBlock returns a new block with an empty header, except what can be
 // computed from itself.
 // It populates the same set of fields validated by ValidateBasic.
-func MakeBlock(height int64, txs []Tx, lastCommit *Commit, evidence []Evidence,pack_data []byte) *Block {
+func MakeBlock(height int64, txs []Tx, lastCommit *Commit, evidence []Evidence, pack_data []byte) *Block {
 	//在这里对交易进行排序
 	//并且将相关信息添加
 	block := &Block{
-		Shard: getShard(), 
+		Shard: getShard(),
 		Header: Header{
-			Height: height,
-			NumTxs: int64(len(txs)),
-			CmRelation:pack_data,
+			Height:     height,
+			NumTxs:     int64(len(txs)),
+			CmRelation: pack_data,
 		},
 		Data: Data{
 			Txs: txs,
@@ -69,7 +68,7 @@ func MakeBlock(height int64, txs []Tx, lastCommit *Commit, evidence []Evidence,p
 	block.fillHeader()
 	return block
 }
-func getShard()(string){
+func getShard() string {
 	v, _ := syscall.Getenv("TASKID")
 	return v
 }
@@ -416,8 +415,8 @@ type Header struct {
 	// consensus info
 	EvidenceHash    cmn.HexBytes `json:"evidence_hash"`    // evidence included in the block
 	ProposerAddress Address      `json:"proposer_address"` // original proposer of the block
-	CrossMerkleRoot cmn.HexBytes  `json:"cross_merkleroot"`
-	CmRelation   cmn.HexBytes	  `json:"cm_relation`
+	CrossMerkleRoot cmn.HexBytes `json:"cross_merkleroot"`
+	CmRelation      cmn.HexBytes `json:"cm_relation`
 }
 
 // Populate the Header with state-derived data.
@@ -790,7 +789,6 @@ func (sh SignedHeader) StringIndented(indent string) string {
 
 // Data contains the set of transactions included in the block
 type Data struct {
-
 	// Txs that will be applied by state @ block.Height+1.
 	// NOTE: not all txs here are valid.  We're just agreeing on the order first.
 	// This means that block.AppHash does not include these txs.

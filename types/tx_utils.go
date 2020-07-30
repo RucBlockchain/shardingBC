@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/identypes"
+	"sort"
 )
 
 // TODO
@@ -13,6 +14,7 @@ import (
 func ClassifyTx(txs Txs) map[string]Txs {
 	// TODO string类型转换为枚举型
 	buckets := make(map[string]Txs)
+	buckets[getShard()] = Txs{}
 	for _, txbyte := range txs {
 		tx, err := identypes.NewTX(txbyte)
 		if err != nil {
@@ -85,8 +87,17 @@ func GenerateMerkleTree(txs Txs) (*merkle.TxMerkleTree, error) {
 	roots := make([][]byte, 0, len(buckets))
 	shardtrees := make(map[string]*merkle.SimpleMerkleTree)
 
+	// 将buckets的keys按shard排序
+
+	keys := make([]string, 0, len(buckets))
+	for k := range buckets {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.StringSlice(keys))
+
 	// 依次为每一个分片的交易生成merkle tree
-	for shard, tmptxs := range buckets {
+	for _, shard := range keys {
+		tmptxs := buckets[shard]
 		// 取出交易
 		tmplist := make([][]byte, 0, len(tmptxs))
 		for _, tx := range tmptxs {
