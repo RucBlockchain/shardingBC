@@ -1381,7 +1381,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 	packdata := cs.blockExec.MergePackage(cs.Height)
 	packs := ParsePackages(packdata)
 	//fmt.Println("本次打包的交易为",packs)
-	if /*cs.ProposalBlock != nil || */ len(packs) == 0 && len(cs.ProposalBlock.Txs) == 0 {
+	if len(packs) == 0 && len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
 		if len(cs.ProposalBlock.Txs) == 0 && len(packs) != 0 {
@@ -1408,12 +1408,11 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 
 		var err error
 		fmt.Println(len(sigs))
-		//fmt.Println(ids)
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
-			fmt.Println(err)
-			fmt.Println("聚合签名错误")
-			cs.Logger.Error("Aggregate error")
+			fmt.Println(ids)
+			fmt.Println(sigs)
+			cs.Logger.Error("Aggregate errar, ", err)
 			return err
 		}
 
@@ -1423,16 +1422,16 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		if err != nil {
 			return err
 		}
-		                // tmp 直接生成最终签名以验证
+		// tmp 直接生成最终签名以验证
                 origin_sig, err := bls.TmpGetSign(mts.RootTree.ComputeRootHash())
                 if err != nil{
                         fmt.Println("生成最终签名出错." ,err)
                 }
 		fmt.Println("root对比", bytes.Equal(cs.ProposalBlock.CrossMerkleRoot, mts.RootTree.ComputeRootHash()))
 		fmt.Println("验证结果:", bytes.Equal(origin_sig, CrossMerkleSig))
-		//fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
-		//fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
-		//fmt.Println("分片公钥: ", bls.GetShardPubkey())
+		fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
+		fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
+		fmt.Println("分片公钥: ", bls.GetShardPubkey())
 		var txs types.Txs
 		txs = cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,

@@ -534,12 +534,12 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 	if cm := ParseData(tx); cm != nil {
 		if cm.SrcZone==getShard(){
 			//收到状态数据库的回执f
-			fmt.Println("收到回执", string(tx))
+			//fmt.Println("收到回执", string(tx))
 			//fmt.Println("收到回执并且执行删除",cm.Packages)
 			mem.ModifyCrossMessagelist(cm)
 			return "回执"
 		}
-		fmt.Println("收到", string(tx))
+		//fmt.Println("收到", string(tx))
 		//relaynum := 0
 		//addnum := 0
 		//for i := 0; i < len(cm.Txlist); i++ {
@@ -582,13 +582,13 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 	status:=mem.CheckDB(tx)
 	if status=="回执"{
-		fmt.Println("回执同步")
+		//fmt.Println("回执同步")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},true)
 	}else if status==""{
-		fmt.Println("cm处理")
+		//fmt.Println("cm处理")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},false)
 	}else {
-		fmt.Println("状态数据库返回")
+		//fmt.Println("状态数据库返回")
 		return errors.New("状态数据库返回")
 	}
 }
@@ -1480,10 +1480,13 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 	//fmt.Println("root: ", cm.CrossMerkleRoot)
 	//fmt.Println("pub: ", cm.Pubkeys)
 	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.Sig); !res {
-		mem.logger.Error("验证CrossMessage的signature出错, ",cm )
+		mem.logger.Error("验证CrossMessage的signature出错")
+		fmt.Println(cm.Sig)
+		fmt.Println(cm.CrossMerkleRoot)
+		fmt.Println( cm.Pubkeys)
 		return false
 	}
-	//fmt.Println("门限签名验证通过！")
+	fmt.Println("门限签名验证通过！")
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
 

@@ -14,7 +14,6 @@ import (
 func ClassifyTx(txs Txs) map[string]Txs {
 	// TODO string类型转换为枚举型
 	buckets := make(map[string]Txs)
-	buckets[getShard()] = Txs{}
 	for _, txbyte := range txs {
 		tx, err := identypes.NewTX(txbyte)
 		if err != nil {
@@ -56,13 +55,20 @@ func HandleSortTx(txs Txs) Txs {
 	buckets := ClassifyTx(txs)
 	cShard := getShard()
 
+        keys := make([]string, 0, len(buckets))
+        for k := range buckets {
+                keys = append(keys, k)
+        }
+        sort.Sort(sort.StringSlice(keys))
+
+
 	// newTxs先放入跨片交易
-	//newTxs := Txs{}
 	newTxs := txs[:0]
-	for shard, listval := range buckets {
+	for _, shard := range keys {
 		if shard == cShard {
 			continue
 		}
+		listval := buckets[shard]
 		for _, tx := range listval {
 			newTxs = append(newTxs, tx)
 		}
