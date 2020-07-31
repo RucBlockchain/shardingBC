@@ -66,12 +66,12 @@ func (accountLog *AccountLog) Check() bool {
 	balanceFromStr := _getState([]byte(from))
 
 	if len(from) != 0 && balanceFromStr == nil && accountLog.TxType!="init"{
-		fmt.Println("支出方账户不存在")
+		//fmt.Println("支出方账户不存在")
 		// logger.Error("支出方账户不存在")
 		return false
 	}
 	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
-		fmt.Println("接收方账户不存在")
+		//fmt.Println("接收方账户不存在")
 		logger.Error("接收方账户不存在")
 		return false
 	}
@@ -79,8 +79,8 @@ func (accountLog *AccountLog) Check() bool {
 	if len(from) != 0 {
 		balanceFrom := _byte2digit(balanceFromStr)
 		if balanceFrom < amount {
-			fmt.Println(balanceFrom)
-			logger.Error("余额不足")
+			//fmt.Println(balanceFrom)
+			//logger.Error("余额不足")
 			return false
 		}
 	}

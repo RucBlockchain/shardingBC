@@ -50,7 +50,7 @@ func main() {
 	flagSet.StringVar(&shard, "shard", "0", "now shard of tendermint")
 	flagSet.IntVar(&relayrate, "rate", 2, "relay rate")
 
-	flagSet.StringVar(&allshard, "as", "0,1,2,3", "shard of tendermint")
+	flagSet.StringVar(&allshard, "as", "0", "shard of tendermint")
 	flagSet.StringVar(&broadcastTxMethod, "broadcast-tx-method", "async", "Broadcast method: async (no guarantees; fastest), sync (ensures tx is checked) or commit (ensures tx is checked and committed; slowest)")
 	flagSet.BoolVar(&verbose, "v", false, "Verbose output")
 	flagSet.Usage = func() {

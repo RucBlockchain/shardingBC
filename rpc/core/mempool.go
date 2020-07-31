@@ -157,11 +157,7 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 	//	return nil, err
 	//}
 	err := mempool.CheckTx(tx, nil)
-	if cm:=ParseData(tx);cm!=nil {
-		if err!=nil{
-			fmt.Println("checkcm的结果", err)
-		}
-	}
+
 	if err != nil {
 		if err == errors.New("不合法交易") {
 			if cm := ParseData(tx); cm != nil {

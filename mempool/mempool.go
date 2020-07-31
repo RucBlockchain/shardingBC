@@ -328,7 +328,7 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
 				//考虑如何进行合理分化
-			} else if (mem.cmDB.CrossMessages[i].Height == 2) {
+			} else if (mem.cmDB.CrossMessages[i].Height == 10) {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height = 0
 			} else {
@@ -539,7 +539,7 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 			mem.ModifyCrossMessagelist(cm)
 			return "回执"
 		}
-		//fmt.Println("收到", "SrcZone",cm.SrcZone,"DesZone",cm.DesZone,"Height",cm.Height)
+		//fmt.Println("收到", "SrcZone",cm.SrcZone,"DesZone",cm.DesZone,"Height",cm.Height,"root",string(cm.CrossMerkleRoot))
 
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))

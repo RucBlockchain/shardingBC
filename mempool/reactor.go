@@ -19,8 +19,8 @@ import (
 
 const (
 	MempoolChannel = byte(0x30)
-
-	maxMsgSize = 1048576        // 1MB TODO make it configurable
+	//将单条交易最大容纳值为40mb
+	maxMsgSize = 40485760        // 10MB TODO make it configurable
 	maxTxSize  = maxMsgSize - 8 // account for amino overhead of TxMessage
 
 	peerCatchupSleepIntervalMS = 100 // If peer is behind, sleep this amount

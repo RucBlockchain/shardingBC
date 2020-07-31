@@ -147,6 +147,7 @@ func (c *JSONRPCClient) Call(method string, params map[string]interface{}, resul
 	if err != nil {
 		return nil, err
 	}
+	//fmt.Println("大小",len(requestBytes))
 	// log.Info(string(requestBytes))
 	requestBuf := bytes.NewBuffer(requestBytes)
 	// log.Info(Fmt("RPC request to %v (%v): %v", c.remote, method, string(requestBytes)))
@@ -190,8 +191,7 @@ func (c *HTTP) broadcastCrossMessages(route string, cms []*tp.CrossMessages) {
 	for i := 0; i < len(cms); i++ {
 		data, _ := json.Marshal(cms[i])
 		result := new(ResultBroadcastTx)
-		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
-
+		go c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
 	}
 }
 
@@ -206,6 +206,7 @@ func (c *HTTP) broadcastTX(route string, cms []tp.TX) {
 
 	for i := 0; i < len(cms); i++ {
 		data, _ := json.Marshal(cms[i])
+
 		result := new(ResultBroadcastTx)
 		c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
 

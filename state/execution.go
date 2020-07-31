@@ -214,7 +214,7 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 	resendMessages:=blockExec.UpdatecmDB()//检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
 	//if len(resendMessages)>0{
 	//	for i:=0;i<len(resendMessages);i++{
-	//		fmt.Println("height：",resendMessages[i].Height, "SrcZone",resendMessages[i].SrcZone,"DesZone",resendMessages[i].DesZone)
+	//		fmt.Println("root",string(resendMessages[i].CrossMerkleRoot),"height：",resendMessages[i].Height, "SrcZone",resendMessages[i].SrcZone,"DesZone",resendMessages[i].DesZone)
 	//	}
 	//}else{
 	//	fmt.Println("没有待发送的交易")
@@ -226,7 +226,7 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 			var tx_package []*tp.CrossMessages
 			//由于现在的Zone的名字改动了，所以现在不需要再减65
 			tx_package = append(tx_package, resendMessages[i])
-			go blockExec.SendCrossMessages(1,tx_package)
+			go blockExec.SendCrossMessages(len(resendMessages) ,tx_package)
 		}
 
 
