@@ -8,13 +8,19 @@ import (
 	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"github.com/tendermint/tendermint/libs/log"
 	"math/big"
+	"os"
 	"strings"
 )
 
 const (
 	SepTxContent = "_"
+)
+
+var (
+	logger          = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+	identypesLogger = logger.With("module", "identypes")
 )
 
 /*
@@ -120,14 +126,14 @@ func (tx *TX) VerifySig() bool {
 	pub, err := Content2PubKey(tx.Content)
 
 	if err != nil {
-		fmt.Println("verify failed because of pubkey err, more info: ", err)
+		identypesLogger.Error("verify failed because of pubkey err, more info: ", err)
 		return false
 	}
 
 	// 将signature转换为两个大整数
 	coor, err := sig2bigInt(tx.TxSignature)
 	if err != nil {
-		fmt.Println("verify failed because of sig err, more info: ", err)
+		identypesLogger.Error("verify failed because of sig err, more info: ", err)
 		return false
 	}
 

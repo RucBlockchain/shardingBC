@@ -1,9 +1,13 @@
 package identypes
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"syscall"
 )
 
@@ -18,7 +22,12 @@ type CrossMessages struct {
 	Height          int64     //标志时刻
 	Packages        []Package //应该回复删除什么包
 	ConfirmPackSigs []byte    //对于这些包的签名
-	SrcIndex	    string
+	SrcIndex        string
+
+	// 压缩相关的字段
+	// CompressedData 和 Txlist两者在任意时刻有且只有一个会存放有数据
+	CompressedData []byte // txlist压缩后的数据存放在这里
+	IsCompressed   bool   //
 }
 
 type PartSig struct {
@@ -31,10 +40,11 @@ type Package struct {
 	Height          int64
 	CmID            [32]byte
 	SrcZone         string
-	DesZone 		string
+	DesZone         string
 	SrcIndex        string
 }
-func GetIndex()string{
+
+func GetIndex() string {
 	g, _ := syscall.Getenv("TASKINDEX")
 	return g
 }
@@ -61,6 +71,72 @@ func (cm *CrossMessages) Data() []byte {
 	return nil
 }
 
+func (cm *CrossMessages) Compress() bool {
+	if cm.IsCompressed {
+		return true
+	}
+	cm.IsCompressed = true
+
+	origin_data, err := json.Marshal(cm.Txlist)
+	if err != nil {
+		identypesLogger.Error("compress crossmessage failed, err: " + err.Error())
+		cm.IsCompressed = false
+		return false
+	}
+
+	var buf bytes.Buffer
+	tmp := make([]byte, len(origin_data))
+	copy(tmp, origin_data)
+	zw := gzip.NewWriter(&buf)
+	_, err = zw.Write(tmp)
+	if err != nil {
+		identypesLogger.Error("compress crossmessage failed, err: " + err.Error())
+		cm.IsCompressed = false
+		return false
+	}
+
+	zw.Flush()
+	cm.CompressedData = buf.Bytes()
+	cm.Txlist = nil
+	zw.Close()
+	return true
+}
+
+func (cm *CrossMessages) Decompression() bool {
+	if cm.IsCompressed == false {
+		return true
+	}
+	var err error
+	cm.IsCompressed = false
+
+	tmp := make([]byte, len(cm.CompressedData))
+	copy(tmp, cm.CompressedData)
+	buf := bytes.NewReader(tmp)
+
+	zr, err := gzip.NewReader(buf)
+	if err != nil {
+		identypesLogger.Error("New gzip reader failed, err: " + err.Error())
+		cm.IsCompressed = true
+		return false
+	}
+
+	data_de, err := ioutil.ReadAll(zr)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		identypesLogger.Error("read compressed data failed, err: " + err.Error())
+		cm.IsCompressed = true
+		return false
+	}
+
+	err = json.Unmarshal(data_de, &cm.Txlist)
+	if err != nil {
+		identypesLogger.Error("Unmarshal data failed, err: " + err.Error())
+		cm.IsCompressed = true
+		return false
+	}
+	cm.CompressedData = nil
+	return true
+}
+
 func NewCrossMessage(txs [][]byte,
 	signature []byte,
 	pubkey []byte,
@@ -80,6 +156,8 @@ func NewCrossMessage(txs [][]byte,
 		Packages:        make([]Package, 0, 10),
 		SrcIndex:        GetIndex(),
 		ConfirmPackSigs: nil,
+		CompressedData:  nil,
+		IsCompressed:    false,
 	}
 	copy(cm.Sig, signature)
 	copy(cm.Pubkeys, pubkey)
