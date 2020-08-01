@@ -1365,6 +1365,8 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 		}
 	}
 }
+
+// 判断该cm包里是否有非addtx的交易
 func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	for i := 0; i < len(cm.Txlist); i++ {
 		tx, _ := tp.NewTX(cm.Txlist[i])
@@ -1385,13 +1387,10 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		return nil
 	} else {
 		if len(cs.ProposalBlock.Txs) == 0 && len(packs) != 0 {
-			//fmt.Println("调用ModifyRelationTable")
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
-		//for _,tx:= range cs.ProposalBlock.Txs{
-		//	fmt.Println("遍历",string(tx))
-		//}
+
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
 		for i := 0; i < len(voteSet.PartSigs); i++ {
@@ -1407,7 +1406,6 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		}
 
 		var err error
-		//fmt.Println(len(sigs))
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
 			fmt.Println(ids)
@@ -1416,22 +1414,12 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			return err
 		}
 
-
 		// 重新生成merkle tree
 		mts, err := types.GenerateMerkleTree(cs.ProposalBlock.Txs)
 		if err != nil {
 			return err
 		}
-		// tmp 直接生成最终签名以验证
-        //        origin_sig, err := bls.TmpGetSign(mts.RootTree.ComputeRootHash())
-        //        if err != nil{
-        //                fmt.Println("生成最终签名出错." ,err)
-        //        }
-		//fmt.Println("root对比", bytes.Equal(cs.ProposalBlock.CrossMerkleRoot, mts.RootTree.ComputeRootHash()))
-		//fmt.Println("验证结果:", bytes.Equal(origin_sig, CrossMerkleSig))
-		//fmt.Println("root:" ,mts.RootTree.ComputeRootHash())
-		//fmt.Println("CrossMerkleSig: ", CrossMerkleSig)
-		//fmt.Println("分片公钥: ", bls.GetShardPubkey())
+
 		var txs types.Txs
 		txs = cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,
@@ -1442,18 +1430,22 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		for i := 0; i < len(cms); i++ {
 			//存入realylist之中
 			cms[i].Packages = packs
-			//为什么要判断cm？
+			// 如果cm全是addtx，直接发送cm而不用持久化存储该cm（存放到mempool DB中）
 			if !JudgeCrossMessage(cms[i]) {
-				//fmt.Println("存入")
+				if res := cms[i].Compress(); res == false {
+					cs.Logger.Error("compress error")
+				}
 				cs.blockExec.AddCrossMessagesDB(cms[i])
 			} else {
-				if cs.isLeader(){
+				if cs.isLeader() {
 					var tcm []*tp.CrossMessages
+					if res := cms[i].Compress(); res == false {
+						cs.Logger.Error("compress error")
+					}
 					tcm = append(tcm, cms[i])
 					//是否要发送？
 					go cs.blockExec.SendCrossMessages(8080, tcm)
 				}
-				//fmt.Println("全是addtx")
 
 				//固化到磁盘之中
 			}

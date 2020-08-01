@@ -328,7 +328,7 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
 				//考虑如何进行合理分化
-			} else if (mem.cmDB.CrossMessages[i].Height == 10) {
+			} else if mem.cmDB.CrossMessages[i].Height == 10 {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height = 0
 			} else {
@@ -530,9 +530,9 @@ func (mem *Mempool) CmsWaitChan() <-chan struct{} {
 // cb: A callback from the CheckTx command.
 //     It gets called from another goroutine.
 // CONTRACT: Either cb will get called, or err returned.
-func (mem *Mempool)CheckDB(tx types.Tx) string {
+func (mem *Mempool) CheckDB(tx types.Tx) string {
 	if cm := ParseData(tx); cm != nil {
-		if cm.SrcZone==getShard(){
+		if cm.SrcZone == getShard() {
 			//收到状态数据库的回执f
 			//fmt.Println("收到回执", string(tx))
 			//fmt.Println("收到回执并且执行删除",cm.Packages)
@@ -544,7 +544,7 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
-			name := dbtx.SrcZone + "S"+cm.SrcIndex+":26657"
+			name := dbtx.SrcZone + "S" + cm.SrcIndex + ":26657"
 			//	fmt.Println("发送",name)
 			//	fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
 			//)
@@ -566,14 +566,14 @@ func (mem *Mempool)CheckDB(tx types.Tx) string {
 	return ""
 }
 func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
-	status:=mem.CheckDB(tx)
-	if status=="回执"{
+	status := mem.CheckDB(tx)
+	if status == "回执" {
 		//fmt.Println("回执同步")
-		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},true)
-	}else if status==""{
+		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID}, true)
+	} else if status == "" {
 		//fmt.Println("cm处理")
-		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID},false)
-	}else {
+		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID}, false)
+	} else {
 		//fmt.Println("状态数据库返回")
 		return errors.New("状态数据库返回")
 	}
@@ -611,11 +611,16 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	//由于上层已经锁了，在这里不用锁
 	//检验包的正确性
 	//mem.logger.Error("检验cm")
+	if res := cm.Decompression(); !res {
+		return errors.New("decompression failed.")
+	}
+	defer cm.Compress()
+
 	if result := mem.CheckCrossMessageSig(cm); !result {
 
 		return errors.New("聚合签名或者检验失败")
 	}
-	if len(cm.Packages)>0{
+	if len(cm.Packages) > 0 {
 		//mem.logger.Error("待删除包数量非0，删除对应的包")
 		//mem.ModifyCrossMessagelist(cm)
 	}
@@ -771,7 +776,7 @@ func getShard() string {
 	return v
 }
 
-func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo,checkdb bool) (err error) {
+func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo, checkdb bool) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.proxyMtx.Unlock()
@@ -802,7 +807,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	}
 	if cm := ParseData(tx); cm != nil {
 		//mem.logger.Error("接受到Cm消息")
-		if !checkdb{
+		if !checkdb {
 			if result := mem.CheckCrossMessage(cm); result != nil {
 				fmt.Println(string(tx))
 				return result
@@ -1077,13 +1082,17 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		// Check total size requirement
 		// 删除对应的txlist的relay_out交易
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
-				if cm.SrcZone==getShard(){
-					//fmt.Println("移除回执")
-					var txs types.Txs
-					txs = append(txs, memTx.tx)
-					mem.removeTxs(txs)
-					continue
-				}
+			if cm.SrcZone == getShard() {
+				//fmt.Println("移除回执")
+				var txs types.Txs
+				txs = append(txs, memTx.tx)
+				mem.removeTxs(txs)
+				continue
+			}
+			if res := cm.Decompression(); !res {
+				mem.logger.Error("cross message decompression failed.")
+				return nil
+			}
 			//添加映射关系
 			//对txlist进行遍历，将relay_in的tx加入区块之中
 			var txlist []*tp.TX
@@ -1096,6 +1105,10 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 				if tmp_tx.Txtype == "relaytx" {
 					byte_txlist = append(byte_txlist, cm.Txlist[i])
 				}
+			}
+			if res := cm.Compress(); !res {
+				mem.logger.Error("cross message compress failed.")
+				return nil
 			}
 
 			total_data, err := json.Marshal(txlist)
@@ -1455,7 +1468,7 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		mem.logger.Error("验证CrossMessage的signature出错")
 		fmt.Println(cm.Sig)
 		fmt.Println(cm.CrossMerkleRoot)
-		fmt.Println( cm.Pubkeys)
+		fmt.Println(cm.Pubkeys)
 		return false
 	}
 	//fmt.Println("门限签名验证通过！")
