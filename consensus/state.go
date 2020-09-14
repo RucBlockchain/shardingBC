@@ -1390,7 +1390,10 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
-
+		for i:=0;i<len(cs.ProposalBlock.Txs);i++{//将每条交易时间打印出来
+			tx,_:=tp.NewTX(cs.ProposalBlock.Txs[i])
+			tx.PrintInfo()
+		}
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
 		for i := 0; i < len(voteSet.PartSigs); i++ {
@@ -1408,9 +1411,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		var err error
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
-			fmt.Println(ids)
-			fmt.Println(sigs)
-			cs.Logger.Error("Aggregate errar, ", err)
+			//fmt.Println(ids)
+			//fmt.Println(sigs)
+			cs.Logger.Error("Aggregate error", err)
 			return err
 		}
 

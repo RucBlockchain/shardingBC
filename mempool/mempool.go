@@ -565,11 +565,11 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 
 	return ""
 }
-func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
+func (mem *Mempool) CheckTx(tx types.Tx,cb func(*abci.Response)) (err error) {
 	status := mem.CheckDB(tx)
 	if status == "回执" {
 		//fmt.Println("回执同步")
-		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID}, true)
+		return mem.CheckTxWithInfo(tx, cb,  TxInfo{PeerID: UnknownPeerID}, true)
 	} else if status == "" {
 		//fmt.Println("cm处理")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID}, false)
@@ -775,7 +775,7 @@ func getShard() string {
 	v, _ := syscall.Getenv("TASKID")
 	return v
 }
-
+//传入是否是leader
 func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo TxInfo, checkdb bool) (err error) {
 	mem.proxyMtx.Lock()
 	// use defer to unlock mutex because application (*local client*) might panic
@@ -809,13 +809,12 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb {
 			if result := mem.CheckCrossMessage(cm); result != nil {
-				fmt.Println(string(tx))
 				return result
 			}
 		}
 	} else {
 
-		accountLog := account.NewAccountLog(tx)
+		accountLog := account.NewAccountLog(tx)//判断是否是leader再输出
 		if accountLog == nil {
 			return errors.New("交易解析失败")
 		}
@@ -825,7 +824,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			return errors.New("不合法的交易")
 		}
 	}
-	//mem.logger.Error("交易合法性检验通过")mo
+	//mem.logger.Error("交易合法性检验通过")
 	// CACHE
 	if !mem.cache.Push(tx) {
 		// Record a new sender for a tx we've already seen.

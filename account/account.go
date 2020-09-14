@@ -7,28 +7,32 @@
 package account
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
-
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
+	"strconv"
+	"strings"
+	"time"
 )
 
 /*
  * 交易数据结构
  */
 type AccountLog struct {
+	ID	    [sha256.Size]byte
 	TxType  string // 交易类型
 	From    string // 支出方
 	To      string // 接收方
+	Time    string//发送时间
 	Amount  int    // 金额
 	Operate int    // 支出方: 0,  接收方: 1
 }
 
 // 接受到的交易请求，仅供测试使用
 type TxArg struct {
+	ID	    [sha256.Size]byte`json:"id"`
 	TxType      string `json:"txType"`
 	Sender      string `json:"sender"`
 	Receiver    string `json:"receiver"`
@@ -36,7 +40,9 @@ type TxArg struct {
 	TxSignature string `json:"txSignature"`
 	Operate     int    `json:"operate"`
 }
-
+func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
+	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
+}
 // 实例化交易
 func NewAccountLog(tx []byte) *AccountLog {
 	return _parseTx(tx)
@@ -51,7 +57,9 @@ func (accountLog *AccountLog) Check() bool {
 	from := accountLog.From
 	to := accountLog.To
 	amount := accountLog.Amount
+	t := accountLog.Time
 	if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
+
 		return true
 	}
 	if amount <= 0 {
@@ -59,9 +67,12 @@ func (accountLog *AccountLog) Check() bool {
 		return false
 	}
 	if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
+		//relay_out阶段
+		logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印
 		return true
 	}
-
+	logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
+	logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
 	balanceToStr := _getState([]byte(to))
 	balanceFromStr := _getState([]byte(from))
 
@@ -165,7 +176,6 @@ func _parseTx(tx []byte) *AccountLog {
 	args := strings.Split(string(txArgs.Content), "_")
 	// fmt.Println(args)
 	if len(args) != 4 { //因为添加时间戳参数，所以个数应该是4个
-		fmt.Println("参数个数错误")
 		// logger.Error("参数个数错误")
 		return nil
 	}
@@ -179,6 +189,8 @@ func _parseTx(tx []byte) *AccountLog {
 	accountLog.From = args[0]
 	accountLog.To = args[1]
 	accountLog.Amount = amount
+	accountLog.Time = args[3]//时间戳
+	accountLog.ID = txArgs.ID
 	accountLog.Operate = txArgs.Operate
 	accountLog.TxType = txArgs.TxType
 	return accountLog

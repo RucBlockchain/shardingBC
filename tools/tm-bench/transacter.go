@@ -333,7 +333,6 @@ func pub2string(pub ecdsa.PublicKey) string {
 
 	return hex.EncodeToString(b)
 }
-
 func (t *transacter) createinitTxContent(shard string, i int) (string, string) {
 	toint, _ := strconv.ParseInt(shard, 32, 64)
 	index := toint

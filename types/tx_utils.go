@@ -15,6 +15,7 @@ func ClassifyTx(txs Txs) map[string]Txs {
 	// TODO string类型转换为枚举型
 	buckets := make(map[string]Txs)
 	for _, txbyte := range txs {
+		//共识完成加入第三阶段的代码
 		tx, err := identypes.NewTX(txbyte)
 		if err != nil {
 			continue

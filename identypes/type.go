@@ -11,7 +11,10 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
+	"fmt"
+	"time"
 )
 
 const (
@@ -90,23 +93,48 @@ func NewTX(data []byte) (*TX, error) {
 	}
 	return tx, err
 }
-
+func TimePhase(phase int,tx_id [sha256.Size]byte,t string)string{
+	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,t)
+}
 // 处理跨片交易的后程，修改交易属性
 func (tx *TX) UpdateTx() {
 	if tx == nil {
 		return
 	}
 	// 如果交易类型为relaytx 且 发送方是本分片，则该交易为relay_in，修改operate值为1
+	//if tx.Txtype=="tx" || tx.Txtype=="init"{//说明是本片交易，那么此时输出第三阶段
+	//	logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
+	//}
 	if tx.Txtype == "relaytx" && tx.Sender == getShard() {
+		//
+		//logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
 		tx.Operate = 1
 	}
 
 	// 如果交易类型为relayTx 且 接收方是本分片，则修改交易类型为addtx
 	if tx.Txtype == "relaytx" && tx.Receiver == getShard() {
+		//logger.Info(TimePhase(5,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第五阶段信息打印
 		tx.Txtype = "addtx"
 	}
 }
+func (tx *TX) PrintInfo(){
+	if tx == nil {
+		return
+	}
+	// 如果交易类型为relaytx 且 发送方是本分片，则该交易为relay_in，修改operate值为1
+	if tx.Txtype=="tx" || tx.Txtype=="init"{//说明是本片交易，那么此时输出第三阶段
+		logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
+	}
+	if tx.Txtype == "relaytx" && tx.Sender == getShard() {
+		//
+		logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
+	}
 
+	// 如果交易类型为relayTx 且 接收方是本分片，则修改交易类型为addtx
+	if tx.Txtype == "addtx" && tx.Receiver == getShard() {
+		logger.Info(TimePhase(5,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第五阶段信息打印
+	}
+}
 func (tx *TX) Data() []byte {
 	if data, err := json.Marshal(tx); err == nil {
 		return data
