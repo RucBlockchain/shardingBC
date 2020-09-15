@@ -53,23 +53,8 @@ func calculateStatistics(
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Println("blockMetas:",len(blockMetas))
-	//fmt.Println(blockMetas)
-	// iterates from max height to min height
-	//t1 := time.Now()
-	//t2 := time.Now()
 	sum := 0.0
 	for _, blockMeta := range blockMetas {
-		//if i == 0 {
-		//	t1 = blockMeta.Header.Time
-		//}
-		//t2 = blockMeta.Header.Time
-		//fmt.Println(i)
-		//fmt.Println(blockMeta)
-		//fmt.Println("blockMeta.Header.Time",blockMeta.Header.Time)
-		//fmt.Println("blockMeta.Header.Height",blockMeta.Header.Height)
-		//fmt.Println("blockMeta.Header.NumTxs",blockMeta.Header.NumTxs)
-		// check if block was created after timeStart
 		if blockMeta.Header.Time.Before(timeStart) {
 			break
 		}
@@ -78,9 +63,6 @@ func calculateStatistics(
 		if blockMeta.Header.Time.After(timeEnd) {
 			continue
 		}
-		//fmt.Println("start",timeStart)
-		//fmt.Println("end",timeEnd)
-
 
 
 		sec := secondsSinceTimeStart(timeStart, blockMeta.Header.Time)
@@ -93,18 +75,8 @@ func calculateStatistics(
 
 		logger.Debug(fmt.Sprintf("%d txs at block height %d", blockMeta.Header.NumTxs, blockMeta.Header.Height))
 	}
-	numTxsPerSec[0]+=plustx
-	//fmt.Println("sum:",sum)
-	//time1 := t1.Sub(t2).Seconds()
-	//tps := sum / time1
-	//dua := float64(t2)
-	//fmt.Println("time:", time1)
-	//fmt.Println("sum:", (sum))
-	//fmt.Println("TPS:", tps)
-	//fmt.Println("TimeStart:", timeStart)
-	//fmt.Println("TimeEnd:", timeEnd)
-	//fmt.Println("numTxsPerSec", numTxsPerSec)
-	//fmt.Println("numBlocksPerSec", numBlocksPerSec)
+	//numTxsPerSec[0]+=plustx//为了添加init类型交易，现在不需要，应当删除
+
 	for i := int64(0); i < int64(duration); i++ {
 		stats.BlocksThroughput.Update(numBlocksPerSec[i])
 		stats.TxsThroughput.Update(numTxsPerSec[i])

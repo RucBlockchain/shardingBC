@@ -1,18 +1,11 @@
 package main
 
 import (
-	"crypto/sha256"
 	//	"encoding/binary"
 	//	"encoding/hex"
-	"crypto/ecdsa"
-	"crypto/md5"
-	crand "crypto/rand"
-	"encoding/asn1"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
-	"strconv"
+
 
 	// it is ok to use math/rand here: we do not need a cryptographically secure random
 	// number generator here and we can run the tests a bit faster
@@ -27,7 +20,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 
-	tp "github.com/tendermint/tendermint/identypes"
+
 	"github.com/tendermint/tendermint/libs/log"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 )
@@ -47,7 +40,7 @@ type transacter struct {
 	shard             string
 	allshard          []string
 	relayrate         int
-	count             []plist
+	count             [][]byte
 	flag              int
 
 	conns       []*websocket.Conn
@@ -59,7 +52,7 @@ type transacter struct {
 	logger log.Logger
 }
 
-func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count []plist, flag int, broadcastTxMethod string) *transacter {
+func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count [][]byte, flag int, broadcastTxMethod string) *transacter {
 	return &transacter{
 		Target:            target,
 		Rate:              rate,
@@ -88,6 +81,9 @@ func (t *transacter) Start() error {
 	t.stopped = false
 
 	rand.Seed(time.Now().Unix())
+	//连接到某个节点，有多条连接
+	//考虑把t.Target换成一个数组或切片
+	//连接的发送方变多
 	for i := 0; i < t.Connections; i++ {
 		c, _, err := connect(t.Target)
 		if err != nil {
@@ -97,7 +93,8 @@ func (t *transacter) Start() error {
 	}
 	t.startingWg.Add(t.Connections)
 	//发送init交易保证不会出现支付方还没被确认
-	for i := 0; i < t.Connections; i++ {
+	//这部分不需要了
+	for i := 0; i < t.Connections; i++ {//多个连接并行执行sendloop
 		go t.sendLoop(i, t.flag,false)
 	}
 	t.startingWg.Wait()
@@ -105,6 +102,7 @@ func (t *transacter) Start() error {
 	t.startingWg.Add(t.Connections)
 	t.endingWg.Add(2 * t.Connections)
 	for i := 0; i < t.Connections; i++ {
+		//这里的flag是干吗的
 		go t.sendLoop(i, t.flag,true)
 		go t.receiveLoop(i)
 	}
@@ -146,6 +144,7 @@ func (t *transacter) receiveLoop(connIndex int) {
 }
 
 // sendLoop generates transactions at a given rate.
+// 为什么index这个参数在这个函数中没有使用
 func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 	started := false
 	// Close the starting waitgroup, in the event that this fails to start
@@ -167,44 +166,8 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 		return err
 	})
 	logger := t.logger.With("addr", c.RemoteAddr())
-	if init==false{
-		now := time.Now()
-		if !started {
-			t.startingWg.Done()
-			started = true
-		}
-		for i := 0; i < t.Rate; i++ {
-			var ntx []byte
-			ntx = t.generateTx(t.shard, i)
-
-			//fmt.Println(string(ntx))
-			paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
-			if err != nil {
-				fmt.Printf("failed to encode params: %v\n", err)
-				os.Exit(1)
-			}
-			rawParamsJSON := json.RawMessage(paramsJSON)
-
-			c.SetWriteDeadline(now.Add(sendTimeout))
-			err = c.WriteJSON(rpctypes.RPCRequest{
-				JSONRPC: "2.0",
-				ID:      rpctypes.JSONRPCStringID("tm-bench"),
-				Method:  t.BroadcastTxMethod,
-				Params:  rawParamsJSON,
-			})
-			if err != nil {
-				err = errors.Wrap(err,
-					fmt.Sprintf("txs send failed on connection #%d", connIndex))
-				t.connsBroken[connIndex] = true
-				logger.Error(err.Error())
-				return
-			}
-			// cache the time.Now() reads to save time.
-		}
-		//fmt.Println("发送完毕")
-		return
-	}
-	var txNumber = 1
+	var txNumber = 0 //用来表示已经取到了
+	leftNum := len(t.count) - len(t.count) / t.Rate * t.Rate //剩余交易总数
 
 	pingsTicker := time.NewTicker(pingPeriod)
 	txsTicker := time.NewTicker(1 * time.Second)
@@ -213,7 +176,7 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 		txsTicker.Stop()
 		t.endingWg.Done()
 	}()
-	send_shard := deleteSlice(t.allshard, t.shard)
+	//send_shard := deleteSlice(t.allshard, t.shard)//不需要了
 
 	for {
 		select {
@@ -227,19 +190,31 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 			}
 
 			now := time.Now()
+
+			//得到循环次数，把txcount/T的余数放在
+			var cir int
+			if  leftNum > 0 {
+				cir = t.Rate + 1
+			}else {
+				cir = t.Rate
+			}
+			leftNum--
+
 			//rate是每秒发送消息的数量
-			for i := 0; i < t.Rate; i++ {
+			for i := 0; i < cir; i++ {//由于一段时间内某个分片的交易不一定能整除持续时间，需要对循环的退出条件进行修改
 				var ntx []byte
 
-				ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
-
+				//ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)//生成一个交易t.count[i]
+				ntx = t.count[txNumber]
+				//生成这个交易后只有一处使用了这个交易，使用这个交易的地方是不是把该交易发送到一个发送方
+				//updateTx需要修改，改为根据i的值选出属于这个发送方的一条交易
 				//fmt.Println(string(ntx))
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
 				if err != nil {
 					fmt.Printf("failed to encode params: %v\n", err)
 					os.Exit(1)
 				}
-				rawParamsJSON := json.RawMessage(paramsJSON)
+				rawParamsJSON := json.RawMessage(paramsJSON)//把交易转换成
 
 				c.SetWriteDeadline(now.Add(sendTimeout))
 				err = c.WriteJSON(rpctypes.RPCRequest{
@@ -305,143 +280,6 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 func connect(host string) (*websocket.Conn, *http.Response, error) {
 	u := url.URL{Scheme: "ws", Host: host, Path: "/websocket"}
 	return websocket.DefaultDialer.Dial(u.String(), nil)
-}
-
-func bigint2str(r, s big.Int) string {
-	coor := ecdsaSignature{X: &r, Y: &s}
-	b, _ := asn1.Marshal(coor)
-	return hex.EncodeToString(b)
-}
-func digest(Content string) []byte {
-	origin := []byte(Content)
-
-	// 生成md5 hash值
-	digest_md5 := md5.New()
-	digest_md5.Write(origin)
-
-	return digest_md5.Sum(nil)
-}
-
-type ecdsaSignature struct {
-	X, Y *big.Int
-}
-
-func pub2string(pub ecdsa.PublicKey) string {
-
-	coor := ecdsaSignature{X: pub.X, Y: pub.Y}
-	b, _ := asn1.Marshal(coor)
-
-	return hex.EncodeToString(b)
-}
-func (t *transacter) createinitTxContent(shard string, i int) (string, string) {
-	toint, _ := strconv.ParseInt(shard, 32, 64)
-	index := toint
-	//获取分片
-	shardcount := t.count[index]
-	//对所有账户存钱
-	priv := shardcount[i]
-
-	pub_s := priv.PublicKey
-	tx_content := "_" + pub2string(pub_s) + "_1000000" + "_" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	sig := "sig"
-	return tx_content, sig
-
-}
-
-func (t *transacter) createRelayTxContent(shard_s string, shard_r string, rate int) (string, string) {
-	//rate指的是该分片账户数量
-	source := rand.NewSource(time.Now().Unix())
-	newrand := rand.New(source)
-	//产生转化交易金额
-	num := newrand.Intn(100)
-	toint, _ := strconv.ParseInt(shard_s, 32, 64)
-	sendshard := t.count[toint]
-	//拿取支付方账户信息
-	priv := sendshard[newrand.Intn(rate)]
-	pub_s := priv.PublicKey
-
-	toint2, _ := strconv.ParseInt(shard_r, 32, 64)
-	receiveshard := t.count[toint2]
-	//拿取转入方账户信息
-	priv_r := receiveshard[newrand.Intn(rate)]
-	pub_r := priv_r.PublicKey
-	//最后加入时间戳信息
-	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num) + "_" + strconv.FormatInt(time.Now().UnixNano(), 10) //添加时间戳来唯一标识该交易
-
-	tr, ts, _ := ecdsa.Sign(crand.Reader, priv, digest(tx_content))
-	sig := bigint2str(*tr, *ts)
-	return tx_content, sig
-
-}
-
-func (t *transacter) createLocalTxContent(shard string, rate int) (string, string) {
-	//rate指的是该分片账户数量
-	source := rand.NewSource(time.Now().Unix())
-	newrand := rand.New(source)
-	//金额可以随便
-	num := newrand.Intn(100)
-
-	toint, _ := strconv.ParseInt(shard, 32, 64)
-
-	shardcount := t.count[toint]
-	priv := shardcount[newrand.Intn(rate)]
-	pub_s := priv.PublicKey
-
-	priv_r := shardcount[newrand.Intn(rate)]
-	pub_r := priv_r.PublicKey
-
-	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_" + strconv.Itoa(num) + "_" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	tr, ts, _ := ecdsa.Sign(crand.Reader, priv, digest(tx_content))
-	sig := bigint2str(*tr, *ts)
-	return tx_content, sig
-
-}
-
-//TX考虑当前分片中实际账户
-func (t *transacter) generateTx(shard string, index int) []byte {
-	content, sig := t.createinitTxContent(shard, index)
-	tx := &tp.TX{
-		Txtype:      "init",
-		Sender:      shard,
-		Receiver:    "",
-		ID:          sha256.Sum256([]byte(content)),
-		Content:     content,
-		TxSignature: sig,
-		Operate:     0}
-	res, _ := json.Marshal(tx)
-
-	return res
-}
-
-// warning, mutates input byte slice
-func (t *transacter) updateTx(txNumber int, send_shard []string, shard string, rate int, txnum int) []byte {
-
-	var res []byte
-	if txNumber%rate == 0 {
-		step := len(send_shard)
-		content, sig := t.createRelayTxContent(shard, send_shard[txNumber%step], txnum)
-		tx := &tp.TX{
-			Txtype:      "relaytx",
-			Sender:      shard,
-			Receiver:    send_shard[txNumber%step],
-			ID:          sha256.Sum256([]byte(content)),
-			Content:     content,
-			TxSignature: sig,
-			Operate:     0}
-		res, _ = json.Marshal(tx)
-	} else {
-		content, sig := t.createLocalTxContent(shard, txnum)
-		tx := &tp.TX{
-			Txtype:      "tx",
-			Sender:      "",
-			Receiver:    "",
-			ID:          sha256.Sum256([]byte(content)),
-			Content:     content,
-			TxSignature: sig}
-		res, _ = json.Marshal(tx)
-	}
-	return res
-
 }
 
 func deleteSlice(a []string, alp string) []string {

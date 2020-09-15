@@ -2,11 +2,8 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	crand "crypto/rand"
 	"flag"
 	"fmt"
-
 	//"github.com/gorilla/websocket"
 	"os"
 	"strings"
@@ -38,8 +35,8 @@ func main() {
 	//relayrate 跨片比例
 	var durationInt, txsRate, connections, txSize, relayrate int
 	var verbose bool
-	var outputFormat, broadcastTxMethod, allshard string
-	var shard string
+	var outputFormat, broadcastTxMethod, allshard, datafile string
+	//var shard string
 	flagSet := flag.NewFlagSet("tm-bench", flag.ExitOnError)
 	//初始化数值
 	flagSet.IntVar(&connections, "c", 1, "Connections to keep open per endpoint")
@@ -47,7 +44,8 @@ func main() {
 	flagSet.IntVar(&txsRate, "r", 1000, "Txs per second to send in a connection")
 	flagSet.IntVar(&txSize, "s", 250, "The size of a transaction in bytes, must be greater than or equal to 40.")
 	flagSet.StringVar(&outputFormat, "output-format", "plain", "Output format: plain or json")
-	flagSet.StringVar(&shard, "shard", "0", "now shard of tendermint")
+	flagSet.StringVar(&datafile, "datafile", "token_transfers.csv", "The name of data file")
+	//flagSet.StringVar(&shard, "shard", "0", "now shard of tendermint")
 	flagSet.IntVar(&relayrate, "rate", 2, "relay rate")
 
 	flagSet.StringVar(&allshard, "as", "0", "shard of tendermint")
@@ -71,14 +69,6 @@ Examples:
 		flagSet.Usage()
 		os.Exit(1)
 	}
-	//fmt.Println("我使用了连接！！！")
-	//c1 := myline.UseConnect("A",0)
-	//go func(c *websocket.Conn){
-	//	_,p,_:=c.ReadMessage()
-	//	fmt.Println(p)
-	//}(c1)
-
-	//fmt.Println("连接关闭！！！")
 	if verbose {
 		if outputFormat == "json" {
 			printErrorAndExit("Verbose mode not supported with json output.")
@@ -109,23 +99,31 @@ Examples:
 
 	var (
 		endpoints     = strings.Split(flagSet.Arg(0), ",")
-		client        = tmrpc.NewHTTP(endpoints[0], "/websocket")
-		initialHeight = latestBlockHeight(client)
+		clients []*tmrpc.HTTP
+		initHeights []int64
 	)
-
-	logger.Info("Latest block height", "h", initialHeight)
+	//创建一组分片leader小组链接
+	clients = make([]*tmrpc.HTTP,len(endpoints))
+	for i:=0;i<len(endpoints);i++{
+		clients[i] = tmrpc.NewHTTP(endpoints[i], "/websocket")
+		initHeights[i] = latestBlockHeight(clients[i])
+	}
+	//得到各分片链的初始化高度
+	//logger.Info("Latest block height", "h", initialHeight)
 	//开始创建client,发送交易
 	var transacters []*transacter
+	var rawdata map[string] Stas
 	allSahrd := strings.Split(allshard, ",")
-	transacters = startTransacters(
+	transacters,rawdata = startTransacters(//初始化交易者？
 		endpoints,
 		connections,
 		txsRate,
+		durationInt,
 		txSize,
-		shard,
 		allSahrd,
 		relayrate,
-		"broadcast_tx_"+broadcastTxMethod)
+		"broadcast_tx_"+broadcastTxMethod,
+		datafile)
 
 	// Stop upon receiving SIGTERM or CTRL-C.
 	//创建各个分片的账户并写入文件中
@@ -155,12 +153,22 @@ Examples:
 		}
 	}
 	logger.Debug("Time all transacters stopped", "t", time.Now())
+	var totaltxs int64
+	var crosstxs int64
+	totaltxs=0
+	crosstxs=0
+	var realtxs int64
+	realtxs=0
+	for _,v:=range rawdata{
+		totaltxs +=int64(v.cnt)
+		crosstxs+=int64(v.relaycnt)
+	}
 
 	for i, _ := range endpoints {
-		client = tmrpc.NewHTTP(endpoints[i], "/websocket")
+		client := clients[i]
 		stats, err := calculateStatistics(
 			client,
-			initialHeight,
+			initHeights[i],
 			timeStart,
 			durationInt,
 			int64(txsRate),
@@ -168,9 +176,17 @@ Examples:
 		if err != nil {
 			printErrorAndExit(err.Error())
 		}
-		printStatistics(stats, outputFormat)
+		//在这里打印统计结果，说明已经统计完全，可以进行公式计算
+		//计算totaltxs 与 crosstxs
+		realtxs +=stats.TxsThroughput.Sum()
+		//printStatistics(stats, outputFormat)
 	}
+	var TPS float64
+	TPS = float64(realtxs * totaltxs) / float64(totaltxs + crosstxs)
 
+	var Crossrate float64
+	Crossrate = float64(crosstxs) / float64(totaltxs)
+	fmt.Println(TPS,Crossrate)
 }
 
 func latestBlockHeight(client tmrpc.Client) int64 {
@@ -192,38 +208,27 @@ func countCrashes(crashes []bool) int {
 	return count
 }
 
-func createCount(allshard []string, num int) []plist {
 
-	var count []plist
-	for i := 0; i < len(allshard); i++ {
-		var pl plist
-		for j := 0; j < num; j++ {
-			priv, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
-			pl = append(pl, priv)
-		}
-		count = append(count, pl)
-	}
-	return count
-}
 
 func startTransacters(
 	endpoints []string,
 	connections,
 	txsRate int,
+	T       int,//发送交易持续时间
 	txSize int,
-	shard string,
 	allshard []string,
 	relayrate int,
-	broadcastTxMethod string) []*transacter {
+	broadcastTxMethod string,
+	datafile string) ([]*transacter, map[string] Stas){
 	transacters := make([]*transacter, len(endpoints))
 
-	count := createCount(allshard, txsRate)
+	count, data := CreateTx(txsRate*T, len(allshard), datafile)//传入allshard还是shardcount？
 	iwg := sync.WaitGroup{}
 	iwg.Add(len(endpoints))
-	//先创建账户
-	for i, e := range endpoints {
+	//使用sync.WaitGroup来创建与endpoints大小相同的线程
+	for i, e := range endpoints {//为什么每个端口的transacter的shard都相同？
 		flag := 0
-		t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
+		t := newTransacter(e, connections, len(count[allshard[i]])/T, txSize, allshard[i], allshard, relayrate, count[allshard[i]], flag, broadcastTxMethod)//这一句是与每个端口间建立一个transacter
 		t.SetLogger(logger)
 		go func(i int) {
 			defer iwg.Done()
@@ -235,29 +240,8 @@ func startTransacters(
 		}(i)
 	}
 	iwg.Wait()
-	// fmt.Println("创建账户完成")
-	//发送交易
-	// wg := sync.WaitGroup{}
-	// wg.Add(len(endpoints))
-	// for i, e := range endpoints {
-	// 	shard := allshard[i]
-	// 	flag := 1
-	// 	t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
-	// 	t.SetLogger(logger)
-	// 	go func(i int) {
-	// 		defer wg.Done()
-	// 		if err := t.Start(); err != nil {
-	// 			fmt.Fprintln(os.Stderr, err)
-	// 			os.Exit(1)
-	// 		}
-	// 		transacters[i] = t
-	// 	}(i)
-	// }
-	// wg.Wait()
-	// fmt.Println("交易发送完成")
-	return transacters
+	return transacters,data
 }
-
 func printErrorAndExit(err string) {
 	fmt.Fprintln(os.Stderr, err)
 	os.Exit(1)
