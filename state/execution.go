@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -377,9 +378,14 @@ func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.Cros
 }
 
 // sending tx to shard x
+func getIP() string {
+	v, _ := syscall.Getenv("TargetIP")
+	return v
+}
 func (blockExec *BlockExecutor) SendMessage(DesZone string,  tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
-	name := DesZone + "S1:26657"
+	//name := DesZone + "S1:26657"
+	name := getIP() + ":26657"
 	//fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)

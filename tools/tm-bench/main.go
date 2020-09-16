@@ -114,7 +114,7 @@ Examples:
 	var transacters []*transacter
 	var rawdata map[string] Stas
 	allSahrd := strings.Split(allshard, ",")
-	transacters,rawdata = startTransacters(//初始化交易者？
+	transacters,rawdata = startTransacters(//初始化交易者
 		endpoints,
 		connections,
 		txsRate,

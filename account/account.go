@@ -63,8 +63,9 @@ func (accountLog *AccountLog) Check() bool {
 		return true
 	}
 	if amount <= 0 {
-		// logger.Error("金额应大于0")
-		return false
+		// 关闭查雨捷的交易合法性验证
+		//return false
+		return true
 	}
 	if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
 		//relay_out阶段
@@ -79,12 +80,16 @@ func (accountLog *AccountLog) Check() bool {
 	if len(from) != 0 && balanceFromStr == nil && accountLog.TxType!="init"{
 		//fmt.Println("支出方账户不存在")
 		// logger.Error("支出方账户不存在")
-		return false
+		// 关闭查雨捷的交易合法性验证
+		//return false
+		return true
 	}
 	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
 		//fmt.Println("接收方账户不存在")
 		logger.Error("接收方账户不存在")
-		return false
+		// 关闭查雨捷的交易合法性验证
+		//return false
+		return true
 	}
 
 	if len(from) != 0 {
@@ -92,7 +97,9 @@ func (accountLog *AccountLog) Check() bool {
 		if balanceFrom < amount {
 			//fmt.Println(balanceFrom)
 			//logger.Error("余额不足")
-			return false
+			// 关闭查雨捷的交易合法性验证
+			//return false
+			return true
 		}
 	}
 	// logger.Error("交易通过验证：" + from + " -> " + to + "  " + strconv.Itoa(amount))
