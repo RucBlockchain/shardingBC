@@ -50,9 +50,10 @@ type transacter struct {
 	stopped     bool
 
 	logger log.Logger
+	Tcount int
 }
 
-func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count [][]byte, flag int, broadcastTxMethod string) *transacter {
+func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count [][]byte, flag int, broadcastTxMethod string,T int) *transacter {
 	return &transacter{
 		Target:            target,
 		Rate:              rate,
@@ -67,6 +68,7 @@ func newTransacter(target string, connections, rate int, size int, shard string,
 		conns:             make([]*websocket.Conn, connections),
 		connsBroken:       make([]bool, connections),
 		logger:            log.NewNopLogger(),
+		Tcount: 			T,
 	}
 }
 
@@ -91,14 +93,14 @@ func (t *transacter) Start() error {
 		}
 		t.conns[i] = c
 	}
-	t.startingWg.Add(t.Connections)
+	//t.startingWg.Add(t.Connections)
 	//发送init交易保证不会出现支付方还没被确认
 	//这部分不需要了
-	for i := 0; i < t.Connections; i++ {//多个连接并行执行sendloop
-		go t.sendLoop(i, t.flag,false)
-	}
-	t.startingWg.Wait()
-	time.Sleep(1*time.Second)
+	//for i := 0; i < t.Connections; i++ {//多个连接并行执行sendloop
+	//	go t.sendLoop(i, t.flag,false)
+	//}
+	//t.startingWg.Wait()
+	//time.Sleep(1*time.Second)
 	t.startingWg.Add(t.Connections)
 	t.endingWg.Add(2 * t.Connections)
 	for i := 0; i < t.Connections; i++ {
@@ -146,6 +148,7 @@ func (t *transacter) receiveLoop(connIndex int) {
 // sendLoop generates transactions at a given rate.
 // 为什么index这个参数在这个函数中没有使用
 func (t *transacter) sendLoop(connIndex int, index int,init bool) {
+	count := 1
 	started := false
 	// Close the starting waitgroup, in the event that this fails to start
 	defer func() {
@@ -167,8 +170,10 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 	})
 	logger := t.logger.With("addr", c.RemoteAddr())
 	var txNumber = 0 //用来表示已经取到了
-	leftNum := len(t.count) - len(t.count) / t.Rate * t.Rate //剩余交易总数
-
+	leftNum := len(t.count) - t.Rate * t.Tcount //剩余交易总数
+	//fmt.Println("每秒发送交易的数量",t.Rate)
+	//fmt.Println("该片的数量",len(t.count))
+	//fmt.Println("剩余的交易数",leftNum)
 	pingsTicker := time.NewTicker(pingPeriod)
 	txsTicker := time.NewTicker(1 * time.Second)
 	defer func() {
@@ -191,21 +196,33 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 
 			now := time.Now()
 
+			max := func(a,b int) int{
+				if a < b{
+					return b
+				}
+				return a
+			}
 			//得到循环次数，把txcount/T的余数放在
 			var cir int
+			//fmt.Println("剩余数量为",leftNum)
 			if  leftNum > 0 {
-				cir = t.Rate + 1
+				cir = t.Rate + max(leftNum/t.Tcount,1)
+				leftNum-=max(leftNum/t.Tcount,1)
 			}else {
 				cir = t.Rate
 			}
-			leftNum--
 
 			//rate是每秒发送消息的数量
 			for i := 0; i < cir; i++ {//由于一段时间内某个分片的交易不一定能整除持续时间，需要对循环的退出条件进行修改
 				var ntx []byte
-
 				//ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)//生成一个交易t.count[i]
+
+				if txNumber >= len(t.count){
+					//fmt.Printf("[%v] txnumBer: %v, cir: %v, rate: %v, left: %v\n", i, txNumber, cir,t.Rate, leftNum)
+					break
+				}
 				ntx = t.count[txNumber]
+				//fmt.Println(string(ntx))
 				//生成这个交易后只有一处使用了这个交易，使用这个交易的地方是不是把该交易发送到一个发送方
 				//updateTx需要修改，改为根据i的值选出属于这个发送方的一条交易
 				//fmt.Println(string(ntx))
@@ -242,6 +259,9 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 
 				txNumber++
 			}
+			//fmt.Printf("第%v秒",count)
+			count+=1
+			//fmt.Println("本次循环的数量已经到了",txNumber)
 			timeToSend := time.Since(startTime)
 			logger.Info(fmt.Sprintf("sent %d transactions", numTxSent), "took", timeToSend)
 			if timeToSend < 1*time.Second {

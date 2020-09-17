@@ -138,7 +138,7 @@ func CreateTx(txcount int,shardcount int, datafile string) (map[string] [][]byte
 				content.WriteString("_")
 			}
 		}
-		tx_content:=content.String()+"_"+strconv.FormatInt(time.Now().UnixNano(), 10)
+		tx_content:=content.String()+strconv.FormatInt(time.Now().UnixNano(), 10)
 		tr, ts, _ := ecdsa.Sign(crand.Reader, Count[from], digest(tx_content))
 		sig := bigint2str(*tr, *ts)
 		id:=sha256.Sum256([]byte(tx_content))

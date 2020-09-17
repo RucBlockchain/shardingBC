@@ -615,32 +615,35 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 		return errors.New("decompression failed.")
 	}
 	defer cm.Compress()
-
+	//mem.logger.Error("解压完成")
 	if result := mem.CheckCrossMessageSig(cm); !result {
-
+		//fmt.Println("路径验证失败")
 		return errors.New("聚合签名或者检验失败")
 	}
 	if len(cm.Packages) > 0 {
 		//mem.logger.Error("待删除包数量非0，删除对应的包")
 		//mem.ModifyCrossMessagelist(cm)
 	}
+	//fmt.Println("聚合签名与解压完成")
 	//mem.logger.Error("修改cmdb完成")
 	//交易合法性检验
 	for i := 0; i < len(cm.Txlist); i++ {
+		//fmt.Println("交易合法性验证")
 		accountLog := account.NewAccountLog(cm.Txlist[i])
 		if accountLog == nil {
 			fmt.Println("交易解析失败")
 			return errors.New("交易解析失败")
 		}
 		checkRes := accountLog.Check()
-
+		//fmt.Println("交易合法验证通过")
 		if !checkRes {
+			fmt.Println("不合法的交易")
 			return errors.New("不合法的交易")
 		}
 	}
 	//mem.logger.Error("交易合法性检验通过")
 	//删除对应的CrossList内容
-
+	//fmt.Println("完成验证")
 	return nil
 }
 
@@ -1476,10 +1479,12 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 
 	// 生成分片的tree root，获得该分片的merkle tree root来验证路径的正确性
 	smt := merkle.SimpleTreeFromByteSlices(txs)
+	//fmt.Println("生成树")
 	if smt == nil {
+		fmt.Println("生成树失败")
 		return false
 	}
-
+	//fmt.Println("生成树成功")
 	currentRoot := smt.ComputeRootHash()
 	if currentRoot == nil || len(currentRoot) == 0 {
 		return false

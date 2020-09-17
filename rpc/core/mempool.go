@@ -144,6 +144,7 @@ func ParseData(data types.Tx) (*tp.CrossMessages) {
 
 func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	//异步解决
+	//fmt.Println("收到tx",string(tx))
 	//if cm:=ParseData(tx);cm!=nil{//处理CrossMessage流程
 	////TODO:需要完善此接口函数
 	//	mempool.CheckCrossMessage(tx)//check这个消息如果通过则放入mempool之中
@@ -159,6 +160,7 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 	err := mempool.CheckTx(tx, nil)
 
 	if err != nil {
+		fmt.Println(err)
 		if err == errors.New("不合法交易") {
 			if cm := ParseData(tx); cm != nil {
 				//fmt.Println("交易cm不合法", cm)

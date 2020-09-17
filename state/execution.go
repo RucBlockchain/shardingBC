@@ -117,13 +117,13 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	// Fetch a limited amount of valid txs
 	maxDataBytes := types.MaxDataBytes(maxBytes, state.Validators.Size(), len(evidence))
 	//拿到相关的txs
-	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas,height)
+	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas, height)
 	Packages := blockExec.mempool.SearchRelationTable(height)
 	//将相关的txs进行排序
 	txs = types.HandleSortTx(txs)
 	// TODO 更新交易的operate属性
 
-	return state.MakeBlock(height, txs, commit, evidence, proposerAddr,Packages)
+	return state.MakeBlock(height, txs, commit, evidence, proposerAddr, Packages)
 }
 
 // ValidateBlock validates the given block against the given state.
@@ -208,11 +208,11 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 //------------------------------------------------------
 //检查是否有跨链交易产生，对其进行后续处理
-func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
+func (blockExec *BlockExecutor) CheckRelayTxs(block *types.Block, flag bool) {
 
 	blockExec.logger.Error("-------------Begin check Cross Messages----------")
 	//resendTxs := blockExec.UpdateRelaytxDB() //检查状态数据库，没有及时确认的relayTxs需要重新发送relaytxs
-	resendMessages:=blockExec.UpdatecmDB()//检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
+	resendMessages := blockExec.UpdatecmDB() //检查状态数据库，没有及时确认的包需要重新发送crossmessage消息包
 	//if len(resendMessages)>0{
 	//	for i:=0;i<len(resendMessages);i++{
 	//		fmt.Println("root",string(resendMessages[i].CrossMerkleRoot),"height：",resendMessages[i].Height, "SrcZone",resendMessages[i].SrcZone,"DesZone",resendMessages[i].DesZone)
@@ -227,9 +227,8 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 			var tx_package []*tp.CrossMessages
 			//由于现在的Zone的名字改动了，所以现在不需要再减65
 			tx_package = append(tx_package, resendMessages[i])
-			go blockExec.SendCrossMessages(len(resendMessages) ,tx_package)
+			go blockExec.SendCrossMessages(len(resendMessages), tx_package)
 		}
-
 
 		fmt.Println("需要发送的CheckCrossMessages交易数量：", len(resendMessages))
 	}
@@ -313,16 +312,16 @@ func (blockExec *BlockExecutor) CheckRelayTxs( block *types.Block, flag bool) {
 func (blockExec *BlockExecutor) SearchPackageExist(pack tp.Package) bool {
 	return blockExec.mempool.SearchPackageExist(pack)
 }
-func (BlockExecutor *BlockExecutor)SyncRelationTable(pack tp.Package,height int64){
-	BlockExecutor.mempool.SyncRelationTable(pack,height)
+func (BlockExecutor *BlockExecutor) SyncRelationTable(pack tp.Package, height int64) {
+	BlockExecutor.mempool.SyncRelationTable(pack, height)
 }
-func(blockExec *BlockExecutor)MergePackage(height int64)[]byte{
-	packs:=blockExec.mempool.SearchRelationTable(height)
-	pack_data,_:=json.Marshal(packs)
+func (blockExec *BlockExecutor) MergePackage(height int64) []byte {
+	packs := blockExec.mempool.SearchRelationTable(height)
+	pack_data, _ := json.Marshal(packs)
 	return pack_data
 }
-func (blockExec *BlockExecutor)ModifyRelationTable(pk []byte,cfs []byte,height int64){
-	blockExec.mempool.ModifyRelationTable(pk,cfs,height)
+func (blockExec *BlockExecutor) ModifyRelationTable(pk []byte, cfs []byte, height int64) {
+	blockExec.mempool.ModifyRelationTable(pk, cfs, height)
 }
 func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
 	cpTxs := blockExec.mempool.GetAllCrossMessages()
@@ -346,7 +345,6 @@ func (blockExec *BlockExecutor) UpdatecmDB() []*tp.CrossMessages {
 //	return cpTxs
 //}
 
-
 func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages) {
 	blockExec.logger.Error("SendCrossMessages")
 	var shard_send [][]*tp.CrossMessages
@@ -355,7 +353,7 @@ func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages)
 	//将需要跨片的交易按分片归类
 	for i := 0; i < len(resendMessages); i++ {
 		//由于现在的Zone的名字改动了，所以现在不需要再减65
-		index,_:=strconv.Atoi(resendMessages[i].DesZone)
+		index, _ := strconv.Atoi(resendMessages[i].DesZone)
 		shard_send[index] = append(shard_send[index], resendMessages[i])
 	}
 
@@ -364,13 +362,12 @@ func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages)
 		if shard_send[i] != nil {
 			num := len(shard_send[i]) //发送到某分片所有跨片交易的数量，进行打包
 			tx_package = shard_send[i]
-			go blockExec.SendCrossMessages(num,tx_package)
+			go blockExec.SendCrossMessages(num, tx_package)
 
 		}
 	}
 }
 func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.CrossMessages) {
-
 
 	if num > 0 {
 		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
@@ -382,10 +379,10 @@ func getIP() string {
 	v, _ := syscall.Getenv("TargetIP")
 	return v
 }
-func (blockExec *BlockExecutor) SendMessage(DesZone string,  tx_package []*tp.CrossMessages) {
+func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
-	//name := DesZone + "S1:26657"
-	name := getIP() + ":26657"
+	name := DesZone + "S1:26657"
+	// name := getIP() + ":26657"
 	//fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
@@ -439,6 +436,7 @@ func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Co
 	myline.Flag_conn[string(index+65)][rnd] = false //释放资源
 
 }
+
 //已经包含在消息里面，无需在进行这一步
 //func (blockExec *BlockExecutor) SendAddedRelayTxs( /*line *myline.Line,*/ txs []tp.TX) {
 //	//向发送来的分片中返回确认消息

@@ -104,9 +104,11 @@ Examples:
 	)
 	//创建一组分片leader小组链接
 	clients = make([]*tmrpc.HTTP,len(endpoints))
+	initHeights = make([]int64, len(endpoints))
 	for i:=0;i<len(endpoints);i++{
 		clients[i] = tmrpc.NewHTTP(endpoints[i], "/websocket")
 		initHeights[i] = latestBlockHeight(clients[i])
+		//fmt.Println("获取区块高度",initHeights[i])
 	}
 	//得到各分片链的初始化高度
 	//logger.Info("Latest block height", "h", initialHeight)
@@ -186,7 +188,7 @@ Examples:
 
 	var Crossrate float64
 	Crossrate = float64(crosstxs) / float64(totaltxs)
-	fmt.Println(TPS,Crossrate)
+	fmt.Println(TPS/float64(durationInt),Crossrate)
 }
 
 func latestBlockHeight(client tmrpc.Client) int64 {
@@ -209,6 +211,13 @@ func countCrashes(crashes []bool) int {
 }
 
 
+func CompareData(a int,b int) int {
+	if a<=b{
+		return a
+	}else {
+		return b
+	}
+}
 
 func startTransacters(
 	endpoints []string,
@@ -228,7 +237,7 @@ func startTransacters(
 	//使用sync.WaitGroup来创建与endpoints大小相同的线程
 	for i, e := range endpoints {//为什么每个端口的transacter的shard都相同？
 		flag := 0
-		t := newTransacter(e, connections, len(count[allshard[i]])/T, txSize, allshard[i], allshard, relayrate, count[allshard[i]], flag, broadcastTxMethod)//这一句是与每个端口间建立一个transacter
+		t := newTransacter(e, connections, CompareData(len(count[allshard[i]])/T,len(count[allshard[i]])), txSize, allshard[i], allshard, relayrate, count[allshard[i]], flag, broadcastTxMethod,T)//这一句是与每个端口间建立一个transacter
 		t.SetLogger(logger)
 		go func(i int) {
 			defer iwg.Done()

@@ -86,7 +86,7 @@ func (accountLog *AccountLog) Check() bool {
 	}
 	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
 		//fmt.Println("接收方账户不存在")
-		logger.Error("接收方账户不存在")
+		//logger.Error("接收方账户不存在")
 		// 关闭查雨捷的交易合法性验证
 		//return false
 		return true
@@ -176,7 +176,7 @@ func _parseTx(tx []byte) *AccountLog {
 		// logger.Error("交易解析失败")
 		return nil
 	}
-	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
+		if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
 		accountLog.TxType = txArgs.TxType
 		return accountLog
 	}
