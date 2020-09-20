@@ -7,14 +7,22 @@
 package account
 
 import (
-	"crypto/sha256"
-	"encoding/json"
-	"fmt"
-	dbm "github.com/tendermint/tendermint/libs/db"
-	"github.com/tendermint/tendermint/libs/log"
-	"strconv"
-	"strings"
-	"time"
+    "crypto/ecdsa"
+    "crypto/elliptic"
+    crand "crypto/rand"
+    "crypto/sha256"
+    "crypto/x509"
+    "encoding/hex"
+    "encoding/json"
+    "encoding/pem"
+    "fmt"
+    "math/big"
+    "os"
+    "strconv"
+    "strings"
+
+    dbm "github.com/tendermint/tendermint/libs/db"
+    "github.com/tendermint/tendermint/libs/log"
 )
 
 /*
@@ -141,6 +149,20 @@ func (accountLog *AccountLog) Save() {
 var db dbm.DB
 var logger log.Logger
 
+// 最新快照
+var snapshot Snapshot
+
+// 快照缓存
+var snapshotCache = make(map[string]int)
+
+var SNAPSHOT_INTERVAL = 10
+
+var IsNewPeer = true
+
+var SnapshotHash string
+
+var SnapshotVersion = "v3.0"
+
 // 获取db和logger句柄
 func InitAccountDB(db1 dbm.DB, logger1 log.Logger) {
 	db = db1
@@ -265,3 +287,240 @@ func _byte2digit(digitByte []byte) int {
 func _digit2byte(num int) []byte {
 	return []byte(strconv.Itoa(num))
 }
+
+// 生成快照 v1.0版本
+func GenerateSnapshot(version int64) {
+    newSnapshot := Snapshot{}
+    newSnapshot.Version = version
+    // 快照内容，仅供测试
+    newSnapshot.Content = GetAllStates()
+    snapshot = newSnapshot
+}
+
+// 生成快照 v2.0版本
+func GenerateSnapshotFast(version int64) {
+    // 如果当前快照不存在，则初始化
+    if snapshot.Content == nil {
+        snapshot.Content = make(map[string]string)
+    }
+
+    tempSnapshotCache := snapshotCache
+    // 清空缓存
+    snapshotCache = make(map[string]int)
+    // 当前快照内容
+
+    // 增量合并快照
+    for k, v := range tempSnapshotCache {
+        oldVal, _ := strconv.Atoi(snapshot.Content[k])
+        snapshot.Content[k] = strconv.Itoa(oldVal + v)
+    }
+    snapshot.Version = version
+
+    snapshotByte, _ := json.Marshal(snapshot)
+    logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
+}
+
+// 生成快照 v3.0版本
+func GenerateSnapshotWithSecurity(version int64) {
+    // 如果当前快照不存在，则初始化
+    if snapshot.Content == nil {
+        snapshot.Content = make(map[string]string)
+    }
+    tempSnapshotCache := snapshotCache
+    // 清空缓存
+    snapshotCache = make(map[string]int)
+    // 当前快照内容
+
+    // 增量合并快照
+    for k, v := range tempSnapshotCache {
+        oldVal, _ := strconv.Atoi(snapshot.Content[k])
+        snapshot.Content[k] = strconv.Itoa(oldVal + v)
+    }
+    snapshot.Version = version
+
+    snapshotByte, _ := json.Marshal(snapshot)
+    logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
+
+    // TODO: 增加签名
+    hash := DoHash(string(snapshotByte))
+    logger.Info("快照hash:", "hash", hash)
+    SnapshotHash = hash
+}
+
+// 获取所有状态集合
+func GetAllStates() map[string]string {
+    //n := 10000
+    kvMaps := make(map[string]string)
+    iter := db.Iterator([]byte("0"), []byte("z"))
+    for iter.Valid() {
+        key := string(iter.Key())
+        val := string(iter.Value())
+        kvMaps[key] = val
+        //fmt.Println(iter.Valid())
+        iter.Next()
+    }
+    // 测试使用，作为快照集合
+    //for i := 0; i < n; i++ {
+    //    address := _geneateRandomStr(32)
+    //    t := md5.Sum([]byte(address))
+    //    md5str := fmt.Sprintf("%x", t)
+    //    //amout := rand.Intn(100)
+    //    kvMaps[address] = md5str
+    //    SetState([]byte(md5str), []byte(md5str))
+    //}
+    return kvMaps
+}
+
+// 获取快照
+func GetSnapshot() Snapshot {
+    return snapshot
+}
+
+// 更新快照
+func SetSnapshot(newSnapshot Snapshot) {
+    snapshot = newSnapshot
+}
+
+// 更新状态
+func SetState(key []byte, val []byte) {
+    if db != nil {
+        //blockExec.db.SetSync(key, val);
+        db.Set(key, val)
+    }
+}
+
+// Hash算法 sha256: 生成的16进制字符串长度为32，大小为256bit
+func DoHash(text string) string {
+    hash := sha256.New()
+    hash.Write([]byte(text))
+    res := hash.Sum(nil)
+    return hex.EncodeToString(res)
+}
+
+// 签名 ECDSA
+func Sign(text string, priKeyPath string) ([]byte, []byte) {
+    //1，打开私钥文件，读出内容
+    file, err := os.Open(priKeyPath)
+    if err != nil {
+        panic(err)
+    }
+    info, err := file.Stat()
+    buf := make([]byte, info.Size())
+    file.Read(buf)
+    //2,pem解密
+    block, _ := pem.Decode(buf)
+    //x509解密
+    privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+    if err != nil {
+        panic(err)
+    }
+    //数字签名
+    r, s, err := ecdsa.Sign(crand.Reader, privateKey, []byte(text))
+    if err != nil {
+        panic(err)
+    }
+    rText, err := r.MarshalText()
+    if err != nil {
+        panic(err)
+    }
+    sText, err := s.MarshalText()
+    if err != nil {
+        panic(err)
+    }
+    defer file.Close()
+    return rText, sText
+}
+
+// 验证签名
+func Verify(rText []byte, sText []byte, text string, pubKeyPath string) bool {
+    file, err := os.Open(pubKeyPath)
+    if err != nil {
+        panic(err)
+    }
+    info, err := file.Stat()
+    if err != nil {
+        panic(err)
+    }
+    buf := make([]byte, info.Size())
+    file.Read(buf)
+    //pem解码
+    block, _ := pem.Decode(buf)
+
+    //x509
+    publicStream, err := x509.ParsePKIXPublicKey(block.Bytes)
+    if err != nil {
+        panic(err)
+    }
+    //接口转换成公钥
+    publicKey := publicStream.(*ecdsa.PublicKey)
+    var r, s big.Int
+    r.UnmarshalText(rText)
+    s.UnmarshalText(sText)
+    //认证
+    res := ecdsa.Verify(publicKey, []byte(text), &r, &s)
+    defer file.Close()
+    return res
+}
+
+// 生成ECDSA密钥对
+func GenerateKey(priKeyPath string, pubKeyPath string) error {
+    //使用ecdsa生成密钥对
+    privateKey, err := ecdsa.GenerateKey(elliptic.P521(), crand.Reader)
+    if err != nil {
+        return err
+    }
+    //使用509
+    private, err := x509.MarshalECPrivateKey(privateKey) //此处
+    if err != nil {
+        return err
+    }
+    //pem
+    block := pem.Block{
+        Type:  "esdsa private key",
+        Bytes: private,
+    }
+    file, err := os.Create(priKeyPath)
+    if err != nil {
+        return err
+    }
+    err = pem.Encode(file, &block)
+    if err != nil {
+        return err
+    }
+    file.Close()
+
+    //处理公钥
+    public := privateKey.PublicKey
+
+    //x509序列化
+    publicKey, err := x509.MarshalPKIXPublicKey(&public)
+    if err != nil {
+        return err
+    }
+    //pem
+    public_block := pem.Block{
+        Type:  "ecdsa public key",
+        Bytes: publicKey,
+    }
+    file, err = os.Create(pubKeyPath)
+    if err != nil {
+        return err
+    }
+    //pem编码
+    err = pem.Encode(file, &public_block)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+/**
+ * 设置快照算法版本
+ */
+func SetSnapshotVersion(version string) {
+    if version == "v1.0" || version == "v2.0" || version == "v3.0" {
+        SnapshotVersion = version
+    }
+    fmt.Println("快照生成算法版本为: " + SnapshotVersion)
+}
+
