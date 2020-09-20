@@ -115,21 +115,21 @@ func validateBlock(evidencePool EvidencePool, stateDB dbm.DB, state State, block
 			)
 		}
 
-		medianTime := MedianTime(block.LastCommit, state.LastValidators)
-		if !block.Time.Equal(medianTime) {
-			return fmt.Errorf("Invalid block time. Expected %v, got %v",
-				medianTime,
-				block.Time,
-			)
-		}
+		//medianTime := MedianTime(block.LastCommit, state.LastValidators)
+		//if !block.Time.Equal(medianTime) {
+		//	return fmt.Errorf("Invalid block time. Expected %v, got %v",
+		//		medianTime,
+		//		block.Time,
+		//	)
+		//}
 	} else if block.Height == 1 {
-		genesisTime := state.LastBlockTime
-		if !block.Time.Equal(genesisTime) {
-			return fmt.Errorf("Block time %v is not equal to genesis time %v",
-				block.Time,
-				genesisTime,
-			)
-		}
+		//genesisTime := state.LastBlockTime
+		//if !block.Time.Equal(genesisTime) {
+		//	return fmt.Errorf("Block time %v is not equal to genesis time %v",
+		//		block.Time,
+		//		genesisTime,
+		//	)
+		//}
 	}
 
 	// Limit the amount of evidence
