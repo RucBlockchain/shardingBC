@@ -20,7 +20,7 @@ import (
     "os"
     "strconv"
     "strings"
-
+    "time"
     dbm "github.com/tendermint/tendermint/libs/db"
     "github.com/tendermint/tendermint/libs/log"
 )
@@ -140,7 +140,11 @@ func (accountLog *AccountLog) Save() {
 	}
 	// logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
 }
-
+// 快照数据结构
+type Snapshot struct {
+    Version int64             // 版本
+    Content map[string]string // 内容
+}
 /*
  * 静态函数和私有函数
  */

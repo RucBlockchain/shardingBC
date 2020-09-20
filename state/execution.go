@@ -9,7 +9,6 @@ import (
 	"time"
 	account "github.com/tendermint/tendermint/account"
 	"github.com/gorilla/websocket"
-	"github.com/tendermint/tendermint/account"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 
 	abci "github.com/tendermint/tendermint/abci/types"
