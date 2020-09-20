@@ -21,6 +21,7 @@ import (
     "strconv"
     "strings"
     "time"
+
     dbm "github.com/tendermint/tendermint/libs/db"
     "github.com/tendermint/tendermint/libs/log"
 )
@@ -144,14 +145,14 @@ func (accountLog *AccountLog) Save() {
     //balanceB := _getState([]byte(accountLog.To))
     //logger.Error(accountLog.From + "账户余额: " + string(balanceA) + ", " + accountLog.To + "账户余额: " + string(balanceB))
     statesByte, _ := json.Marshal(GetAllStates())
-    logger.Error(cmn.Fmt("状态集合为: %v", string(statesByte)))
+    logger.Error(fmt.Sprintf("状态集合为: %v", string(statesByte)))
 
     // 快照增量缓存
     SetSnapshotCache(accountLog.From, accountLog.Amount, false)
     SetSnapshotCache(accountLog.To, accountLog.Amount, true)
 
     cacheByte, _ := json.Marshal(snapshotCache)
-    logger.Error(cmn.Fmt("快照缓存集合为: %v", string(cacheByte)))
+    logger.Error(fmt.Sprintf("快照缓存集合为: %v", string(cacheByte)))
 	// logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
 }
 // 快照数据结构

@@ -615,7 +615,7 @@ func execBlockOnProxyApp(
 		 * @Desc: update state
 		 * @Date: 19.11.10
 		 */
-		accountLog := account. g(tx)
+		accountLog := account.NewAccountLog(tx)
 		if accountLog != nil {
 			accountLog.Save()
 		}
