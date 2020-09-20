@@ -147,7 +147,6 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	currentHeight := block.Height - 1
 	if currentHeight > 0 && int(currentHeight)%account.SNAPSHOT_INTERVAL == 0 {
 		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
-		time.Sleep(time.Second * 5)
 		if account.SnapshotVersion == "v1.0" {
 			// 快照生成v1.0
 			account.GenerateSnapshot(block.Height - 1)
@@ -616,7 +615,7 @@ func execBlockOnProxyApp(
 		 * @Desc: update state
 		 * @Date: 19.11.10
 		 */
-		accountLog := account.NewAccountLog(tx)
+		accountLog := account. g(tx)
 		if accountLog != nil {
 			accountLog.Save()
 		}
