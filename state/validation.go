@@ -32,60 +32,60 @@ func validateBlock(evidencePool EvidencePool, stateDB dbm.DB, state State, block
 			block.ChainID,
 		)
 	}
-	if block.Height != state.LastBlockHeight+1 {
-		return fmt.Errorf("Wrong Block.Header.Height. Expected %v, got %v",
-			state.LastBlockHeight+1,
-			block.Height,
-		)
-	}
+	//if block.Height != state.LastBlockHeight+1 {
+	//	return fmt.Errorf("Wrong Block.Header.Height. Expected %v, got %v",
+	//		state.LastBlockHeight+1,
+	//		block.Height,
+	//	)
+	//}
+	//
+	//// Validate prev block info.
+	//if !block.LastBlockID.Equals(state.LastBlockID) {
+	//	return fmt.Errorf("Wrong Block.Header.LastBlockID.  Expected %v, got %v",
+	//		state.LastBlockID,
+	//		block.LastBlockID,
+	//	)
+	//}
 
-	// Validate prev block info.
-	if !block.LastBlockID.Equals(state.LastBlockID) {
-		return fmt.Errorf("Wrong Block.Header.LastBlockID.  Expected %v, got %v",
-			state.LastBlockID,
-			block.LastBlockID,
-		)
-	}
-
-	newTxs := int64(len(block.Data.Txs))
-	if block.TotalTxs != state.LastBlockTotalTx+newTxs {
-		return fmt.Errorf("Wrong Block.Header.TotalTxs. Expected %v, got %v",
-			state.LastBlockTotalTx+newTxs,
-			block.TotalTxs,
-		)
-	}
-
-	// Validate app info
-	if !bytes.Equal(block.AppHash, state.AppHash) {
-		return fmt.Errorf("Wrong Block.Header.AppHash.  Expected %X, got %v",
-			state.AppHash,
-			block.AppHash,
-		)
-	}
-	if !bytes.Equal(block.ConsensusHash, state.ConsensusParams.Hash()) {
-		return fmt.Errorf("Wrong Block.Header.ConsensusHash.  Expected %X, got %v",
-			state.ConsensusParams.Hash(),
-			block.ConsensusHash,
-		)
-	}
-	if !bytes.Equal(block.LastResultsHash, state.LastResultsHash) {
-		return fmt.Errorf("Wrong Block.Header.LastResultsHash.  Expected %X, got %v",
-			state.LastResultsHash,
-			block.LastResultsHash,
-		)
-	}
-	if !bytes.Equal(block.ValidatorsHash, state.Validators.Hash()) {
-		return fmt.Errorf("Wrong Block.Header.ValidatorsHash.  Expected %X, got %v",
-			state.Validators.Hash(),
-			block.ValidatorsHash,
-		)
-	}
-	if !bytes.Equal(block.NextValidatorsHash, state.NextValidators.Hash()) {
-		return fmt.Errorf("Wrong Block.Header.NextValidatorsHash.  Expected %X, got %v",
-			state.NextValidators.Hash(),
-			block.NextValidatorsHash,
-		)
-	}
+	//newTxs := int64(len(block.Data.Txs))
+	//if block.TotalTxs != state.LastBlockTotalTx+newTxs {
+	//	return fmt.Errorf("Wrong Block.Header.TotalTxs. Expected %v, got %v",
+	//		state.LastBlockTotalTx+newTxs,
+	//		block.TotalTxs,
+	//	)
+	//}
+	//
+	//// Validate app info
+	//if !bytes.Equal(block.AppHash, state.AppHash) {
+	//	return fmt.Errorf("Wrong Block.Header.AppHash.  Expected %X, got %v",
+	//		state.AppHash,
+	//		block.AppHash,
+	//	)
+	//}
+	//if !bytes.Equal(block.ConsensusHash, state.ConsensusParams.Hash()) {
+	//	return fmt.Errorf("Wrong Block.Header.ConsensusHash.  Expected %X, got %v",
+	//		state.ConsensusParams.Hash(),
+	//		block.ConsensusHash,
+	//	)
+	//}
+	//if !bytes.Equal(block.LastResultsHash, state.LastResultsHash) {
+	//	return fmt.Errorf("Wrong Block.Header.LastResultsHash.  Expected %X, got %v",
+	//		state.LastResultsHash,
+	//		block.LastResultsHash,
+	//	)
+	//}
+	//if !bytes.Equal(block.ValidatorsHash, state.Validators.Hash()) {
+	//	return fmt.Errorf("Wrong Block.Header.ValidatorsHash.  Expected %X, got %v",
+	//		state.Validators.Hash(),
+	//		block.ValidatorsHash,
+	//	)
+	//}
+	//if !bytes.Equal(block.NextValidatorsHash, state.NextValidators.Hash()) {
+	//	return fmt.Errorf("Wrong Block.Header.NextValidatorsHash.  Expected %X, got %v",
+	//		state.NextValidators.Hash(),
+	//		block.NextValidatorsHash,
+	//	)
+	//}
 
 	// Validate block LastCommit.
 	if block.Height == 1 {
@@ -93,17 +93,17 @@ func validateBlock(evidencePool EvidencePool, stateDB dbm.DB, state State, block
 			return errors.New("Block at height 1 can't have LastCommit precommits")
 		}
 	} else {
-		if len(block.LastCommit.Precommits) != state.LastValidators.Size() {
-			return fmt.Errorf("Invalid block commit size. Expected %v, got %v",
-				state.LastValidators.Size(),
-				len(block.LastCommit.Precommits),
-			)
-		}
-		err := state.LastValidators.VerifyCommit(
-			state.ChainID, state.LastBlockID, block.Height-1, block.LastCommit)
-		if err != nil {
-			return err
-		}
+		//if len(block.LastCommit.Precommits) != state.LastValidators.Size() {
+		//	return fmt.Errorf("Invalid block commit size. Expected %v, got %v",
+		//		state.LastValidators.Size(),
+		//		len(block.LastCommit.Precommits),
+		//	)
+		//}
+		//err := state.LastValidators.VerifyCommit(
+		//	state.ChainID, state.LastBlockID, block.Height-1, block.LastCommit)
+		//if err != nil {
+		//	return err
+		//}
 	}
 
 	// Validate block Time
@@ -133,32 +133,32 @@ func validateBlock(evidencePool EvidencePool, stateDB dbm.DB, state State, block
 	}
 
 	// Limit the amount of evidence
-	maxNumEvidence, _ := types.MaxEvidencePerBlock(state.ConsensusParams.Block.MaxBytes)
-	numEvidence := int64(len(block.Evidence.Evidence))
-	if numEvidence > maxNumEvidence {
-		return types.NewErrEvidenceOverflow(maxNumEvidence, numEvidence)
-
-	}
-
-	// Validate all evidence.
-	for _, ev := range block.Evidence.Evidence {
-		if err := VerifyEvidence(stateDB, state, ev); err != nil {
-			return types.NewErrEvidenceInvalid(ev, err)
-		}
-		if evidencePool != nil && evidencePool.IsCommitted(ev) {
-			return types.NewErrEvidenceInvalid(ev, errors.New("evidence was already committed"))
-		}
-	}
-
-	// NOTE: We can't actually verify it's the right proposer because we dont
-	// know what round the block was first proposed. So just check that it's
-	// a legit address and a known validator.
-	if len(block.ProposerAddress) != crypto.AddressSize ||
-		!state.Validators.HasAddress(block.ProposerAddress) {
-		return fmt.Errorf("Block.Header.ProposerAddress, %X, is not a validator",
-			block.ProposerAddress,
-		)
-	}
+	//maxNumEvidence, _ := types.MaxEvidencePerBlock(state.ConsensusParams.Block.MaxBytes)
+	//numEvidence := int64(len(block.Evidence.Evidence))
+	//if numEvidence > maxNumEvidence {
+	//	return types.NewErrEvidenceOverflow(maxNumEvidence, numEvidence)
+	//
+	//}
+	//
+	//// Validate all evidence.
+	//for _, ev := range block.Evidence.Evidence {
+	//	if err := VerifyEvidence(stateDB, state, ev); err != nil {
+	//		return types.NewErrEvidenceInvalid(ev, err)
+	//	}
+	//	if evidencePool != nil && evidencePool.IsCommitted(ev) {
+	//		return types.NewErrEvidenceInvalid(ev, errors.New("evidence was already committed"))
+	//	}
+	//}
+	//
+	//// NOTE: We can't actually verify it's the right proposer because we dont
+	//// know what round the block was first proposed. So just check that it's
+	//// a legit address and a known validator.
+	//if len(block.ProposerAddress) != crypto.AddressSize ||
+	//	!state.Validators.HasAddress(block.ProposerAddress) {
+	//	return fmt.Errorf("Block.Header.ProposerAddress, %X, is not a validator",
+	//		block.ProposerAddress,
+	//	)
+	//}
 
 	return nil
 }

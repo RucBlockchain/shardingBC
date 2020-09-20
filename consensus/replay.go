@@ -356,14 +356,15 @@ func (h *Handshaker) ReplayBlocks(
 		// the app should never be ahead of the store (but this is under app's control)
 		return appHash, sm.ErrAppBlockHeightTooHigh{CoreHeight: storeBlockHeight, AppHeight: appBlockHeight}
 
-	} else if storeBlockHeight < stateBlockHeight {
-		// the state should never be ahead of the store (this is under tendermint's control)
-		cmn.PanicSanity(fmt.Sprintf("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
-
-	} else if storeBlockHeight > stateBlockHeight+1 {
-		// store should be at most one ahead of the state (this is under tendermint's control)
-		cmn.PanicSanity(fmt.Sprintf("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
 	}
+	//else if storeBlockHeight < stateBlockHeight {
+	//	// the state should never be ahead of the store (this is under tendermint's control)
+	//	cmn.PanicSanity(fmt.Sprintf("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
+	//
+	//} else if storeBlockHeight > stateBlockHeight+1 {
+	//	// store should be at most one ahead of the state (this is under tendermint's control)
+	//	cmn.PanicSanity(fmt.Sprintf("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
+	//}
 
 	var err error
 	// Now either store is equal to state, or one ahead.
@@ -411,8 +412,14 @@ func (h *Handshaker) ReplayBlocks(
 
 	}
 
-	cmn.PanicSanity("Should never happen")
-	return nil, nil
+	/*
+    * @Author: zyj
+    * @Desc: 移除区块校验报错
+    * @Date: 19.11.24
+    */
+	//cmn.PanicSanity("Should never happen")
+	//return nil, nil
+	return appHash, nil
 }
 
 func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBlockHeight, storeBlockHeight int64, mutateState bool) ([]byte, error) {
