@@ -108,7 +108,7 @@ Examples:
 	for i:=0;i<len(endpoints);i++{
 		clients[i] = tmrpc.NewHTTP(endpoints[i], "/websocket")
 		initHeights[i] = latestBlockHeight(clients[i])
-		//fmt.Println("获取区块高度",initHeights[i])
+		// fmt.Println("获取区块高度",initHeights[i])
 	}
 	//得到各分片链的初始化高度
 	//logger.Info("Latest block height", "h", initialHeight)
@@ -181,6 +181,7 @@ Examples:
 		//在这里打印统计结果，说明已经统计完全，可以进行公式计算
 		//计算totaltxs 与 crosstxs
 		realtxs +=stats.TxsThroughput.Sum()
+		// fmt.Println("交易数量",stats.TxsThroughput.Sum(),i)
 		//printStatistics(stats, outputFormat)
 	}
 	var TPS float64

@@ -29,8 +29,8 @@ func calculateStatistics(
 	plustx int64,
 ) (*statistics, error) {
 		//fmt.Println(timeStart)
-	timesub,_:=time.ParseDuration("-1s")
-		timeStart=timeStart.Add(timesub)
+	// timesub,_:=time.ParseDuration("-1s")
+	// 	timeStart=timeStart.Add(timesub)
 	//timeStart=timeStart.Add(time.Second)
 	timeEnd := timeStart.Add(time.Duration(duration) * time.Second)
 	stats := &statistics{

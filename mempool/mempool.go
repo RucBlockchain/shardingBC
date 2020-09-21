@@ -118,7 +118,10 @@ func IsPreCheckError(err error) bool {
 	_, ok := err.(ErrPreCheck)
 	return ok
 }
-
+func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
+	fmt.Printf("[tx_phase%d] tx_id:%X time:%s\n",phase,tx_id,time)
+	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
+}
 // PreCheckAminoMaxBytes checks that the size of the transaction plus the amino
 // overhead is smaller or equal to the expected maxBytes.
 func PreCheckAminoMaxBytes(maxBytes int64) PreCheckFunc {
@@ -535,18 +538,18 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 		if cm.SrcZone == getShard() {
 			//收到状态数据库的回执f
 			//fmt.Println("收到回执", string(tx))
-			//fmt.Println("收到回执并且执行删除",cm.Packages)
+			// fmt.Println("收到回执并且执行删除",cm.Packages)
 			mem.ModifyCrossMessagelist(cm)
 			return "回执"
 		}
-		//fmt.Println("收到", "SrcZone",cm.SrcZone,"DesZone",cm.DesZone,"Height",cm.Height,"root",string(cm.CrossMerkleRoot))
+		// fmt.Println("收到", "SrcZone",cm.SrcZone,"DesZone",cm.DesZone,"Height",cm.Height,"root",string(cm.CrossMerkleRoot))
 
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
 			name := dbtx.SrcZone + "S" + cm.SrcIndex + ":26657"
 			//	fmt.Println("发送",name)
-			//	fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
+				// fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
 			//)
 			tx_package := []*tp.CrossMessages{}
 			tx_package = append(tx_package, dbtx)
@@ -622,7 +625,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	}
 	if len(cm.Packages) > 0 {
 		//mem.logger.Error("待删除包数量非0，删除对应的包")
-		//mem.ModifyCrossMessagelist(cm)
+		mem.ModifyCrossMessagelist(cm)
 	}
 	//fmt.Println("聚合签名与解压完成")
 	//mem.logger.Error("修改cmdb完成")
@@ -811,12 +814,15 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	if cm := ParseData(tx); cm != nil {
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb {
+			phase := 22
+			fmt.Printf("[tx_phase%d] time:%s\n",phase,strconv.FormatInt(time.Now().UnixNano(), 10))
 			if result := mem.CheckCrossMessage(cm); result != nil {
 				return result
 			}
+			phase = 23
+			fmt.Printf("[tx_phase%d] time:%s\n",phase,strconv.FormatInt(time.Now().UnixNano(), 10))
 		}
 	} else {
-
 		accountLog := account.NewAccountLog(tx)//判断是否是leader再输出
 		if accountLog == nil {
 			return errors.New("交易解析失败")
@@ -1065,7 +1071,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	//区块能取到最大的数量，最大gas值
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
-	mem.logger.Error("reap txs")
+	//mem.logger.Error("reap txs")
 	for atomic.LoadInt32(&mem.rechecking) > 0 {
 		// TODO: Something better?
 		time.Sleep(time.Millisecond * 10)
@@ -1104,6 +1110,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 				if err != nil {
 					mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 				}
+				
 				if tmp_tx.Txtype == "relaytx" {
 					byte_txlist = append(byte_txlist, cm.Txlist[i])
 				}
@@ -1138,6 +1145,13 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			totalGas = newTotalGas
 			//做测试
+			for i := 0; i < len(byte_txlist); i++ {
+				tmp_tx1, err := tp.NewTX(byte_txlist[i])
+				if err != nil {
+					mem.logger.Error("Unmarshall tp.TX error, err: ", err)
+				}
+				mem.logger.Info(TimePhase(41,tmp_tx1.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第21阶段打印
+			}
 			txs = append(txs, byte_txlist...)
 		} else {
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
@@ -1156,6 +1170,11 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 				return txs
 			}
 			totalGas = newTotalGas
+			tmp_tx, err := tp.NewTX(memTx.tx)
+			if err != nil {
+				mem.logger.Error("Unmarshall tp.TX error, err: ", err)
+			}
+			mem.logger.Info(TimePhase(21,tmp_tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第21阶段打印
 			txs = append(txs, memTx.tx)
 		}
 
@@ -1167,6 +1186,11 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 // If max is negative, there is no cap on the size of all returned
 // transactions (~ all available transactions).
 func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
+
+    mem.logger.Info("reap走这里")
+    fmt.Println("reap走这里") 
+    mem.logger.Error("reap走这里")
+
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
 
@@ -1178,7 +1202,6 @@ func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 		// TODO: Something better?
 		time.Sleep(time.Millisecond * 10)
 	}
-
 	txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max))
 	for e := mem.txs.Front(); e != nil && len(txs) <= max; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)

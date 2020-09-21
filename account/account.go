@@ -57,7 +57,7 @@ func (accountLog *AccountLog) Check() bool {
 	from := accountLog.From
 	to := accountLog.To
 	amount := accountLog.Amount
-	t := accountLog.Time
+	t := accountLog.Time //阶段打印使用
 	if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
 
 		return true
