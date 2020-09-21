@@ -180,7 +180,7 @@ var IsNewPeer = true
 
 var SnapshotHash string
 
-var SnapshotVersion = "v3.0"
+var SnapshotVersion = ""
 
 // 获取db和logger句柄
 func InitAccountDB(db1 dbm.DB, logger1 log.Logger) {

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
+	account "github.com/tendermint/tendermint/account"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	flow "github.com/tendermint/tendermint/libs/flowrate"
 	"github.com/tendermint/tendermint/libs/log"
@@ -110,21 +110,23 @@ func (pool *BlockPool) makeRequestersRoutine() {
      * @Desc: pool启动时即同步快照和当前版本，height=-1
      * @Date: 19.11.24
      */
-	pool.Logger.Error("新节点加入，请求同步快照")
-	for ; ; {
-		if len(pool.peers) > 0 {
-			break
-		}
-		time.Sleep(100 * time.Microsecond)
-	}
-	for _, peer := range pool.peers {
-		pool.Logger.Error("发送消息给邻居节点", peer.id)
-		pool.requestsCh <- BlockRequest{-1, peer.id}
-		break
-	}
-	time.Sleep(time.Second * 10)
-	pool.Logger.Error("节点开始同步区块")
-	pool.Logger.Error(fmt.Sprintf("当前高度为: %v", pool.height))
+     if (account.SnapshotVersion != "") {
+		 pool.Logger.Error("新节点加入，请求同步快照")
+		 for ; ; {
+			 if len(pool.peers) > 0 {
+				 break
+			 }
+			 time.Sleep(100 * time.Microsecond)
+		 }
+		 for _, peer := range pool.peers {
+			 pool.Logger.Error("发送消息给邻居节点", peer.id)
+			 pool.requestsCh <- BlockRequest{-1, peer.id}
+			 break
+		 }
+		 time.Sleep(time.Second * 10)
+		 pool.Logger.Error("节点开始同步区块")
+		 pool.Logger.Error(fmt.Sprintf("当前高度为: %v", pool.height))
+	 }
 	// ------------------------------------------------------
 
 	for {

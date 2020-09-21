@@ -145,7 +145,7 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
      * @Date: 19.01.04
      */
 	currentHeight := block.Height - 1
-	if currentHeight > 0 && int(currentHeight)%account.SNAPSHOT_INTERVAL == 0 {
+	if currentHeight > 0 && int(currentHeight)%account.SNAPSHOT_INTERVAL == 0 && account.SnapshotVersion != "" {
 		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
 		if account.SnapshotVersion == "v1.0" {
 			// 快照生成v1.0
