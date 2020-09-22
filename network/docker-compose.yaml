@@ -14,7 +14,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=2d9d95ffdbed8a297e1673b371bcb6f076dbc739@0S5:26656,3e661dacebafe1e35ef3e00f337969d029f2faad@0S3:26656,bcd0e6b8f945418882d874507991240b63c3a3fc@0S2:26656
+    - tendermint node --p2p.persistent_peers=8c85ad409b7001d3fb5b9c9a4f711e0d405121a2@0S5:26656,d02a654b54c70686389e9b6a971b439d8998b898@0S3:26656,0eeb6b3dae3e46db55c828020495c2c092899155@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -39,7 +39,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=d36ff7f255ca6f8192eb301e4d2a61742247723a@0S1:26656,2679d9549f50a27638ce1976d1083948235938a3@0S4:26656,06bf3047a7bcfe716b5a0f14e87643cb70b0eabe@0S6:26656
+    - tendermint node --p2p.persistent_peers=4d823edc7f0dc78883f2992ce661d872b76d8908@0S1:26656,9ce73754ee8e62536bffa654ec11513b53d83b5b@0S4:26656,b68f3365f4e61602eaaa2ee8d9c25d0ce1a4c920@0S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -66,7 +66,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=d36ff7f255ca6f8192eb301e4d2a61742247723a@0S1:26656,328e1ac065348c5c274c45b40ca05db49b84525d@0S7:26656,2679d9549f50a27638ce1976d1083948235938a3@0S4:26656
+    - tendermint node --p2p.persistent_peers=4d823edc7f0dc78883f2992ce661d872b76d8908@0S1:26656,7daff37ff07a8e32653b78fc930b9f38f2976905@0S7:26656,9ce73754ee8e62536bffa654ec11513b53d83b5b@0S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -93,7 +93,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=3e661dacebafe1e35ef3e00f337969d029f2faad@0S3:26656,bcd0e6b8f945418882d874507991240b63c3a3fc@0S2:26656,b96d065a04a673cbc611a20bbd57ddd1a503638d@0S8:26656
+    - tendermint node --p2p.persistent_peers=d02a654b54c70686389e9b6a971b439d8998b898@0S3:26656,0eeb6b3dae3e46db55c828020495c2c092899155@0S2:26656,9359f51fab2fec581dda5113d37f081126899f06@0S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -120,7 +120,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=d36ff7f255ca6f8192eb301e4d2a61742247723a@0S1:26656,328e1ac065348c5c274c45b40ca05db49b84525d@0S7:26656,06bf3047a7bcfe716b5a0f14e87643cb70b0eabe@0S6:26656
+    - tendermint node --p2p.persistent_peers=4d823edc7f0dc78883f2992ce661d872b76d8908@0S1:26656,7daff37ff07a8e32653b78fc930b9f38f2976905@0S7:26656,b68f3365f4e61602eaaa2ee8d9c25d0ce1a4c920@0S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -147,7 +147,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=2d9d95ffdbed8a297e1673b371bcb6f076dbc739@0S5:26656,b96d065a04a673cbc611a20bbd57ddd1a503638d@0S8:26656,bcd0e6b8f945418882d874507991240b63c3a3fc@0S2:26656
+    - tendermint node --p2p.persistent_peers=8c85ad409b7001d3fb5b9c9a4f711e0d405121a2@0S5:26656,9359f51fab2fec581dda5113d37f081126899f06@0S8:26656,0eeb6b3dae3e46db55c828020495c2c092899155@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -174,7 +174,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=2d9d95ffdbed8a297e1673b371bcb6f076dbc739@0S5:26656,3e661dacebafe1e35ef3e00f337969d029f2faad@0S3:26656,b96d065a04a673cbc611a20bbd57ddd1a503638d@0S8:26656
+    - tendermint node --p2p.persistent_peers=8c85ad409b7001d3fb5b9c9a4f711e0d405121a2@0S5:26656,d02a654b54c70686389e9b6a971b439d8998b898@0S3:26656,9359f51fab2fec581dda5113d37f081126899f06@0S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -201,7 +201,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=2679d9549f50a27638ce1976d1083948235938a3@0S4:26656,06bf3047a7bcfe716b5a0f14e87643cb70b0eabe@0S6:26656,328e1ac065348c5c274c45b40ca05db49b84525d@0S7:26656
+    - tendermint node --p2p.persistent_peers=9ce73754ee8e62536bffa654ec11513b53d83b5b@0S4:26656,b68f3365f4e61602eaaa2ee8d9c25d0ce1a4c920@0S6:26656,7daff37ff07a8e32653b78fc930b9f38f2976905@0S7:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -229,7 +229,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=15ce7166d68e682904c7a8fbab8936f34f4028c1@1S5:26656,aa5f7fda1a811a89550f2ae03a681901e2c3d050@1S3:26656,e43e3c1f76cd32d390d07d5d71b69970cd617887@1S2:26656
+    - tendermint node --p2p.persistent_peers=492d3555185cbad89d5aad622481aa1b239d1bab@1S5:26656,4dbbb2c3cac1edaa8133f6f47e505cad88a5425b@1S3:26656,0dc56f400dd6fb60b2dfbed4be7104a92909aa33@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -254,7 +254,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=696550106791b38dd39e2d0746fc565f4826de42@1S1:26656,2791aaee415a19eb646823dde39c2dad24f80764@1S4:26656,61754d658e9c189adcee60713ec12ac5b7db9bd7@1S6:26656
+    - tendermint node --p2p.persistent_peers=bce6f3dd261370db14bb42eaf1f8a48588274187@1S1:26656,90ee6519cfa53c9139500a104ae1630e3b28e684@1S4:26656,e75e088dcac3d0ed4c38615d6a36c2b3657cc2d3@1S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -281,7 +281,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=696550106791b38dd39e2d0746fc565f4826de42@1S1:26656,cf76ba79afb51e6791466431b843493d70784238@1S7:26656,2791aaee415a19eb646823dde39c2dad24f80764@1S4:26656
+    - tendermint node --p2p.persistent_peers=bce6f3dd261370db14bb42eaf1f8a48588274187@1S1:26656,4c0adc8f4c642409da97f815a8cd82dd36bc23b1@1S7:26656,90ee6519cfa53c9139500a104ae1630e3b28e684@1S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -308,7 +308,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=aa5f7fda1a811a89550f2ae03a681901e2c3d050@1S3:26656,e43e3c1f76cd32d390d07d5d71b69970cd617887@1S2:26656,d489de84f162f30313c148c213ff6a581a1c2c91@1S8:26656
+    - tendermint node --p2p.persistent_peers=4dbbb2c3cac1edaa8133f6f47e505cad88a5425b@1S3:26656,0dc56f400dd6fb60b2dfbed4be7104a92909aa33@1S2:26656,0644e15c6ddbd347205c7f238fd835eb74d9412c@1S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -335,7 +335,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=696550106791b38dd39e2d0746fc565f4826de42@1S1:26656,cf76ba79afb51e6791466431b843493d70784238@1S7:26656,61754d658e9c189adcee60713ec12ac5b7db9bd7@1S6:26656
+    - tendermint node --p2p.persistent_peers=bce6f3dd261370db14bb42eaf1f8a48588274187@1S1:26656,4c0adc8f4c642409da97f815a8cd82dd36bc23b1@1S7:26656,e75e088dcac3d0ed4c38615d6a36c2b3657cc2d3@1S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -362,7 +362,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=15ce7166d68e682904c7a8fbab8936f34f4028c1@1S5:26656,d489de84f162f30313c148c213ff6a581a1c2c91@1S8:26656,e43e3c1f76cd32d390d07d5d71b69970cd617887@1S2:26656
+    - tendermint node --p2p.persistent_peers=492d3555185cbad89d5aad622481aa1b239d1bab@1S5:26656,0644e15c6ddbd347205c7f238fd835eb74d9412c@1S8:26656,0dc56f400dd6fb60b2dfbed4be7104a92909aa33@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -389,7 +389,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=15ce7166d68e682904c7a8fbab8936f34f4028c1@1S5:26656,aa5f7fda1a811a89550f2ae03a681901e2c3d050@1S3:26656,d489de84f162f30313c148c213ff6a581a1c2c91@1S8:26656
+    - tendermint node --p2p.persistent_peers=492d3555185cbad89d5aad622481aa1b239d1bab@1S5:26656,4dbbb2c3cac1edaa8133f6f47e505cad88a5425b@1S3:26656,0644e15c6ddbd347205c7f238fd835eb74d9412c@1S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -416,7 +416,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=2791aaee415a19eb646823dde39c2dad24f80764@1S4:26656,61754d658e9c189adcee60713ec12ac5b7db9bd7@1S6:26656,cf76ba79afb51e6791466431b843493d70784238@1S7:26656
+    - tendermint node --p2p.persistent_peers=90ee6519cfa53c9139500a104ae1630e3b28e684@1S4:26656,e75e088dcac3d0ed4c38615d6a36c2b3657cc2d3@1S6:26656,4c0adc8f4c642409da97f815a8cd82dd36bc23b1@1S7:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -424,436 +424,6 @@ services:
         - 1S8
     links:
     - 1S4
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-services:
-  2S1:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S1
-    hostname: 2S1
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S1/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=1
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=73fbe532e4fa5c2ba7b6bcfa6e6d2eb0ed874f17@2S5:26656,59dc2f796944c13a5661726045abe89496769917@2S3:26656,3ea6cfe7dcd8a13b1b9db70137c0308fa8f8a2d0@2S2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S2:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S2
-    hostname: 2S2
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S2/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=2
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=935f5e99b9dbaec574f3a053ab55b7f308465737@2S1:26656,b1b9d5035a15e62c187650bd8ae94904d8e02d2e@2S4:26656,4de1c4a447ff7d5a7173ccc0132f479fac701ff5@2S6:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S2
-    links:
-    - 2S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S3:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S3
-    hostname: 2S3
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S3/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=3
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=935f5e99b9dbaec574f3a053ab55b7f308465737@2S1:26656,56df2f046551ce0a9df1179319e1ec1c1744ab42@2S7:26656,b1b9d5035a15e62c187650bd8ae94904d8e02d2e@2S4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S3
-    links:
-    - 2S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S4:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S4
-    hostname: 2S4
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S4/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=4
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=59dc2f796944c13a5661726045abe89496769917@2S3:26656,3ea6cfe7dcd8a13b1b9db70137c0308fa8f8a2d0@2S2:26656,6db98913a55df7fd121f6556b62072a9dd997721@2S8:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S4
-    links:
-    - 2S3
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S5:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S5
-    hostname: 2S5
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S5/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=5
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=935f5e99b9dbaec574f3a053ab55b7f308465737@2S1:26656,56df2f046551ce0a9df1179319e1ec1c1744ab42@2S7:26656,4de1c4a447ff7d5a7173ccc0132f479fac701ff5@2S6:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S5
-    links:
-    - 2S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S6:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S6
-    hostname: 2S6
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S6/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=6
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=73fbe532e4fa5c2ba7b6bcfa6e6d2eb0ed874f17@2S5:26656,6db98913a55df7fd121f6556b62072a9dd997721@2S8:26656,3ea6cfe7dcd8a13b1b9db70137c0308fa8f8a2d0@2S2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S6
-    links:
-    - 2S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S7:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S7
-    hostname: 2S7
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S7/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=7
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=73fbe532e4fa5c2ba7b6bcfa6e6d2eb0ed874f17@2S5:26656,59dc2f796944c13a5661726045abe89496769917@2S3:26656,6db98913a55df7fd121f6556b62072a9dd997721@2S8:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S7
-    links:
-    - 2S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  2S8:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 2S8
-    hostname: 2S8
-    tty: true
-    volumes:
-    - /root/NFS500/network/2S8/config:/tendermint/config
-    environment:
-    - TASKID=2
-    - TASKINDEX=8
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=b1b9d5035a15e62c187650bd8ae94904d8e02d2e@2S4:26656,4de1c4a447ff7d5a7173ccc0132f479fac701ff5@2S6:26656,56df2f046551ce0a9df1179319e1ec1c1744ab42@2S7:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 2S8
-    links:
-    - 2S4
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-services:
-  3S1:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S1
-    hostname: 3S1
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S1/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=1
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=cd54bfe6b3a965bb68ecf1001c6235ea6eecf234@3S5:26656,67fb34374c55d5c5f04eec74872f386aa2ec65cf@3S3:26656,99fe1a78b21ba5d4bfd736205a0f51d3287e56f1@3S2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S2:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S2
-    hostname: 3S2
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S2/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=2
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=764e98355dd99315dc61b71312a7575ef56abcf4@3S1:26656,c1dc312eba04fbdd53be3eed5da11bf07d6f87de@3S4:26656,4a3037e552642d05dcf6107c4e4fa1fe930475dc@3S6:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S2
-    links:
-    - 3S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S3:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S3
-    hostname: 3S3
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S3/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=3
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=764e98355dd99315dc61b71312a7575ef56abcf4@3S1:26656,976cc433cc79bf3c4e4c98a77d270ed5319e9f3b@3S7:26656,c1dc312eba04fbdd53be3eed5da11bf07d6f87de@3S4:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S3
-    links:
-    - 3S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S4:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S4
-    hostname: 3S4
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S4/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=4
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=67fb34374c55d5c5f04eec74872f386aa2ec65cf@3S3:26656,99fe1a78b21ba5d4bfd736205a0f51d3287e56f1@3S2:26656,0396d07dba4741c1dc1ab5249da164fee7d1d752@3S8:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S4
-    links:
-    - 3S3
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S5:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S5
-    hostname: 3S5
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S5/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=5
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=764e98355dd99315dc61b71312a7575ef56abcf4@3S1:26656,976cc433cc79bf3c4e4c98a77d270ed5319e9f3b@3S7:26656,4a3037e552642d05dcf6107c4e4fa1fe930475dc@3S6:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S5
-    links:
-    - 3S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S6:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S6
-    hostname: 3S6
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S6/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=6
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=cd54bfe6b3a965bb68ecf1001c6235ea6eecf234@3S5:26656,0396d07dba4741c1dc1ab5249da164fee7d1d752@3S8:26656,99fe1a78b21ba5d4bfd736205a0f51d3287e56f1@3S2:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S6
-    links:
-    - 3S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S7:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S7
-    hostname: 3S7
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S7/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=7
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=cd54bfe6b3a965bb68ecf1001c6235ea6eecf234@3S5:26656,67fb34374c55d5c5f04eec74872f386aa2ec65cf@3S3:26656,0396d07dba4741c1dc1ab5249da164fee7d1d752@3S8:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S7
-    links:
-    - 3S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
-  3S8:
-    image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
-    container_name: 3S8
-    hostname: 3S8
-    tty: true
-    volumes:
-    - /root/NFS500/network/3S8/config:/tendermint/config
-    environment:
-    - TASKID=3
-    - TASKINDEX=8
-    - THRESHOLD=6
-    entrypoint:
-    - sh
-    - -c
-    - tendermint node --p2p.persistent_peers=c1dc312eba04fbdd53be3eed5da11bf07d6f87de@3S4:26656,4a3037e552642d05dcf6107c4e4fa1fe930475dc@3S6:26656,976cc433cc79bf3c4e4c98a77d270ed5319e9f3b@3S7:26656
-      --moniker=`hostname` --proxy_app=persistent_kvstore
-    networks:
-      tendermintnet1:
-        aliases:
-        - 3S8
-    links:
-    - 3S4
     logging:
       driver: fluentd
       options:

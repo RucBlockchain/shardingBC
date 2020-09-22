@@ -1127,12 +1127,15 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			aminoOverhead := types.ComputeAminoOverhead(total_data, 1)
 			if maxBytes > -1 && totalBytes+int64(len(total_data))+aminoOverhead > maxBytes {
+				fmt.Println("区块最大容量为：",maxBytes,"本次要打包交易的容量为",int64(len(total_data))+aminoOverhead,"因此打包失败")
 				return txs
 			}
+
 			//在这里如果交易通过核验，那么就可以确定要取该交易。那么此时，我们需要在这里对交易进行判断,加入映射表之中
 			//TODO:映射表的完善
 			mem.AddRelationTable(cm, height, txKey(memTx.tx))
 			totalBytes += int64(len(total_data)) + aminoOverhead
+			fmt.Println("区块最大容量为：",maxBytes,"本次要打包交易的容量为",int64(len(total_data))+aminoOverhead,"因此打包成功")
 			// Check total gas requirement.
 			// If maxGas is negative, skip this check.
 			// Since newTotalGas < masGas, which
