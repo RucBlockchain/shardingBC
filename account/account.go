@@ -14,7 +14,7 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"strconv"
 	"strings"
-	"time"
+	// "time"
 )
 
 /*
@@ -57,7 +57,7 @@ func (accountLog *AccountLog) Check() bool {
 	from := accountLog.From
 	to := accountLog.To
 	amount := accountLog.Amount
-	t := accountLog.Time //阶段打印使用
+	// t := accountLog.Time //阶段打印使用
 	if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
 
 		return true
@@ -69,11 +69,11 @@ func (accountLog *AccountLog) Check() bool {
 	}
 	if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
 		//relay_out阶段
-		logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印
+		// logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印
 		return true
 	}
-	logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
-	logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
+	// logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
+	// logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
 	balanceToStr := _getState([]byte(to))
 	balanceFromStr := _getState([]byte(from))
 

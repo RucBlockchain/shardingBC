@@ -119,7 +119,7 @@ func IsPreCheckError(err error) bool {
 	return ok
 }
 func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
-	fmt.Printf("[tx_phase%d] tx_id:%X time:%s\n",phase,tx_id,time)
+	// fmt.Printf("[tx_phase%d] tx_id:%X time:%s\n",phase,tx_id,time)
 	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
 }
 // PreCheckAminoMaxBytes checks that the size of the transaction plus the amino
