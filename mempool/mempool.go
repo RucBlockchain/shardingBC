@@ -28,6 +28,7 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
+	"math/big"
 	//"github.com/tendermint/tendermint/state"
 )
 
@@ -118,8 +119,25 @@ func IsPreCheckError(err error) bool {
 	_, ok := err.(ErrPreCheck)
 	return ok
 }
+func PrintLog(ID [sha256.Size]byte)bool{
+	OXstring := fmt.Sprintf("%X",ID)
+	BigInt,err := new(big.Int).SetString(OXstring, 16)
+	if !err{
+		fmt.Println("生成大整数错误")
+	}
+	shd := big.NewInt(int64(100))//取100模运算
+	mod := new(big.Int)
+	_, mod = BigInt.DivMod(BigInt, shd, mod)
+	if mod.String() == "0"{
+		return true
+	}else{
+		return false
+	}
+}
 func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
-	// fmt.Printf("[tx_phase%d] tx_id:%X time:%s\n",phase,tx_id,time)
+	if PrintLog(tx_id){
+		fmt.Printf("[tx_phase%d] tx_id:%X time:%s\n",phase,tx_id,time)	
+	}
 	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
 }
 // PreCheckAminoMaxBytes checks that the size of the transaction plus the amino

@@ -14,7 +14,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=8c85ad409b7001d3fb5b9c9a4f711e0d405121a2@0S5:26656,d02a654b54c70686389e9b6a971b439d8998b898@0S3:26656,0eeb6b3dae3e46db55c828020495c2c092899155@0S2:26656
+    - tendermint node --p2p.persistent_peers=dd7f97c8507ba2a53bef0f405b9fcd16c5bb9b5c@0S5:26656,5e4df16a797dadea8815ca4955be4b1001b70196@0S3:26656,0d3db18ffb55630e6fd9e18a03d9249fb7497d34@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -39,7 +39,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4d823edc7f0dc78883f2992ce661d872b76d8908@0S1:26656,9ce73754ee8e62536bffa654ec11513b53d83b5b@0S4:26656,b68f3365f4e61602eaaa2ee8d9c25d0ce1a4c920@0S6:26656
+    - tendermint node --p2p.persistent_peers=84ab53eb4e222c3d360e9627bae0f1a43e6c5e03@0S1:26656,5c73d5e86ae5275faecc6895277dd8992a357832@0S4:26656,bae37b167952261bda94c7b32f55449135b0b9ff@0S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -66,7 +66,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4d823edc7f0dc78883f2992ce661d872b76d8908@0S1:26656,7daff37ff07a8e32653b78fc930b9f38f2976905@0S7:26656,9ce73754ee8e62536bffa654ec11513b53d83b5b@0S4:26656
+    - tendermint node --p2p.persistent_peers=84ab53eb4e222c3d360e9627bae0f1a43e6c5e03@0S1:26656,497ff2729ef16288bfef7af59b1ae5af6c5ddb24@0S7:26656,5c73d5e86ae5275faecc6895277dd8992a357832@0S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -93,7 +93,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=d02a654b54c70686389e9b6a971b439d8998b898@0S3:26656,0eeb6b3dae3e46db55c828020495c2c092899155@0S2:26656,9359f51fab2fec581dda5113d37f081126899f06@0S8:26656
+    - tendermint node --p2p.persistent_peers=5e4df16a797dadea8815ca4955be4b1001b70196@0S3:26656,0d3db18ffb55630e6fd9e18a03d9249fb7497d34@0S2:26656,35777e28a527d495bf09ffb90a0a33b2c5b4b892@0S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -120,7 +120,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4d823edc7f0dc78883f2992ce661d872b76d8908@0S1:26656,7daff37ff07a8e32653b78fc930b9f38f2976905@0S7:26656,b68f3365f4e61602eaaa2ee8d9c25d0ce1a4c920@0S6:26656
+    - tendermint node --p2p.persistent_peers=84ab53eb4e222c3d360e9627bae0f1a43e6c5e03@0S1:26656,497ff2729ef16288bfef7af59b1ae5af6c5ddb24@0S7:26656,bae37b167952261bda94c7b32f55449135b0b9ff@0S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -147,7 +147,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=8c85ad409b7001d3fb5b9c9a4f711e0d405121a2@0S5:26656,9359f51fab2fec581dda5113d37f081126899f06@0S8:26656,0eeb6b3dae3e46db55c828020495c2c092899155@0S2:26656
+    - tendermint node --p2p.persistent_peers=dd7f97c8507ba2a53bef0f405b9fcd16c5bb9b5c@0S5:26656,35777e28a527d495bf09ffb90a0a33b2c5b4b892@0S8:26656,0d3db18ffb55630e6fd9e18a03d9249fb7497d34@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -174,7 +174,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=8c85ad409b7001d3fb5b9c9a4f711e0d405121a2@0S5:26656,d02a654b54c70686389e9b6a971b439d8998b898@0S3:26656,9359f51fab2fec581dda5113d37f081126899f06@0S8:26656
+    - tendermint node --p2p.persistent_peers=dd7f97c8507ba2a53bef0f405b9fcd16c5bb9b5c@0S5:26656,5e4df16a797dadea8815ca4955be4b1001b70196@0S3:26656,35777e28a527d495bf09ffb90a0a33b2c5b4b892@0S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -201,7 +201,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=9ce73754ee8e62536bffa654ec11513b53d83b5b@0S4:26656,b68f3365f4e61602eaaa2ee8d9c25d0ce1a4c920@0S6:26656,7daff37ff07a8e32653b78fc930b9f38f2976905@0S7:26656
+    - tendermint node --p2p.persistent_peers=5c73d5e86ae5275faecc6895277dd8992a357832@0S4:26656,bae37b167952261bda94c7b32f55449135b0b9ff@0S6:26656,497ff2729ef16288bfef7af59b1ae5af6c5ddb24@0S7:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -229,7 +229,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=492d3555185cbad89d5aad622481aa1b239d1bab@1S5:26656,4dbbb2c3cac1edaa8133f6f47e505cad88a5425b@1S3:26656,0dc56f400dd6fb60b2dfbed4be7104a92909aa33@1S2:26656
+    - tendermint node --p2p.persistent_peers=21c57192b11b9cc0f59b05b58ec1eea3e7fb02bd@1S5:26656,dea1aebab608ece0c1d0655958500c223fced701@1S3:26656,99fe41c25493bba82c82ad5e7f20dcb3eccae5b4@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -254,7 +254,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=bce6f3dd261370db14bb42eaf1f8a48588274187@1S1:26656,90ee6519cfa53c9139500a104ae1630e3b28e684@1S4:26656,e75e088dcac3d0ed4c38615d6a36c2b3657cc2d3@1S6:26656
+    - tendermint node --p2p.persistent_peers=1c2bebfdc493373d80057301aab91cee7df8d679@1S1:26656,64172ae98fdeaf124d2833f2a7362a2b26461c4a@1S4:26656,51929dfff098be8796b9db815345b2ec7fb7003f@1S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -281,7 +281,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=bce6f3dd261370db14bb42eaf1f8a48588274187@1S1:26656,4c0adc8f4c642409da97f815a8cd82dd36bc23b1@1S7:26656,90ee6519cfa53c9139500a104ae1630e3b28e684@1S4:26656
+    - tendermint node --p2p.persistent_peers=1c2bebfdc493373d80057301aab91cee7df8d679@1S1:26656,61b34d56455fcd0cc128c975cd07b0cdfe97a379@1S7:26656,64172ae98fdeaf124d2833f2a7362a2b26461c4a@1S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -308,7 +308,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=4dbbb2c3cac1edaa8133f6f47e505cad88a5425b@1S3:26656,0dc56f400dd6fb60b2dfbed4be7104a92909aa33@1S2:26656,0644e15c6ddbd347205c7f238fd835eb74d9412c@1S8:26656
+    - tendermint node --p2p.persistent_peers=dea1aebab608ece0c1d0655958500c223fced701@1S3:26656,99fe41c25493bba82c82ad5e7f20dcb3eccae5b4@1S2:26656,165c8ca542178e3fcf76b73d0993f6a00eb0e894@1S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -335,7 +335,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=bce6f3dd261370db14bb42eaf1f8a48588274187@1S1:26656,4c0adc8f4c642409da97f815a8cd82dd36bc23b1@1S7:26656,e75e088dcac3d0ed4c38615d6a36c2b3657cc2d3@1S6:26656
+    - tendermint node --p2p.persistent_peers=1c2bebfdc493373d80057301aab91cee7df8d679@1S1:26656,61b34d56455fcd0cc128c975cd07b0cdfe97a379@1S7:26656,51929dfff098be8796b9db815345b2ec7fb7003f@1S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -362,7 +362,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=492d3555185cbad89d5aad622481aa1b239d1bab@1S5:26656,0644e15c6ddbd347205c7f238fd835eb74d9412c@1S8:26656,0dc56f400dd6fb60b2dfbed4be7104a92909aa33@1S2:26656
+    - tendermint node --p2p.persistent_peers=21c57192b11b9cc0f59b05b58ec1eea3e7fb02bd@1S5:26656,165c8ca542178e3fcf76b73d0993f6a00eb0e894@1S8:26656,99fe41c25493bba82c82ad5e7f20dcb3eccae5b4@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -389,7 +389,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=492d3555185cbad89d5aad622481aa1b239d1bab@1S5:26656,4dbbb2c3cac1edaa8133f6f47e505cad88a5425b@1S3:26656,0644e15c6ddbd347205c7f238fd835eb74d9412c@1S8:26656
+    - tendermint node --p2p.persistent_peers=21c57192b11b9cc0f59b05b58ec1eea3e7fb02bd@1S5:26656,dea1aebab608ece0c1d0655958500c223fced701@1S3:26656,165c8ca542178e3fcf76b73d0993f6a00eb0e894@1S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -416,7 +416,7 @@ services:
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=90ee6519cfa53c9139500a104ae1630e3b28e684@1S4:26656,e75e088dcac3d0ed4c38615d6a36c2b3657cc2d3@1S6:26656,4c0adc8f4c642409da97f815a8cd82dd36bc23b1@1S7:26656
+    - tendermint node --p2p.persistent_peers=64172ae98fdeaf124d2833f2a7362a2b26461c4a@1S4:26656,51929dfff098be8796b9db815345b2ec7fb7003f@1S6:26656,61b34d56455fcd0cc128c975cd07b0cdfe97a379@1S7:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:

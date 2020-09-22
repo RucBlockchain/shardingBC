@@ -13,10 +13,25 @@ import (
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
 	"strconv"
+	"math/big"
 	"strings"
-	// "time"
+	"time"
 )
-
+func PrintLog(ID [sha256.Size]byte)bool{
+	OXstring := fmt.Sprintf("%X",ID)
+	BigInt,err := new(big.Int).SetString(OXstring, 16)
+	if !err{
+		fmt.Println("生成大整数错误")
+	}
+	shd := big.NewInt(int64(100))//取100模运算
+	mod := new(big.Int)
+	_, mod = BigInt.DivMod(BigInt, shd, mod)
+	if mod.String() == "0"{
+		return true
+	}else{
+		return false
+	}
+}
 /*
  * 交易数据结构
  */
@@ -41,6 +56,7 @@ type TxArg struct {
 	Operate     int    `json:"operate"`
 }
 func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
+
 	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
 }
 // 实例化交易
@@ -57,7 +73,7 @@ func (accountLog *AccountLog) Check() bool {
 	from := accountLog.From
 	to := accountLog.To
 	amount := accountLog.Amount
-	// t := accountLog.Time //阶段打印使用
+	t := accountLog.Time //阶段打印使用
 	if accountLog.TxType == "checkpoint" || accountLog.TxType == "addtx" {
 
 		return true
@@ -69,8 +85,17 @@ func (accountLog *AccountLog) Check() bool {
 	}
 	if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
 		//relay_out阶段
-		// logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印
+		if PrintLog(accountLog.ID){
+			logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印	
+		}
+		
 		return true
+	}
+	if PrintLog(accountLog.ID){
+		logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
+	}
+	if PrintLog(accountLog.ID){
+		logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
 	}
 	// logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
 	// logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印

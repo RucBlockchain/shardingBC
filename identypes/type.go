@@ -11,10 +11,10 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"os"
-	// "strconv"
+	"strconv"
 	"strings"
 	"fmt"
-	// "time"
+	"time"
 )
 
 const (
@@ -117,21 +117,45 @@ func (tx *TX) UpdateTx() {
 		tx.Txtype = "addtx"
 	}
 }
+func PrintLog(ID [sha256.Size]byte)bool{
+	OXstring := fmt.Sprintf("%X",ID)
+	BigInt,err := new(big.Int).SetString(OXstring, 16)
+	if !err{
+		fmt.Println("生成大整数错误")
+	}
+	shd := big.NewInt(int64(100))//取100模运算
+	mod := new(big.Int)
+	_, mod = BigInt.DivMod(BigInt, shd, mod)
+	if mod.String() == "0"{
+		return true
+	}else{
+		return false
+	}
+}
 func (tx *TX) PrintInfo(){
 	if tx == nil {
 		return
 	}
 	// 如果交易类型为relaytx 且 发送方是本分片，则该交易为relay_in，修改operate值为1
 	if tx.Txtype=="tx" || tx.Txtype=="init"{//说明是本片交易，那么此时输出第三阶段
+		if PrintLog(tx.ID){
+			logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
+		}
 		// logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
 	}
 	if tx.Txtype == "relaytx" && tx.Sender == getShard() {
 		//
+		if PrintLog(tx.ID){
+			logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
+		}
 		// logger.Info(TimePhase(3,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
 	}
 
 	// 如果交易类型为relayTx 且 接收方是本分片，则修改交易类型为addtx
 	if tx.Txtype == "addtx" && tx.Receiver == getShard() {
+		if PrintLog(tx.ID){
+			logger.Info(TimePhase(5,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第三阶段信息打印
+		}
 		// logger.Info(TimePhase(5,tx.ID,strconv.FormatInt(time.Now().UnixNano(), 10)))//第五阶段信息打印
 	}
 }
