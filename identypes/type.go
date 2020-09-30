@@ -94,7 +94,7 @@ func NewTX(data []byte) (*TX, error) {
 	return tx, err
 }
 func TimePhase(phase int,tx_id [sha256.Size]byte,t string)string{
-	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,t)
+	return fmt.Sprintf("[tx_phase] index:phase%d id:%X time:%s",phase,tx_id,t)
 }
 // 处理跨片交易的后程，修改交易属性
 func (tx *TX) UpdateTx() {
