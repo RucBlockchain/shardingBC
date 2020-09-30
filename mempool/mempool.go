@@ -136,7 +136,7 @@ func PrintLog(ID [sha256.Size]byte)bool{
 }
 func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
 	if PrintLog(tx_id){
-		fmt.Printf("[tx_phase] index:%d id:%X time:%s\n",phase,tx_id,time)
+		fmt.Printf("[tx_phase] index:phase%d id:%X time:%s\n",phase,tx_id,time)
 	}
 	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
 }
