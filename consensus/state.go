@@ -1014,7 +1014,10 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 		block, blockParts = cs.ValidBlock, cs.ValidBlockParts
 	} else {
 		// Create a new proposal block from state/txs from the mempool.
+		beign_time:=time.Now()
 		block, blockParts = cs.createProposalBlock()
+		end_time := time.Now()
+		PrintinfoTime(1,block.Hash(),strconv.FormatInt(end_time.Sub(beign_time).Nanoseconds(),10))
 		if block == nil { // on error
 			return
 		}
@@ -1027,6 +1030,9 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 	propBlockId := types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}
 	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockId)
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, proposal); err == nil {
+		//发送区块的时刻
+
+		PrintinfoTime(2,block.Hash(),strconv.FormatInt(time.Now().UnixNano(),10))
 
 		// send proposal and block parts on internal msg queue
 		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, ""})
@@ -1394,6 +1400,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			tx,_:=tp.NewTX(cs.ProposalBlock.Txs[i])
 			tx.PrintInfo()
 		}
+		begin_time:=time.Now()
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
 		for i := 0; i < len(voteSet.PartSigs); i++ {
@@ -1456,6 +1463,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		}
 		//fmt.Println("调用ModifyRelationTable")
 		cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
+		end_time:=time.Now()
+		PrintinfoTime(4,cs.ProposalBlock.Hash(),strconv.FormatInt(end_time.Sub(begin_time).Nanoseconds(),10))
 		return nil
 	}
 
@@ -1708,7 +1717,9 @@ func (cs *ConsensusState) defaultSetProposal(proposal *types.Proposal) error {
 	cs.Logger.Info("Received proposal", "proposal", proposal)
 	return nil
 }
-
+func PrintinfoTime(phase int,id cmn.HexBytes,t string){
+	fmt.Printf("[tx_phase] index:cphase%d id:%X time:%s\n",phase,id,t)
+}
 // NOTE: block is not necessarily valid.
 // Asynchronously triggers either enterPrevote (before we timeout of propose) or tryFinalizeCommit, once we have the full block.
 func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p.ID) (added bool, err error) {
@@ -1735,6 +1746,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 	}
 	if added && cs.ProposalBlockParts.IsComplete() {
 		// Added and completed!
+
 		_, err = cdc.UnmarshalBinaryLengthPrefixedReader(
 			cs.ProposalBlockParts.GetReader(),
 			&cs.ProposalBlock,
@@ -1746,7 +1758,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 		// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 		cs.Logger.Info("Received complete proposal block", "height", cs.ProposalBlock.Height, "hash", cs.ProposalBlock.Hash())
 		cs.eventBus.PublishEventCompleteProposal(cs.CompleteProposalEvent())
-
+		PrintinfoTime(21,cs.ProposalBlock.Hash(),strconv.FormatInt(time.Now().UnixNano(),10))
 		// Update Valid* if we can.
 		prevotes := cs.Votes.Prevotes(cs.Round)
 		blockID, hasTwoThirds := prevotes.TwoThirdsMajority()
@@ -2050,7 +2062,8 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	//这里是对跨片进行签名
 	if type_ == types.PrevoteType && hash != nil && vote.BlockID.Hash != nil {
 		//还要进行验证如果打包cm不在自己的mempool之中，说明leader作恶，需要投反对票
-		//交易池没有该交易并且不是leader，那么就需要判断是否存在
+		//交易池没有该交易并且不是leader，那么就需要判断是否存在vote
+		begin_time:=time.Now()
 		if !cs.JudgeBlockPakcages() {
 			cs.Logger.Error("在mempool未找到对应交易，投反对票")
 			vote.BlockID.Hash = nil //投反对票
@@ -2062,7 +2075,8 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 				vote.BlockID.Hash = nil //因为签名出错，可能是自身的密钥有问题，投反对票
 			}
 		}
-
+		end_time:=time.Now()
+		PrintinfoTime(3,cs.ProposalBlock.Hash(),strconv.FormatInt(end_time.Sub(begin_time).Nanoseconds(),10))
 		// prevote阶段对每条跨片交易生成签名
 		// 没有想好怎么处理这里的错误
 

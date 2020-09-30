@@ -136,7 +136,7 @@ func PrintLog(ID [sha256.Size]byte)bool{
 }
 func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
 	if PrintLog(tx_id){
-		fmt.Printf("[tx_phase%d] tx_id:%X time:%s\n",phase,tx_id,time)	
+		fmt.Printf("[tx_phase] index:%d id:%X time:%s\n",phase,tx_id,time)
 	}
 	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
 }
@@ -830,15 +830,23 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		}
 	}
 	if cm := ParseData(tx); cm != nil {
+		if txInfo.PeerID == UnknownPeerID{//说明是第一次接受
+			t:=time.Now()
+			fmt.Printf("[tx_phase] index:phase42 id:%X time:%s\n",tx,strconv.FormatInt(t.UnixNano(),10))
+		}else{//说明来自其他节点的同步
+			t:=time.Now()
+			fmt.Printf("[tx_phase] index:phase43 id:%X time:%s\n",tx,strconv.FormatInt(t.UnixNano(),10))
+		}
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb {
-			phase := 22
-			fmt.Printf("[tx_phase%d] time:%s\n",phase,strconv.FormatInt(time.Now().UnixNano(), 10))
+
+			begin_time := time.Now()
 			if result := mem.CheckCrossMessage(cm); result != nil {
 				return result
 			}
-			phase = 23
-			fmt.Printf("[tx_phase%d] time:%s\n",phase,strconv.FormatInt(time.Now().UnixNano(), 10))
+			end_time := time.Now()
+			phase40:=end_time.Sub(begin_time)
+			fmt.Printf("[tx_phase] index:phase40 id:%X time:%s\n",tx,strconv.FormatInt(phase40.Nanoseconds(),10))
 		}
 	} else {
 		accountLog := account.NewAccountLog(tx)//判断是否是leader再输出
@@ -1208,9 +1216,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 // transactions (~ all available transactions).
 func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 
-    mem.logger.Info("reap走这里")
-    fmt.Println("reap走这里") 
-    mem.logger.Error("reap走这里")
 
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()

@@ -57,7 +57,7 @@ type TxArg struct {
 }
 func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
 
-	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s",phase,tx_id,time)
+	return fmt.Sprintf("[tx_phase] index:{%d} id:{%X} time:%s\n",phase,tx_id,time)
 }
 // 实例化交易
 func NewAccountLog(tx []byte) *AccountLog {
