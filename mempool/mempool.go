@@ -832,10 +832,10 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	if cm := ParseData(tx); cm != nil {
 		if txInfo.PeerID == UnknownPeerID{//说明是第一次接受
 			t:=time.Now()
-			fmt.Printf("[tx_phase] index:phase42 id:%X time:%s\n",tx,strconv.FormatInt(t.UnixNano(),10))
+			fmt.Printf("[tx_phase] index:phase42 id:%X time:%s\n",sha256.Sum256(tx),strconv.FormatInt(t.UnixNano(),10))
 		}else{//说明来自其他节点的同步
 			t:=time.Now()
-			fmt.Printf("[tx_phase] index:phase43 id:%X time:%s\n",tx,strconv.FormatInt(t.UnixNano(),10))
+			fmt.Printf("[tx_phase] index:phase43 id:%X time:%s\n",sha256.Sum256(tx),strconv.FormatInt(t.UnixNano(),10))
 		}
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb {
@@ -846,7 +846,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			}
 			end_time := time.Now()
 			phase40:=end_time.Sub(begin_time)
-			fmt.Printf("[tx_phase] index:phase40 id:%X time:%s\n",tx,strconv.FormatInt(phase40.Nanoseconds(),10))
+			fmt.Printf("[tx_phase] index:phase40 id:%X time:%s\n",sha256.Sum256(tx),strconv.FormatInt(phase40.Nanoseconds(),10))
 		}
 	} else {
 		accountLog := account.NewAccountLog(tx)//判断是否是leader再输出
