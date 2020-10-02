@@ -55,9 +55,9 @@ type TxArg struct {
 	TxSignature string `json:"txSignature"`
 	Operate     int    `json:"operate"`
 }
-func TimePhase(phase int,tx_id [sha256.Size]byte,time string)string{
+func TimePhase(phase string,tx_id [sha256.Size]byte,time string)string{
 
-	return fmt.Sprintf("[tx_phase] index:phase%d id:%X time:%s\n",phase,tx_id,time)
+	return fmt.Sprintf("[tx_phase] index:%s id:%X time:%s\n",phase,tx_id,time)
 }
 // 实例化交易
 func NewAccountLog(tx []byte) *AccountLog {
@@ -92,11 +92,11 @@ func (accountLog *AccountLog) Check() bool {
 		return true
 	}
 	if PrintLog(accountLog.ID){
-		logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
+		logger.Info(TimePhase("tPoposeTx",accountLog.ID,t))//第一阶段打印
 	}
-	if PrintLog(accountLog.ID){
-		logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
-	}
+	//if PrintLog(accountLog.ID){
+	//	logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
+	//}
 	// logger.Info(TimePhase(1,accountLog.ID,t))//第一阶段打印
 	// logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
 	balanceToStr := _getState([]byte(to))

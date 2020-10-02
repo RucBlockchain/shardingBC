@@ -134,9 +134,9 @@ func PrintLog(ID [sha256.Size]byte) bool {
 		return false
 	}
 }
-func TimePhase(phase int, tx_id [sha256.Size]byte, time string) string {
+func TimePhase(phase string, tx_id [sha256.Size]byte, time string) string {
 	if PrintLog(tx_id) {
-		fmt.Printf("[tx_phase] index:phase%d id:%X time:%s\n", phase, tx_id, time)
+		fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, time)
 	}
 	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s", phase, tx_id, time)
 }
@@ -834,23 +834,32 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	if cm := ParseData(tx); cm != nil {
 		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
 			t := time.Now()
-			fmt.Printf("[tx_phase] index:phase42 id:%X time:%s\n", sha256.Sum256(tx), strconv.FormatInt(t.UnixNano(), 10))
+			fmt.Printf("[tx_phase] index:tPreCheck1CM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 		} else { //说明来自其他节点的同步
 			t := time.Now()
-			fmt.Printf("[tx_phase] index:phase43 id:%X time:%s\n", sha256.Sum256(tx), strconv.FormatInt(t.UnixNano(), 10))
+			fmt.Printf("[tx_phase] index:tPreCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 		}
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb {
-
 			begin_time := time.Now()
 			if result := mem.CheckCrossMessage(cm); result != nil {
 				return result
 			}
 			end_time := time.Now()
 			phase40 := end_time.Sub(begin_time)
-			fmt.Printf("[tx_phase] index:phase40 id:%X time:%s\n", sha256.Sum256(tx), strconv.FormatInt(phase40.Nanoseconds(), 10))
+			fmt.Printf("[tx_phase] index:periodCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(phase40.Nanoseconds(), 10))
+			fmt.Printf("[tx_phase] index:tPostCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 		}
 	} else {
+		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
+			t := time.Now()
+			tmp_tx,_:=tp.NewTX(tx)
+			fmt.Printf("[tx_phase] index:tPreCheck1TX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+		} else { //说明来自其他节点的同步
+			t := time.Now()
+			tmp_tx,_:=tp.NewTX(tx)
+			fmt.Printf("[tx_phase] index:tPreCheckTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
 		if accountLog == nil {
 			return errors.New("交易解析失败")
@@ -986,6 +995,9 @@ func (mem *Mempool) removeTx(tx types.Tx, elem *clist.CElement, removeFromCache 
 //
 // The case where the app checks the tx for the second and subsequent times is
 // handled by the resCbRecheck callback.
+func time2string(t int64)string{
+	return strconv.FormatInt(t,10)
+}
 func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response) {
 	switch r := res.Value.(type) {
 	case *abci.Response_CheckTx:
@@ -1000,8 +1012,11 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 				tx:        tx,
 			}
 			memTx.senders.Store(peerID, true)
-
+			btime := time.Now()
 			mem.addTx(memTx)
+			etime := time.Now()
+			mem.logger.Info(TimePhase("periodAddTX",txKey(memTx.tx),time2string(etime.Sub(btime).Nanoseconds())))
+			mem.logger.Info(TimePhase("tInsideMem",txKey(memTx.tx),time2string(time.Now().UnixNano())))
 			mem.logger.Info("Added good transaction",
 				"tx", TxID(tx),
 				"res", r,
@@ -1111,6 +1126,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	// size per tx, and set the initial capacity based off of that.
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
 	txs := make([]types.Tx, 0, mem.txs.Len())
+
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		//取交易
 		memTx := e.Value.(*mempoolTx)
@@ -1119,6 +1135,8 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		// 删除对应的txlist的relay_out交易
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
+			t:=time.Now()
+			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 			if cm.SrcZone == getShard() {
 				//fmt.Println("移除回执")
 				var txs types.Txs
@@ -1156,7 +1174,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			aminoOverhead := types.ComputeAminoOverhead(total_data, 1)
 			if maxBytes > -1 && totalBytes+int64(len(total_data))+aminoOverhead > maxBytes {
-				fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包失败")
+				//fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包失败")
 				return txs
 			}
 
@@ -1164,7 +1182,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			//TODO:映射表的完善
 			mem.AddRelationTable(cm, height, txKey(memTx.tx))
 			totalBytes += int64(len(total_data)) + aminoOverhead
-			fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包成功")
+			//fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包成功")
 			// Check total gas requirement.
 			// If maxGas is negative, skip this check.
 			// Since newTotalGas < masGas, which
@@ -1177,18 +1195,21 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			totalGas = newTotalGas
 			//做测试
-			for i := 0; i < len(byte_txlist); i++ {
-				tmp_tx1, err := tp.NewTX(byte_txlist[i])
-				if err != nil {
-					mem.logger.Error("Unmarshall tp.TX error, err: ", err)
-				}
-				mem.logger.Info(TimePhase(41, tmp_tx1.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第41阶段打印
-
-			}
+			//for i := 0; i < len(byte_txlist); i++ {
+			//	//tmp_tx1, err := tp.NewTX(byte_txlist[i])
+			//	if err != nil {
+			//		mem.logger.Error("Unmarshall tp.TX error, err: ", err)
+			//	}
+			//	//mem.logger.Info(TimePhase(41, tmp_tx1.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第41阶段打印
+			//
+			//}
 			parseend_time := time.Now()
-			mem.logger.Info(TimePhase(42, sha256.Sum256(memTx.tx), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10)))
+			fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
 			txs = append(txs, byte_txlist...)
 		} else {
+			t:=time.Now()
+			tmp_tx,_ := tp.NewTX(memTx.tx)
+			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n",tmp_tx.ID , strconv.FormatInt(t.UnixNano(), 10))
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
 				return txs
@@ -1209,7 +1230,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			if err != nil {
 				mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 			}
-			mem.logger.Info(TimePhase(21, tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第21阶段打印
+			//mem.logger.Info(TimePhase(21, tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第21阶段打印
 			txs = append(txs, memTx.tx)
 		}
 
