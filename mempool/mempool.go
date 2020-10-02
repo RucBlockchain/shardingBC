@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
+	//cm "github.com/tendermint/tendermint/consensus"
 	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"strconv"
@@ -191,6 +192,10 @@ func CmID(cm *tp.CrossMessages) string {
 	heightHash := Sum([]byte(strconv.FormatInt(cm.Height, 10)))
 	ID := append(heightHash, cm.CrossMerkleRoot...)
 	return fmt.Sprintf("%X", ID)
+}
+func CmId(cm []byte) [sha256.Size]byte {
+	ID := sha256.Sum256(cm)
+	return ID
 }
 
 // txKey is the fixed length array sha256 hash used as the key in maps.
@@ -656,7 +661,8 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 			fmt.Println("交易解析失败")
 			return errors.New("交易解析失败")
 		}
-		checkRes := accountLog.Check() //开始打印日志
+		fmt.Printf("[tx_phase] index:tCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+		checkRes := accountLog.Check() //开始打印日志 sha256.Sum256()
 		//fmt.Println("交易合法验证通过")
 		if !checkRes {
 			fmt.Println("不合法的交易")
@@ -757,6 +763,7 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 			//fmt.Println(string(cm))
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
 			//cmid,_:=json.Marshal(CmID(cm)
+
 			checkdb.Save([]byte(CmID(cm)), cm) //存储
 			//fmt.Println("存储", "CrossMerkleRoot root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages,"Srczone",cm.SrcZone,"Deszone",cm.DesZone)
 			i--
