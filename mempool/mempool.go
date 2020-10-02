@@ -1022,9 +1022,13 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 				fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
 				fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 			} else {
+
 				tmp_tx, _ := tp.NewTX(memTx.tx)
-				fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
-				fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
+				if PrintLog(tmp_tx.ID) {
+					fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
+					fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
+
+				}
 
 			}
 
