@@ -12,53 +12,56 @@ import (
 	"fmt"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
-	"strconv"
 	"math/big"
+	"strconv"
 	"strings"
-	"time"
 )
-func PrintLog(ID [sha256.Size]byte)bool{
-	OXstring := fmt.Sprintf("%X",ID)
-	BigInt,err := new(big.Int).SetString(OXstring, 16)
-	if !err{
+
+func PrintLog(ID [sha256.Size]byte) bool {
+	OXstring := fmt.Sprintf("%X", ID)
+	BigInt, err := new(big.Int).SetString(OXstring, 16)
+	if !err {
 		fmt.Println("生成大整数错误")
 	}
-	shd := big.NewInt(int64(100))//取100模运算
+	shd := big.NewInt(int64(100)) //取100模运算
 	mod := new(big.Int)
 	_, mod = BigInt.DivMod(BigInt, shd, mod)
-	if mod.String() == "0"{
+	if mod.String() == "0" {
 		return true
-	}else{
+	} else {
 		return false
 	}
 }
+
 /*
  * 交易数据结构
  */
 type AccountLog struct {
-	ID	    [sha256.Size]byte
+	ID      [sha256.Size]byte
 	TxType  string // 交易类型
 	From    string // 支出方
 	To      string // 接收方
-	Time    string//发送时间
+	Time    string //发送时间
 	Amount  int    // 金额
 	Operate int    // 支出方: 0,  接收方: 1
 }
 
 // 接受到的交易请求，仅供测试使用
 type TxArg struct {
-	ID	    [sha256.Size]byte`json:"id"`
-	TxType      string `json:"txType"`
-	Sender      string `json:"sender"`
-	Receiver    string `json:"receiver"`
-	Content     string `json:"content"`
-	TxSignature string `json:"txSignature"`
-	Operate     int    `json:"operate"`
+	ID          [sha256.Size]byte `json:"id"`
+	TxType      string            `json:"txType"`
+	Sender      string            `json:"sender"`
+	Receiver    string            `json:"receiver"`
+	Content     string            `json:"content"`
+	TxSignature string            `json:"txSignature"`
+	Operate     int               `json:"operate"`
 }
-func TimePhase(phase string,tx_id [sha256.Size]byte,time string)string{
 
-	return fmt.Sprintf("[tx_phase] index:%s id:%X time:%s\n",phase,tx_id,time)
+func TimePhase(phase string, tx_id [sha256.Size]byte, time string) string {
+
+	return fmt.Sprintf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, time)
 }
+
 // 实例化交易
 func NewAccountLog(tx []byte) *AccountLog {
 	return _parseTx(tx)
@@ -85,14 +88,14 @@ func (accountLog *AccountLog) Check() bool {
 	}
 	if accountLog.TxType == "relaytx" && accountLog.Operate == 1 {
 		//relay_out阶段
-		if PrintLog(accountLog.ID){
-			logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印	
-		}
-		
+		//if PrintLog(accountLog.ID){
+		//	logger.Info(TimePhase(4,accountLog.ID,t),strconv.FormatInt(time.Now().UnixNano(), 10))//第四阶段打印
+		//}
+
 		return true
 	}
-	if PrintLog(accountLog.ID){
-		logger.Info(TimePhase("tPoposeTx",accountLog.ID,t))//第一阶段打印
+	if PrintLog(accountLog.ID) {
+		logger.Info(TimePhase("tPoposeTx", accountLog.ID, t)) //第一阶段打印
 	}
 	//if PrintLog(accountLog.ID){
 	//	logger.Info(TimePhase(2,accountLog.ID,strconv.FormatInt(time.Now().UnixNano(), 10))) //第二阶段打印
@@ -102,14 +105,14 @@ func (accountLog *AccountLog) Check() bool {
 	balanceToStr := _getState([]byte(to))
 	balanceFromStr := _getState([]byte(from))
 
-	if len(from) != 0 && balanceFromStr == nil && accountLog.TxType!="init"{
+	if len(from) != 0 && balanceFromStr == nil && accountLog.TxType != "init" {
 		//fmt.Println("支出方账户不存在")
 		// logger.Error("支出方账户不存在")
 		// 关闭查雨捷的交易合法性验证
 		//return false
 		return true
 	}
-	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0)  {
+	if len(from) != 0 && balanceToStr == nil && !(accountLog.TxType == "relaytx" && accountLog.Operate == 0) {
 		//fmt.Println("接收方账户不存在")
 		//logger.Error("接收方账户不存在")
 		// 关闭查雨捷的交易合法性验证
@@ -201,7 +204,7 @@ func _parseTx(tx []byte) *AccountLog {
 		// logger.Error("交易解析失败")
 		return nil
 	}
-		if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
+	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
 		accountLog.TxType = txArgs.TxType
 		return accountLog
 	}
@@ -221,7 +224,7 @@ func _parseTx(tx []byte) *AccountLog {
 	accountLog.From = args[0]
 	accountLog.To = args[1]
 	accountLog.Amount = amount
-	accountLog.Time = args[3]//时间戳
+	accountLog.Time = args[3] //时间戳
 	accountLog.ID = txArgs.ID
 	accountLog.Operate = txArgs.Operate
 	accountLog.TxType = txArgs.TxType

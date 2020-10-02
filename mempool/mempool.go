@@ -853,11 +853,11 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	} else {
 		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
 			t := time.Now()
-			tmp_tx,_:=tp.NewTX(tx)
+			tmp_tx, _ := tp.NewTX(tx)
 			fmt.Printf("[tx_phase] index:tPreCheck1TX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
 		} else { //说明来自其他节点的同步
 			t := time.Now()
-			tmp_tx,_:=tp.NewTX(tx)
+			tmp_tx, _ := tp.NewTX(tx)
 			fmt.Printf("[tx_phase] index:tPreCheckTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
 		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
@@ -917,6 +917,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		return err
 	}
 	reqRes := mem.proxyAppConn.CheckTxAsync(tx)
+
 	reqRes.SetCallback(mem.reqResCb(tx, txInfo.PeerID, cb))
 	return nil
 }
@@ -950,6 +951,7 @@ func (mem *Mempool) globalCb(req *abci.Request, res *abci.Response) {
 //
 // Used in CheckTxWithInfo to record PeerID who sent us the tx.
 func (mem *Mempool) reqResCb(tx []byte, peerID uint16, externalCb func(*abci.Response)) func(res *abci.Response) {
+
 	return func(res *abci.Response) {
 		if mem.recheckCursor != nil {
 			// this should never happen
@@ -995,8 +997,8 @@ func (mem *Mempool) removeTx(tx types.Tx, elem *clist.CElement, removeFromCache 
 //
 // The case where the app checks the tx for the second and subsequent times is
 // handled by the resCbRecheck callback.
-func time2string(t int64)string{
-	return strconv.FormatInt(t,10)
+func time2string(t int64) string {
+	return strconv.FormatInt(t, 10)
 }
 func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response) {
 	switch r := res.Value.(type) {
@@ -1013,10 +1015,19 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			}
 			memTx.senders.Store(peerID, true)
 			btime := time.Now()
+
 			mem.addTx(memTx)
 			etime := time.Now()
-			mem.logger.Info(TimePhase("periodAddTX",txKey(memTx.tx),time2string(etime.Sub(btime).Nanoseconds())))
-			mem.logger.Info(TimePhase("tInsideMem",txKey(memTx.tx),time2string(time.Now().UnixNano())))
+			if cm := ParseData(memTx.tx); cm != nil {
+				fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
+				fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+			} else {
+				tmp_tx, _ := tp.NewTX(memTx.tx)
+				fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
+				fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
+
+			}
+
 			mem.logger.Info("Added good transaction",
 				"tx", TxID(tx),
 				"res", r,
@@ -1135,7 +1146,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		// 删除对应的txlist的relay_out交易
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
-			t:=time.Now()
+			t := time.Now()
 			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 			if cm.SrcZone == getShard() {
 				//fmt.Println("移除回执")
@@ -1207,9 +1218,9 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
 			txs = append(txs, byte_txlist...)
 		} else {
-			t:=time.Now()
-			tmp_tx,_ := tp.NewTX(memTx.tx)
-			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n",tmp_tx.ID , strconv.FormatInt(t.UnixNano(), 10))
+			t := time.Now()
+			tmp_tx, _ := tp.NewTX(memTx.tx)
+			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
 				return txs
