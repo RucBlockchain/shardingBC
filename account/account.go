@@ -23,7 +23,7 @@ func PrintLog(ID [sha256.Size]byte) bool {
 	if !err {
 		fmt.Println("生成大整数错误")
 	}
-	shd := big.NewInt(int64(100)) //取100模运算
+	shd := big.NewInt(int64(500)) //取100模运算
 	mod := new(big.Int)
 	_, mod = BigInt.DivMod(BigInt, shd, mod)
 	if mod.String() == "0" {
