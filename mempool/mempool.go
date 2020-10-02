@@ -1148,7 +1148,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 		// Check total size requirement
 		// 删除对应的txlist的relay_out交易
-		parse_time := time.Now()                   //解析时间
+		//parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
 			t := time.Now()
 			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
@@ -1218,8 +1218,10 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			//	//mem.logger.Info(TimePhase(41, tmp_tx1.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第41阶段打印
 			//
 			//}
-			parseend_time := time.Now()
-			fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
+			//parseend_time := time.Now()
+			//fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
+			fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+
 			txs = append(txs, byte_txlist...)
 		} else {
 			t := time.Now()
@@ -1245,6 +1247,8 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			if err != nil {
 				mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 			}
+			fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+
 			//mem.logger.Info(TimePhase(21, tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第21阶段打印
 			txs = append(txs, memTx.tx)
 		}
