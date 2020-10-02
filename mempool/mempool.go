@@ -1019,14 +1019,14 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			mem.addTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
-				fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
-				fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+				fmt.Printf("[tx_phase] index:periodAddCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
+				fmt.Printf("[tx_phase] index:tInsideMemCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 			} else {
 
 				tmp_tx, _ := tp.NewTX(memTx.tx)
 				if PrintLog(tmp_tx.ID) {
 					fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
-					fmt.Printf("[tx_phase] index:tInsideMem id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
+					fmt.Printf("[tx_phase] index:tInsideMemTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
 
 				}
 
