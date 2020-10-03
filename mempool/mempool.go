@@ -120,6 +120,8 @@ func IsPreCheckError(err error) bool {
 	_, ok := err.(ErrPreCheck)
 	return ok
 }
+
+//取模运算，模n输出。
 func PrintLog(ID [sha256.Size]byte) bool {
 	OXstring := fmt.Sprintf("%X", ID)
 	BigInt, err := new(big.Int).SetString(OXstring, 16)
@@ -861,11 +863,17 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(tx)
-			fmt.Printf("[tx_phase] index:tPreCheck1TX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			if PrintLog(tmp_tx.ID) {
+				fmt.Printf("[tx_phase] index:tPreCheck1TX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			}
 		} else { //说明来自其他节点的同步
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(tx)
-			fmt.Printf("[tx_phase] index:tPreCheckTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			if PrintLog(tmp_tx.ID) {
+				fmt.Printf("[tx_phase] index:tPreCheckTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+
+			}
+
 		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
 		if accountLog == nil {
@@ -1237,7 +1245,9 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		} else {
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(memTx.tx)
-			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			if PrintLog(tmp_tx.ID) {
+				fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			}
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
 				return txs
@@ -1258,7 +1268,9 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			if err != nil {
 				mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 			}
-			fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			if PrintLog(tmp_tx.ID) {
+				fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			}
 
 			//mem.logger.Info(TimePhase(21, tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第21阶段打印
 			txs = append(txs, memTx.tx)
