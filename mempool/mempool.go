@@ -137,10 +137,18 @@ func PrintLog(ID [sha256.Size]byte) bool {
 		return false
 	}
 }
-func LogPrint(phase string, tx_id [sha256.Size]byte, t time.Time) {
-	if PrintLog(tx_id) {
-		fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t.UnixNano(), 10))
+
+//logtype 1表示tx 2表示cm
+
+func (mem *Mempool) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int) {
+	if logtype == 1 && (mem.Plog == 1 || mem.Plog == 2) { //打印tx
+		if PrintLog(tx_id) {
+			fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t, 10))
+		}
+	} else if logtype == 2 && (mem.Plog == 2) { //打印cm
+		fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t, 10))
 	}
+
 }
 func TimePhase(phase string, tx_id [sha256.Size]byte, time string) string {
 	if PrintLog(tx_id) {
@@ -221,9 +229,9 @@ type Mempool struct {
 	proxyAppConn proxy.AppConnMempool
 	txs          *clist.CList // concurrent linked-list of good txs
 	Cms          *clist.CList
-
-	preCheck  PreCheckFunc
-	postCheck PostCheckFunc
+	Plog         int
+	preCheck     PreCheckFunc
+	postCheck    PostCheckFunc
 	//rDB          relaytxDB //relaylist
 	cmDB   CrossMessagesDB
 	RlDB   []RelationTable
@@ -304,6 +312,7 @@ func NewMempool(
 		metrics:       NopMetrics(),
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
+		Plog:          2,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -661,6 +670,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	//fmt.Println("聚合签名与解压完成")
 	//mem.logger.Error("修改cmdb完成")
 	//交易合法性检验
+	tmp_tx, _ := json.Marshal(cm)
 	for i := 0; i < len(cm.Txlist); i++ {
 		//fmt.Println("交易合法性验证")
 		accountLog := account.NewAccountLog(cm.Txlist[i])
@@ -668,7 +678,9 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 			fmt.Println("交易解析失败")
 			return errors.New("交易解析失败")
 		}
-		fmt.Printf("[tx_phase] index:tCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+		accountLog.Logtype = mem.Plog
+		mem.LogPrint("tCheckCM", txKey(tmp_tx), time.Now().UnixNano(), 2)
+		//fmt.Printf("[tx_phase] index:tCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 		checkRes := accountLog.Check() //开始打印日志 sha256.Sum256()
 		//fmt.Println("交易合法验证通过")
 		if !checkRes {
@@ -848,10 +860,12 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	if cm := ParseData(tx); cm != nil {
 		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
 			t := time.Now()
-			fmt.Printf("[tx_phase] index:tPreCheck1CM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
+			mem.LogPrint("tPreCheck1CM", txKey(tx), t.UnixNano(), 2)
+			//fmt.Printf("[tx_phase] index:tPreCheck1CM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 		} else { //说明来自其他节点的同步
 			t := time.Now()
-			fmt.Printf("[tx_phase] index:tPreCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
+			mem.LogPrint("tPreCheckCM", txKey(tx), t.UnixNano(), 2)
+			//fmt.Printf("[tx_phase] index:tPreCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 		}
 		//mem.logger.Error("接受到Cm消息")
 		if !checkdb {
@@ -861,29 +875,27 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			}
 			end_time := time.Now()
 			phase40 := end_time.Sub(begin_time)
-			fmt.Printf("[tx_phase] index:periodCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(phase40.Nanoseconds(), 10))
-			fmt.Printf("[tx_phase] index:tPostCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+			mem.LogPrint("periodCheck", txKey(tx), phase40.Nanoseconds(), 2)
+			//fmt.Printf("[tx_phase] index:periodCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(phase40.Nanoseconds(), 10))
+			mem.LogPrint("tPostCheck", txKey(tx), time.Now().UnixNano(), 2)
+			//fmt.Printf("[tx_phase] index:tPostCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 		}
 	} else {
 		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(tx)
-			if PrintLog(tmp_tx.ID) {
-				fmt.Printf("[tx_phase] index:tPreCheck1TX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
-			}
+			mem.LogPrint("tPreCheck1TX", tmp_tx.ID, t.UnixNano(), 1)
+
 		} else { //说明来自其他节点的同步
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(tx)
-			if PrintLog(tmp_tx.ID) {
-				fmt.Printf("[tx_phase] index:tPreCheckTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
-
-			}
-
+			mem.LogPrint("tPreCheckTX", tmp_tx.ID, t.UnixNano(), 1)
 		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
 		if accountLog == nil {
 			return errors.New("交易解析失败")
 		}
+		accountLog.Logtype = mem.Plog
 		checkRes := accountLog.Check()
 
 		if !checkRes {
@@ -1039,16 +1051,20 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			mem.addTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
-				fmt.Printf("[tx_phase] index:periodAddCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
-				fmt.Printf("[tx_phase] index:tInsideMemCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+				mem.LogPrint("periodAddCM", txKey(memTx.tx), etime.Sub(btime).Nanoseconds(), 2)
+				mem.LogPrint("tInsideMemCM", txKey(memTx.tx), time.Now().UnixNano(), 2)
+				//fmt.Printf("[tx_phase] index:periodAddCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
+				//fmt.Printf("[tx_phase] index:tInsideMemCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 			} else {
 
 				tmp_tx, _ := tp.NewTX(memTx.tx)
-				if PrintLog(tmp_tx.ID) {
-					fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
-					fmt.Printf("[tx_phase] index:tInsideMemTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
-
-				}
+				mem.LogPrint("periodAddTX", tmp_tx.ID, etime.Sub(btime).Nanoseconds(), 1)
+				mem.LogPrint("tInsideMemTX", tmp_tx.ID, time.Now().UnixNano(), 1)
+				//if PrintLog(tmp_tx.ID) {
+				//	fmt.Printf("[tx_phase] index:periodAddTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
+				//	fmt.Printf("[tx_phase] index:tInsideMemTX id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))
+				//
+				//}
 
 			}
 
@@ -1175,7 +1191,8 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
 			t := time.Now()
-			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
+			mem.LogPrint("tReapMem1", txKey(memTx.tx), t.UnixNano(), 2)
+			//fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 			if cm.SrcZone == getShard() {
 				//fmt.Println("移除回执")
 				var txs types.Txs
@@ -1243,16 +1260,19 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			//
 			//}
 			parseend_time := time.Now()
-			fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
-			fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+			mem.LogPrint("pickCM", txKey(memTx.tx), parseend_time.Sub(parse_time).Nanoseconds(), 2)
+			mem.LogPrint("tReapMemDone1", txKey(memTx.tx), time.Now().UnixNano(), 2)
+			//fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
+			//fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 
 			txs = append(txs, byte_txlist...)
 		} else {
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(memTx.tx)
-			if PrintLog(tmp_tx.ID) {
-				fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
-			}
+			mem.LogPrint("tReapMem1", tmp_tx.ID, t.UnixNano(), 1)
+			//if PrintLog(tmp_tx.ID) {
+			//	fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			//}
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
 				return txs
@@ -1273,9 +1293,10 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			if err != nil {
 				mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 			}
-			if PrintLog(tmp_tx.ID) {
-				fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
-			}
+			mem.LogPrint("tReapMemDone1", tmp_tx.ID, t.UnixNano(), 1)
+			//if PrintLog(tmp_tx.ID) {
+			//	fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
+			//}
 
 			//mem.logger.Info(TimePhase(21, tmp_tx.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第21阶段打印
 			txs = append(txs, memTx.tx)

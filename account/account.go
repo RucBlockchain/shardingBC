@@ -44,6 +44,7 @@ type AccountLog struct {
 	Time    string //发送时间
 	Amount  int    // 金额
 	Operate int    // 支出方: 0,  接收方: 1
+	Logtype int    //日志打印级别
 }
 
 // 接受到的交易请求，仅供测试使用
@@ -58,7 +59,6 @@ type TxArg struct {
 }
 
 func TimePhase(phase string, tx_id [sha256.Size]byte, time string) string {
-
 	return fmt.Sprintf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, time)
 }
 
@@ -94,7 +94,7 @@ func (accountLog *AccountLog) Check() bool {
 
 		return true
 	}
-	if PrintLog(accountLog.ID) {
+	if PrintLog(accountLog.ID) && (accountLog.Logtype == 1 || accountLog.Logtype == 2) {
 		logger.Info(TimePhase("tPoposeTx", accountLog.ID, t)) //第一阶段打印
 	}
 	//if PrintLog(accountLog.ID){
