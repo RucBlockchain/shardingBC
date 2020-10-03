@@ -1174,7 +1174,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		// 删除对应的txlist的relay_out交易
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
-			//t := time.Now()
+			t := time.Now()
 			fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
 			if cm.SrcZone == getShard() {
 				//fmt.Println("移除回执")
