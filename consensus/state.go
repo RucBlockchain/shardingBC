@@ -1018,6 +1018,8 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 		block, blockParts = cs.createProposalBlock()
 		end_time := time.Now()
 		PrintinfoTime(1, block.Hash(), strconv.FormatInt(end_time.Sub(beign_time).Nanoseconds(), 10))
+		// [TimeAnalysis] 共识耗时起点
+		tp.ConsensusBegin = time.Now()
 		if block == nil { // on error
 			return
 		}
@@ -1765,6 +1767,9 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 		if err != nil {
 			return added, err
 		}
+
+		// [TimeAnalysis] 共识耗时起点
+		tp.ConsensusBegin = time.Now()
 		// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 		cs.Logger.Info("Received complete proposal block", "height", cs.ProposalBlock.Height, "hash", cs.ProposalBlock.Hash())
 		cs.eventBus.PublishEventCompleteProposal(cs.CompleteProposalEvent())

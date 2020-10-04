@@ -520,6 +520,7 @@ func (blockExec *BlockExecutor) Commit(
 		"Committed state",
 		"height", block.Height,
 		"txs", block.NumTxs,
+		"time", time.Now().Sub(tp.ConsensusBegin).Seconds(), // [TimeAnalysis] 共识耗时终点
 		"appHash", fmt.Sprintf("%X", res.Data),
 	)
 	// Update mempool.
