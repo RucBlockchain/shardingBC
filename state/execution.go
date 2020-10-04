@@ -514,13 +514,19 @@ func (blockExec *BlockExecutor) Commit(
 		)
 		return nil, err
 	}
+	var timeCost float64
 	// ResponseCommit has no error code - just data
+	if tp.CurrentHeight != block.Height {
+		timeCost = 0.0
+	} else {
+		timeCost = time.Now().Sub(tp.ConsensusBegin).Seconds()
+	}
 
 	blockExec.logger.Info(
 		"Committed state",
 		"height", block.Height,
 		"txs", block.NumTxs,
-		"time", time.Now().Sub(tp.ConsensusBegin).Seconds(), // [TimeAnalysis] 共识耗时终点
+		"time", timeCost, // [TimeAnalysis] 共识耗时终点
 		"appHash", fmt.Sprintf("%X", res.Data),
 	)
 	// Update mempool.

@@ -25,6 +25,7 @@ var (
 	logger          = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 	identypesLogger = logger.With("module", "identypes")
 	ConsensusBegin  = time.Now()
+	CurrentHeight   int64
 )
 
 /*

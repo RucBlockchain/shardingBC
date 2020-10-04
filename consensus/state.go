@@ -926,6 +926,7 @@ func (cs *ConsensusState) enterPropose(height int64, round int) {
 	defer func() {
 		// [TimeAnalysis] 共识耗时起点
 		tp.ConsensusBegin = time.Now()
+		tp.CurrentHeight = height
 
 		// Done enterPropose:
 		cs.updateRoundStep(round, cstypes.RoundStepPropose)
@@ -1012,7 +1013,6 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 	var blockParts *types.PartSet
 	// cs.Logger.Error("make proposal")
 	// Decide on block
-	tp.ConsensusBegin = time.Now()
 
 	if cs.ValidBlock != nil {
 		// If there is valid block, choose that.
