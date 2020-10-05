@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"syscall"
 	"time"
-
+	"crypto/sha256"
 	"github.com/gorilla/websocket"
 	"github.com/tendermint/tendermint/account"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
-
+	"math/rand"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
@@ -327,6 +327,9 @@ func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
 	cpTxs := blockExec.mempool.GetAllCrossMessages()
 	return cpTxs
 }
+func (blockExec *BlockExecutor) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int)  {
+	blockExec.mempool.LogPrint(phase,tx_id,t,logtype)
+}
 
 func (blockExec *BlockExecutor) AddCrossMessagesDB(tcm *tp.CrossMessages) {
 	blockExec.mempool.AddCrossMessagesDB(tcm)
@@ -386,11 +389,11 @@ func GetTotal() int {
 }
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
-	//rand.Seed(time.Now().UnixNano())
-	//name := DesZone + "S"+string(rand.Intn(GetTotal()))+":26657"
-	name := DesZone + "S1" + ":26657"
+	rand.Seed(time.Now().UnixNano())
+	name := DesZone + "S"+strconv.Itoa(rand.Intn(GetTotal())+1)+":26657"
+	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
-	//fmt.Println("要发送的目的地",name)
+	fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
 	go client.BroadcastCrossMessageAsync(tx_package)
