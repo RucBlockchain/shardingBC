@@ -924,6 +924,10 @@ func (cs *ConsensusState) enterPropose(height int64, round int) {
 	logger.Info(fmt.Sprintf("enterPropose(%v/%v). Current: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 
 	defer func() {
+		// [TimeAnalysis] 共识耗时起点
+		tp.ConsensusBegin = time.Now()
+		tp.CurrentHeight = height
+
 		// Done enterPropose:
 		cs.updateRoundStep(round, cstypes.RoundStepPropose)
 		cs.newStep()
@@ -1009,6 +1013,7 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 	var blockParts *types.PartSet
 	// cs.Logger.Error("make proposal")
 	// Decide on block
+
 	if cs.ValidBlock != nil {
 		// If there is valid block, choose that.
 		block, blockParts = cs.ValidBlock, cs.ValidBlockParts
@@ -1765,6 +1770,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 		if err != nil {
 			return added, err
 		}
+
 		// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 		cs.Logger.Info("Received complete proposal block", "height", cs.ProposalBlock.Height, "hash", cs.ProposalBlock.Hash())
 		cs.eventBus.PublishEventCompleteProposal(cs.CompleteProposalEvent())
