@@ -132,7 +132,7 @@ func PrintLog(ID [sha256.Size]byte) bool {
 	if !err {
 		fmt.Println("生成大整数错误")
 	}
-	shd := big.NewInt(int64(500)) //取100模运算
+	shd := big.NewInt(int64(200)) //取100模运算
 	mod := new(big.Int)
 	_, mod = BigInt.DivMod(BigInt, shd, mod)
 	if mod.String() == "0" {
@@ -145,6 +145,12 @@ func PrintLog(ID [sha256.Size]byte) bool {
 //logtype 1表示tx 2表示cm
 
 func (mem *Mempool) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int) {
+	if logtype == 0{ // 打印交易级别的response time
+		if PrintLog(tx_id) {
+            fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t, 10))
+			return
+        }
+	}
 	if logtype == 1 && (mem.Plog == 1 || mem.Plog == 2) { //打印tx
 		if PrintLog(tx_id) {
 			fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t, 10))
@@ -316,7 +322,7 @@ func NewMempool(
 		metrics:       NopMetrics(),
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:          1,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
+		Plog:          0,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
