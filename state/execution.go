@@ -390,10 +390,9 @@ func GetTotal() int {
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
 	rand.Seed(time.Now().UnixNano())
-	name := DesZone + "S"+strconv.Itoa(rand.Intn(GetTotal())+1)+":26657"
-	// name := DesZone + "S1" + ":26657"
+	//name := DesZone + "S"+strconv.Itoa(rand.Intn(GetTotal())+1)+":26657"
+	name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
-	fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
 	go client.BroadcastCrossMessageAsync(tx_package)
