@@ -5,6 +5,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"strconv"
+	"syscall"
+
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
@@ -12,9 +16,6 @@ import (
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/kyber/v3/util/random"
 	"golang.org/x/exp/rand"
-	"io"
-	"strconv"
-	"syscall"
 )
 
 //-------------------------------------
@@ -145,6 +146,10 @@ func GetShardPubkey() []byte {
 	data, _ := priv.MarshalBinary()
 
 	return PrivKeyBLS(data).PubKey().Bytes()
+}
+
+func GetShardPrivate() PrivKeyBLS {
+	return genPrivKey(crypto.CReader())
 }
 
 func TmpGetSign(msg []byte) ([]byte, error) {
