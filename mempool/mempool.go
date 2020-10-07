@@ -6,20 +6,25 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+
 	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
+
 	//cm "github.com/tendermint/tendermint/consensus"
-	"github.com/tendermint/tendermint/crypto/bls"
-	"github.com/tendermint/tendermint/crypto/merkle"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/tendermint/tendermint/crypto/bls"
+	"github.com/tendermint/tendermint/crypto/merkle"
+
 	"github.com/pkg/errors"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/account"
+
+	"math/big"
 
 	cfg "github.com/tendermint/tendermint/config"
 	tp "github.com/tendermint/tendermint/identypes"
@@ -29,7 +34,6 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
-	"math/big"
 	//"github.com/tendermint/tendermint/state"
 )
 
@@ -312,7 +316,7 @@ func NewMempool(
 		metrics:       NopMetrics(),
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:          2,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
+		Plog:          1,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)

@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 	"strconv"
 
-	//"strings"
+	"strings"
 	"sync"
 	"time"
 
@@ -924,6 +924,10 @@ func (cs *ConsensusState) enterPropose(height int64, round int) {
 	logger.Info(fmt.Sprintf("enterPropose(%v/%v). Current: %v/%v/%v", height, round, cs.Height, cs.Round, cs.Step))
 
 	defer func() {
+		// [TimeAnalysis] 共识耗时起点
+		tp.ConsensusBegin = time.Now()
+		tp.CurrentHeight = height
+
 		// Done enterPropose:
 		cs.updateRoundStep(round, cstypes.RoundStepPropose)
 		cs.newStep()
@@ -1009,6 +1013,7 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 	var blockParts *types.PartSet
 	// cs.Logger.Error("make proposal")
 	// Decide on block
+
 	if cs.ValidBlock != nil {
 		// If there is valid block, choose that.
 		block, blockParts = cs.ValidBlock, cs.ValidBlockParts
@@ -1382,7 +1387,12 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
-
+func (cs *ConsensusState)ParseTxTime(tx *tp.TX,phase string){
+	t := time.Now()
+	args := strings.Split(string(tx.Content), "_")
+	t1,_ := strconv.Atoi(args[3])
+	cs.blockExec.LogPrint(phase,tx.ID,t.UnixNano()-int64(t1),1)
+}
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
@@ -1406,6 +1416,14 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				txcount += 1
 			}
 			tx.PrintInfo()
+			if tx.Txtype=="relaytx" && tx.Operate==0{
+				continue
+			}
+			if tx.Txtype=="relaytx" && tx.Operate == 1{
+				cs.ParseTxTime(tx,"RelayRes")
+			}
+			cs.ParseTxTime(tx,"TxRes")
+
 		}
 		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
 		fmt.Printf("[tx_statistics]rate=%f relaycount=%d txcount=%d", rate, relaycount, txcount)
@@ -1765,6 +1783,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 		if err != nil {
 			return added, err
 		}
+
 		// NOTE: it's possible to receive complete proposal blocks for future rounds without having the proposal
 		cs.Logger.Info("Received complete proposal block", "height", cs.ProposalBlock.Height, "hash", cs.ProposalBlock.Hash())
 		cs.eventBus.PublishEventCompleteProposal(cs.CompleteProposalEvent())

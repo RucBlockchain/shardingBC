@@ -11,20 +11,18 @@ services:
     - TASKID=0
     - TASKINDEX=1
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=dd7f97c8507ba2a53bef0f405b9fcd16c5bb9b5c@0S5:26656,5e4df16a797dadea8815ca4955be4b1001b70196@0S3:26656,0d3db18ffb55630e6fd9e18a03d9249fb7497d34@0S2:26656
+    - tendermint node --p2p.persistent_peers=3d5a752f63f79804f850c85b37e025753372766d@0S5:26656,34e147f38bc2334da41a825254dd24c9df08624a@0S3:26656,089eadb6173dd80afc2fef48c1bfa5a2849be155@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
         - 0S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S2:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S2
@@ -36,10 +34,11 @@ services:
     - TASKID=0
     - TASKINDEX=2
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=84ab53eb4e222c3d360e9627bae0f1a43e6c5e03@0S1:26656,5c73d5e86ae5275faecc6895277dd8992a357832@0S4:26656,bae37b167952261bda94c7b32f55449135b0b9ff@0S6:26656
+    - tendermint node --p2p.persistent_peers=b8d7107ee450bfcf6e7f177b34b95fcd4ea65cbd@0S1:26656,fb74a4a833ec31c3eb0d2ac634793bc05bc4d5a5@0S4:26656,e0e6f5e9d2997aff18d535747a387efe98e31b76@0S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -47,11 +46,8 @@ services:
         - 0S2
     links:
     - 0S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S3:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S3
@@ -63,10 +59,11 @@ services:
     - TASKID=0
     - TASKINDEX=3
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=84ab53eb4e222c3d360e9627bae0f1a43e6c5e03@0S1:26656,497ff2729ef16288bfef7af59b1ae5af6c5ddb24@0S7:26656,5c73d5e86ae5275faecc6895277dd8992a357832@0S4:26656
+    - tendermint node --p2p.persistent_peers=b8d7107ee450bfcf6e7f177b34b95fcd4ea65cbd@0S1:26656,eaa2b3747faaf7bd7c5c0c50be8b72164f3bbce5@0S7:26656,fb74a4a833ec31c3eb0d2ac634793bc05bc4d5a5@0S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -74,11 +71,8 @@ services:
         - 0S3
     links:
     - 0S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S4:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S4
@@ -90,10 +84,11 @@ services:
     - TASKID=0
     - TASKINDEX=4
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=5e4df16a797dadea8815ca4955be4b1001b70196@0S3:26656,0d3db18ffb55630e6fd9e18a03d9249fb7497d34@0S2:26656,35777e28a527d495bf09ffb90a0a33b2c5b4b892@0S8:26656
+    - tendermint node --p2p.persistent_peers=34e147f38bc2334da41a825254dd24c9df08624a@0S3:26656,089eadb6173dd80afc2fef48c1bfa5a2849be155@0S2:26656,44172354b4308f3317b8185d4d5ceaa5d5d41aef@0S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -101,11 +96,8 @@ services:
         - 0S4
     links:
     - 0S3
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S5:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S5
@@ -117,10 +109,11 @@ services:
     - TASKID=0
     - TASKINDEX=5
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=84ab53eb4e222c3d360e9627bae0f1a43e6c5e03@0S1:26656,497ff2729ef16288bfef7af59b1ae5af6c5ddb24@0S7:26656,bae37b167952261bda94c7b32f55449135b0b9ff@0S6:26656
+    - tendermint node --p2p.persistent_peers=b8d7107ee450bfcf6e7f177b34b95fcd4ea65cbd@0S1:26656,eaa2b3747faaf7bd7c5c0c50be8b72164f3bbce5@0S7:26656,e0e6f5e9d2997aff18d535747a387efe98e31b76@0S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -128,11 +121,8 @@ services:
         - 0S5
     links:
     - 0S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S6:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S6
@@ -144,10 +134,11 @@ services:
     - TASKID=0
     - TASKINDEX=6
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=dd7f97c8507ba2a53bef0f405b9fcd16c5bb9b5c@0S5:26656,35777e28a527d495bf09ffb90a0a33b2c5b4b892@0S8:26656,0d3db18ffb55630e6fd9e18a03d9249fb7497d34@0S2:26656
+    - tendermint node --p2p.persistent_peers=3d5a752f63f79804f850c85b37e025753372766d@0S5:26656,44172354b4308f3317b8185d4d5ceaa5d5d41aef@0S8:26656,089eadb6173dd80afc2fef48c1bfa5a2849be155@0S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -155,11 +146,8 @@ services:
         - 0S6
     links:
     - 0S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S7:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S7
@@ -171,10 +159,11 @@ services:
     - TASKID=0
     - TASKINDEX=7
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=dd7f97c8507ba2a53bef0f405b9fcd16c5bb9b5c@0S5:26656,5e4df16a797dadea8815ca4955be4b1001b70196@0S3:26656,35777e28a527d495bf09ffb90a0a33b2c5b4b892@0S8:26656
+    - tendermint node --p2p.persistent_peers=3d5a752f63f79804f850c85b37e025753372766d@0S5:26656,34e147f38bc2334da41a825254dd24c9df08624a@0S3:26656,44172354b4308f3317b8185d4d5ceaa5d5d41aef@0S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -182,11 +171,8 @@ services:
         - 0S7
     links:
     - 0S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
   0S8:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 0S8
@@ -198,10 +184,11 @@ services:
     - TASKID=0
     - TASKINDEX=8
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=5c73d5e86ae5275faecc6895277dd8992a357832@0S4:26656,bae37b167952261bda94c7b32f55449135b0b9ff@0S6:26656,497ff2729ef16288bfef7af59b1ae5af6c5ddb24@0S7:26656
+    - tendermint node --p2p.persistent_peers=fb74a4a833ec31c3eb0d2ac634793bc05bc4d5a5@0S4:26656,e0e6f5e9d2997aff18d535747a387efe98e31b76@0S6:26656,eaa2b3747faaf7bd7c5c0c50be8b72164f3bbce5@0S7:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -209,11 +196,8 @@ services:
         - 0S8
     links:
     - 0S4
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=1
 services:
   1S1:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
@@ -226,20 +210,18 @@ services:
     - TASKID=1
     - TASKINDEX=1
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=21c57192b11b9cc0f59b05b58ec1eea3e7fb02bd@1S5:26656,dea1aebab608ece0c1d0655958500c223fced701@1S3:26656,99fe41c25493bba82c82ad5e7f20dcb3eccae5b4@1S2:26656
+    - tendermint node --p2p.persistent_peers=789e0ae3953c22c6554057674dfeae5d173b019f@1S5:26656,898dac3cf1e7af96ca84ac305e2d01e88e5c818b@1S3:26656,583df859eee2e8d0b4904c31a98694bf52fd89e1@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
         aliases:
         - 1S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S2:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S2
@@ -251,10 +233,11 @@ services:
     - TASKID=1
     - TASKINDEX=2
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=1c2bebfdc493373d80057301aab91cee7df8d679@1S1:26656,64172ae98fdeaf124d2833f2a7362a2b26461c4a@1S4:26656,51929dfff098be8796b9db815345b2ec7fb7003f@1S6:26656
+    - tendermint node --p2p.persistent_peers=9e8fe56cb9cddb360ca4b124b7923db898caf6f6@1S1:26656,32e3909fa0cd782c109809430586e826fa54ad23@1S4:26656,9a1124989a3a60b6700c2f168cbb27e92d81bc1f@1S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -262,11 +245,8 @@ services:
         - 1S2
     links:
     - 1S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S3:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S3
@@ -278,10 +258,11 @@ services:
     - TASKID=1
     - TASKINDEX=3
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=1c2bebfdc493373d80057301aab91cee7df8d679@1S1:26656,61b34d56455fcd0cc128c975cd07b0cdfe97a379@1S7:26656,64172ae98fdeaf124d2833f2a7362a2b26461c4a@1S4:26656
+    - tendermint node --p2p.persistent_peers=9e8fe56cb9cddb360ca4b124b7923db898caf6f6@1S1:26656,c65ea2f895b5a59b59785db0e12ab5125e3d55ab@1S7:26656,32e3909fa0cd782c109809430586e826fa54ad23@1S4:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -289,11 +270,8 @@ services:
         - 1S3
     links:
     - 1S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S4:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S4
@@ -305,10 +283,11 @@ services:
     - TASKID=1
     - TASKINDEX=4
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=dea1aebab608ece0c1d0655958500c223fced701@1S3:26656,99fe41c25493bba82c82ad5e7f20dcb3eccae5b4@1S2:26656,165c8ca542178e3fcf76b73d0993f6a00eb0e894@1S8:26656
+    - tendermint node --p2p.persistent_peers=898dac3cf1e7af96ca84ac305e2d01e88e5c818b@1S3:26656,583df859eee2e8d0b4904c31a98694bf52fd89e1@1S2:26656,509dec7a48f5cc3b58a34df0c719ac4d054a9e5f@1S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -316,11 +295,8 @@ services:
         - 1S4
     links:
     - 1S3
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S5:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S5
@@ -332,10 +308,11 @@ services:
     - TASKID=1
     - TASKINDEX=5
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=1c2bebfdc493373d80057301aab91cee7df8d679@1S1:26656,61b34d56455fcd0cc128c975cd07b0cdfe97a379@1S7:26656,51929dfff098be8796b9db815345b2ec7fb7003f@1S6:26656
+    - tendermint node --p2p.persistent_peers=9e8fe56cb9cddb360ca4b124b7923db898caf6f6@1S1:26656,c65ea2f895b5a59b59785db0e12ab5125e3d55ab@1S7:26656,9a1124989a3a60b6700c2f168cbb27e92d81bc1f@1S6:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -343,11 +320,8 @@ services:
         - 1S5
     links:
     - 1S1
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S6:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S6
@@ -359,10 +333,11 @@ services:
     - TASKID=1
     - TASKINDEX=6
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=21c57192b11b9cc0f59b05b58ec1eea3e7fb02bd@1S5:26656,165c8ca542178e3fcf76b73d0993f6a00eb0e894@1S8:26656,99fe41c25493bba82c82ad5e7f20dcb3eccae5b4@1S2:26656
+    - tendermint node --p2p.persistent_peers=789e0ae3953c22c6554057674dfeae5d173b019f@1S5:26656,509dec7a48f5cc3b58a34df0c719ac4d054a9e5f@1S8:26656,583df859eee2e8d0b4904c31a98694bf52fd89e1@1S2:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -370,11 +345,8 @@ services:
         - 1S6
     links:
     - 1S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S7:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S7
@@ -386,10 +358,11 @@ services:
     - TASKID=1
     - TASKINDEX=7
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=21c57192b11b9cc0f59b05b58ec1eea3e7fb02bd@1S5:26656,dea1aebab608ece0c1d0655958500c223fced701@1S3:26656,165c8ca542178e3fcf76b73d0993f6a00eb0e894@1S8:26656
+    - tendermint node --p2p.persistent_peers=789e0ae3953c22c6554057674dfeae5d173b019f@1S5:26656,898dac3cf1e7af96ca84ac305e2d01e88e5c818b@1S3:26656,509dec7a48f5cc3b58a34df0c719ac4d054a9e5f@1S8:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -397,11 +370,8 @@ services:
         - 1S7
     links:
     - 1S5
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
   1S8:
     image: registry-vpc.cn-beijing.aliyuncs.com/ruc500/shardingbc:latest
     container_name: 1S8
@@ -413,10 +383,11 @@ services:
     - TASKID=1
     - TASKINDEX=8
     - THRESHOLD=6
+    - Count=8
     entrypoint:
     - sh
     - -c
-    - tendermint node --p2p.persistent_peers=64172ae98fdeaf124d2833f2a7362a2b26461c4a@1S4:26656,51929dfff098be8796b9db815345b2ec7fb7003f@1S6:26656,61b34d56455fcd0cc128c975cd07b0cdfe97a379@1S7:26656
+    - tendermint node --p2p.persistent_peers=32e3909fa0cd782c109809430586e826fa54ad23@1S4:26656,9a1124989a3a60b6700c2f168cbb27e92d81bc1f@1S6:26656,c65ea2f895b5a59b59785db0e12ab5125e3d55ab@1S7:26656
       --moniker=`hostname` --proxy_app=persistent_kvstore
     networks:
       tendermintnet1:
@@ -424,11 +395,8 @@ services:
         - 1S8
     links:
     - 1S4
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: 192.168.0.190:24224
-        tag: docker.origin
+    labels:
+      io.rancher.scheduler.affinity:host_label: label=2
 
 networks:
   tendermintnet1:
