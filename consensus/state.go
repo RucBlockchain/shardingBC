@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 	"strconv"
 
-	//"strings"
+	"strings"
 	"sync"
 	"time"
 
@@ -1387,7 +1387,12 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
-
+func (cs *ConsensusState)ParseTxTime(tx *tp.TX,phase string){
+	t := time.Now()
+	args := strings.Split(string(tx.Content), "_")
+	t1,_ := strconv.Atoi(args[3])
+	cs.blockExec.LogPrint(phase,tx.ID,t.UnixNano()-int64(t1),1)
+}
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
@@ -1411,6 +1416,14 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				txcount += 1
 			}
 			tx.PrintInfo()
+			if tx.Txtype=="relaytx" && tx.Operate==0{
+				continue
+			}
+			if tx.Txtype=="relaytx" && tx.Operate == 1{
+				cs.ParseTxTime(tx,"RelayRes")
+			}
+			cs.ParseTxTime(tx,"TxRes")
+
 		}
 		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
 		fmt.Printf("[tx_statistics]rate=%f relaycount=%d txcount=%d", rate, relaycount, txcount)

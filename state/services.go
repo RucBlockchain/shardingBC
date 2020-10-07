@@ -5,6 +5,7 @@ import (
 	"github.com/tendermint/tendermint/mempool"
 	"github.com/tendermint/tendermint/types"	
 	tp "github.com/tendermint/tendermint/identypes"
+	"crypto/sha256"
 )
 
 //------------------------------------------------------
@@ -34,6 +35,7 @@ type Mempool interface {
 	SearchRelationTable(Height int64)[]tp.Package
 	ModifyRelationTable(packages []byte,cfs []byte,height int64)
 	SearchPackageExist(pack tp.Package)bool
+	LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int)
 	SyncRelationTable(pack tp.Package,height int64)
 	Size() int
 	CheckTx(types.Tx, func(*abci.Response)) error
@@ -57,6 +59,8 @@ var _ Mempool = MockMempool{}
 func (MockMempool) Lock()     {}
 func (MockMempool) Unlock()   {}
 func (MockMempool) Size() int { return 0 }
+func (MockMempool)LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int){}
+
 func (MockMempool) CheckTx(_ types.Tx, _ func(*abci.Response)) error {
 	return nil
 }
