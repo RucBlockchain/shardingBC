@@ -591,7 +591,7 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
-			name := dbtx.SrcZone + "S" + cm.SrcIndex + ":26657"
+			name := "tt"+dbtx.SrcZone + "s" + cm.SrcIndex + ":26657"
 			//	fmt.Println("发送",name)
 			// fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
 			//)

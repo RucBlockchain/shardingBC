@@ -390,7 +390,7 @@ func GetTotal() int {
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
 	rand.Seed(time.Now().UnixNano())
-	name := DesZone + "S"+strconv.Itoa(rand.Intn(GetTotal())+1)+":26657"
+	name := "tt"+DesZone + "s"+strconv.Itoa(rand.Intn(GetTotal())+1)+":26657"
 	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
 	fmt.Println("要发送的目的地",name)
