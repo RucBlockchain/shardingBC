@@ -3,9 +3,9 @@ package main
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	crand "crypto/rand"
 	"flag"
 	"fmt"
+	"math/rand"
 
 	//"github.com/gorilla/websocket"
 	"os"
@@ -22,10 +22,12 @@ import (
 
 var logger = log.NewNopLogger()
 
+//var rander = crand.Reader
+var rander = rand.New(rand.NewSource(int64(0))) // for debug
+
 type plist []*ecdsa.PrivateKey
 
 func main() {
-
 	//durationInt表示持续时间
 	//txsRate 发送交易个数
 	//connections表示链接的个数
@@ -71,14 +73,7 @@ Examples:
 		flagSet.Usage()
 		os.Exit(1)
 	}
-	//fmt.Println("我使用了连接！！！")
-	//c1 := myline.UseConnect("A",0)
-	//go func(c *websocket.Conn){
-	//	_,p,_:=c.ReadMessage()
-	//	fmt.Println(p)
-	//}(c1)
 
-	//fmt.Println("连接关闭！！！")
 	if verbose {
 		if outputFormat == "json" {
 			printErrorAndExit("Verbose mode not supported with json output.")
@@ -199,11 +194,9 @@ func createCount(allshard []string, num int) []plist {
 		// var pl plist
 		pl := make(plist, num)
 		for j := 0; j < num; j++ {
-			priv, _ := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
-			// pl = append(pl, priv)
+			priv, _ := ecdsa.GenerateKey(elliptic.P256(), rander)
 			pl[j] = priv
 		}
-		// count = append(count, pl)
 		count[i] = pl
 	}
 	return count
@@ -238,26 +231,7 @@ func startTransacters(
 		}(i)
 	}
 	iwg.Wait()
-	// fmt.Println("创建账户完成")
-	//发送交易
-	// wg := sync.WaitGroup{}
-	// wg.Add(len(endpoints))
-	// for i, e := range endpoints {
-	// 	shard := allshard[i]
-	// 	flag := 1
-	// 	t := newTransacter(e, connections, txsRate, txSize, shard, allshard, relayrate, count, flag, broadcastTxMethod)
-	// 	t.SetLogger(logger)
-	// 	go func(i int) {
-	// 		defer wg.Done()
-	// 		if err := t.Start(); err != nil {
-	// 			fmt.Fprintln(os.Stderr, err)
-	// 			os.Exit(1)
-	// 		}
-	// 		transacters[i] = t
-	// 	}(i)
-	// }
-	// wg.Wait()
-	// fmt.Println("交易发送完成")
+
 	return transacters
 }
 
