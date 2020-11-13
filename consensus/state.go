@@ -100,7 +100,6 @@ type RPCRequest struct {
 // The internal state machine receives input from peers, the internal validator, and from a timer.
 type ConsensusState struct {
 	cmn.BaseService
-	my *myline.Line
 	// config details
 
 	config        *cfg.ConsensusConfig
@@ -166,20 +165,6 @@ type node struct {
 	target map[string][]string
 }
 
-func (cs *ConsensusState) newline() *myline.Line {
-	endpoints := &node{
-		target: make(map[string][]string, 16),
-	}
-
-	endpoints.target["A"] = []string{"192.168.5.56:26657", "192.168.5.56:36657", "192.168.5.56:46657", "192.168.5.56:56657"}
-	endpoints.target["B"] = []string{"192.168.5.57:26657", "192.168.5.57:36657", "192.168.5.57:46657", "192.168.5.57:56657"}
-	endpoints.target["C"] = []string{"192.168.5.58:26657", "192.168.5.58:36657", "192.168.5.58:46657", "192.168.5.58:56657"}
-	endpoints.target["D"] = []string{"192.168.5.60:26657", "192.168.5.60:36657", "192.168.5.60:46657", "192.168.5.60:56657"}
-
-	l := myline.NewLine(endpoints.target)
-	return l
-}
-
 // StateOption sets an optional parameter on the ConsensusState.
 type StateOption func(*ConsensusState)
 
@@ -215,13 +200,6 @@ func NewConsensusState(
 	cs.setProposal = cs.defaultSetProposal
 
 	cs.updateToState(state)
-	cs.my = cs.newline()
-	//go func(){
-	//	if err:=cs.my.Start();err!=nil{
-	//		fmt.Println(err)
-	//	}
-	//	fmt.Println("state connect!!!!!!!!!!!!!!!!")
-	//}()
 
 	// Don't call scheduleRound0 yet.
 	// We do that upon Start().
@@ -1003,6 +981,12 @@ func getIp() string {
 	}
 	return ""
 }
+
+func getNode() string {
+	v, _ := syscall.Getenv("TASKINDEX")
+	return v
+}
+
 func getShard() string {
 	v, _ := syscall.Getenv("TASKID")
 	return v
@@ -1387,12 +1371,13 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
-func (cs *ConsensusState)ParseTxTime(tx *tp.TX,phase string){
+func (cs *ConsensusState) ParseTxTime(tx *tp.TX, phase string) {
 	t := time.Now()
 	args := strings.Split(string(tx.Content), "_")
-	t1,_ := strconv.Atoi(args[3])
-	cs.blockExec.LogPrint(phase,tx.ID,t.UnixNano()-int64(t1),1)
+	t1, _ := strconv.Atoi(args[3])
+	cs.blockExec.LogPrint(phase, tx.ID, t.UnixNano()-int64(t1), 1)
 }
+
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
@@ -1416,13 +1401,13 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				txcount += 1
 			}
 			tx.PrintInfo()
-			if tx.Txtype=="relaytx" && tx.Operate==0{
+			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				continue
 			}
-			if tx.Txtype=="relaytx" && tx.Operate == 1{
-				cs.ParseTxTime(tx,"RelayRes")
+			if tx.Txtype == "relaytx" && tx.Operate == 1 {
+				cs.ParseTxTime(tx, "RelayRes")
 			}
-			cs.ParseTxTime(tx,"TxRes")
+			cs.ParseTxTime(tx, "TxRes")
 
 		}
 		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
@@ -1603,8 +1588,13 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// Execute and commit the block, update and save the state, and update the mempool.
 	// NOTE The block.AppHash wont reflect these txs until the next block.
 	cs.Logger.Debug("try add aggragate")
+
+	// 生成心跳信息 - 只在commit阶段生成心跳消息
+	cs.PingPong()
+
 	//对区块进行修改,由于会改变tx的内容所以在这里进行处理
 	cs.tryAddAggragate2Block()
+
 	var err error
 	stateCopy, err = cs.blockExec.ApplyBlock(stateCopy, types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}, block, flag)
 	if err != nil {
@@ -1646,6 +1636,46 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// * cs.Step is now cstypes.RoundStepNewHeight
 	// * cs.StartTime is set to when we will start round0.
 
+}
+
+func (cs *ConsensusState) PingPong() {
+	var err error
+
+	// 获取2/3的投票的子签名
+	voteSet := cs.Votes.Prevotes(cs.CommitRound)
+
+	shardid, nodeid := getShard(), getNode()
+
+	var ids = make([]int64, 0, len(voteSet.PartSigs))
+	var sigs = make([][]byte, 0, len(voteSet.PartSigs))
+	for i := 0; i < len(voteSet.PartSigs); i++ {
+		ids = append(ids, voteSet.PartSigs[i].Id)
+		sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
+	}
+
+	var threshold int // 系统参数 外部获取
+	if s, found := syscall.Getenv("THRESHOLD"); found {
+		threshold, _ = strconv.Atoi(s)
+	} else {
+		threshold = 3
+	}
+
+	blockhead, err := cs.ProposalBlock.Marshal()
+	if err != nil {
+		cs.Logger.Error("marshal block head failed, err: %v", err)
+		return
+	}
+
+	signature, err := bls.SignatureRecovery(threshold, sigs, ids)
+	if err != nil {
+		cs.Logger.Error("[signature] threshold signature recover error, %v", err)
+		return
+	}
+	heartmsg := tp.NewHeartMsg(signature, shardid, nodeid, tp.Normal, blockhead)
+
+	fmt.Println("[heart] ", heartmsg)
+
+	// TODO to send
 }
 
 func (cs *ConsensusState) isEqual(lastProposer []byte) bool {
@@ -2071,11 +2101,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	addr := cs.privValidator.GetPubKey().Address()
 	valIndex, _ := cs.Validators.GetByAddress(addr)
 
-	//crossTxNum := 0
-	//if cs.ProposalBlock != nil && cs.ProposalBlock.Txs != nil {
-	//	crossTxNum = len(cs.ProposalBlock.Txs)
-	//}
-
 	vote := &types.Vote{
 		ValidatorAddress: addr,
 		ValidatorIndex:   valIndex,
@@ -2085,7 +2110,7 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		Type:             type_,
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
 		PartSig:          &tp.PartSig{PeerCrossSig: nil, Id: types.ParseId()},
-		//CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
+		PartBlockSig:     &tp.PartSig{PeerCrossSig: nil, Id: types.ParseId()},
 	}
 
 	//这里是对跨片进行签名
@@ -2097,8 +2122,13 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 			cs.Logger.Error("在mempool未找到对应交易，投反对票")
 			vote.BlockID.Hash = nil //投反对票
 		} else {
-			err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, vote)
-			// log for DEBUG
+			// 生成两个门限签名的子签名 - 跨片交易的merkle tree root & 当前block header的hash
+			err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, cs.ProposalBlock.Header.Hash(), vote)
+
+			// [DEBUG] log for DEBUG
+			cs.Logger.Debug("[SIGN] signature: %v, varify: %v",
+				vote.PartBlockSig.PeerCrossSig,
+				cs.privValidator.GetPubKey().VerifyBytes(cs.ProposalBlock.Header.Hash(), vote.PartBlockSig.PeerCrossSig))
 			if err != nil {
 				cs.Logger.Error("generate cross traction signature error, ", err)
 				vote.BlockID.Hash = nil //因为签名出错，可能是自身的密钥有问题，投反对票
@@ -2106,8 +2136,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		}
 		end_time := time.Now()
 		PrintinfoTime(3, cs.ProposalBlock.Hash(), strconv.FormatInt(end_time.Sub(begin_time).Nanoseconds(), 10))
-		// prevote阶段对每条跨片交易生成签名
-		// 没有想好怎么处理这里的错误
 
 	}
 
