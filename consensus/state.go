@@ -160,6 +160,9 @@ type ConsensusState struct {
 
 	// for reporting metrics
 	metrics *Metrics
+
+	// 特殊的心跳消息
+	SpecialHeart *types.SpecialMsg
 }
 type node struct {
 	target map[string][]string
@@ -200,6 +203,10 @@ func NewConsensusState(
 	cs.setProposal = cs.defaultSetProposal
 
 	cs.updateToState(state)
+
+	if tp.IsMonitor() {
+		cs.SpecialHeart = new(types.SpecialMsg)
+	}
 
 	// Don't call scheduleRound0 yet.
 	// We do that upon Start().
@@ -371,11 +378,7 @@ go run scripts/json2wal/main.go wal.json $WALFILE # rebuild the file without cor
 	// schedule the first round!
 	// use GetRoundState so we don't race the receiveRoutine for access
 	cs.scheduleRound0(cs.GetRoundState())
-	//if err:=cs.my.Start();err!=nil{
-	//	fmt.Println("启动失败-cs")
-	//	return err
-	//}
-	//fmt.Println("state 连接！！！！！！！！！！！！！！！！！")
+
 	return nil
 
 }
@@ -489,6 +492,9 @@ func (cs *ConsensusState) updateHeight(height int64) {
 func (cs *ConsensusState) updateRoundStep(round int, step cstypes.RoundStepType) {
 	cs.Round = round
 	cs.Step = step
+
+	// 每次更新step时尝试去更新钦差信息
+	cs.updateSpecialHeart(step)
 }
 
 // enterNewRound(height, 0) at cs.StartTime.
@@ -1391,16 +1397,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
-		relaycount := 0
-		txcount := 0
 		for i := 0; i < len(cs.ProposalBlock.Txs); i++ { //将每条交易时间打印出来
 			tx, _ := tp.NewTX(cs.ProposalBlock.Txs[i])
-			if tx.Txtype == "relaytx" {
-				relaycount += 1
-			} else if tx.Txtype == "tx" || tx.Txtype == "init" {
-				txcount += 1
-			}
-			tx.PrintInfo()
+
 			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				continue
 			}
@@ -1408,10 +1407,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				cs.ParseTxTime(tx, "RelayRes")
 			}
 			cs.ParseTxTime(tx, "TxRes")
-
 		}
-		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
-		fmt.Printf("[tx_statistics]rate=%f relaycount=%d txcount=%d", rate, relaycount, txcount)
+
+		//fmt.Printf("[tx_statistics]rate=%f relaycount=%d txcount=%d", rate, relaycount, txcount)
 		begin_time := time.Now()
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
@@ -1589,7 +1587,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// NOTE The block.AppHash wont reflect these txs until the next block.
 	cs.Logger.Debug("try add aggragate")
 
-	// 生成心跳信息 - 只在commit阶段生成心跳消息
+	// 生成普通心跳信息 - 只在commit阶段生成心跳消息
 	cs.PingPong()
 
 	//对区块进行修改,由于会改变tx的内容所以在这里进行处理
@@ -1620,17 +1618,6 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// Schedule Round0 to start soon.
 	cs.scheduleRound0(&cs.RoundState)
 
-	//leader数据库不用再重建
-	/*
-		if !cs.isEqual(lastLeaderAddress) {
-			if cs.isLeader() {
-				e := useetcd.NewEtcd()
-				e.Update(getShard(), getIp())
-				fmt.Println("------change the leader--------")
-				cs.reactorViaCheckpoint(height)
-			}
-		}
-	*/
 	// By here,
 	// * cs.Height has been increment to height+1
 	// * cs.Step is now cstypes.RoundStepNewHeight
@@ -1671,7 +1658,7 @@ func (cs *ConsensusState) PingPong() {
 		cs.Logger.Error("[signature] threshold signature recover error, %v", err)
 		return
 	}
-	heartmsg := tp.NewHeartMsg(signature, shardid, nodeid, tp.Normal, blockhead)
+	heartmsg := types.NewHeartMsg(signature, shardid, nodeid, types.Normal, blockhead)
 
 	fmt.Println("[heart] ", heartmsg)
 
@@ -2126,9 +2113,9 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 			err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, cs.ProposalBlock.Header.Hash(), vote)
 
 			// [DEBUG] log for DEBUG
-			cs.Logger.Debug("[SIGN] signature: %v, varify: %v",
+			cs.Logger.Debug(fmt.Sprintf("[SIGN] signature: %v, varify: %v",
 				vote.PartBlockSig.PeerCrossSig,
-				cs.privValidator.GetPubKey().VerifyBytes(cs.ProposalBlock.Header.Hash(), vote.PartBlockSig.PeerCrossSig))
+				cs.privValidator.GetPubKey().VerifyBytes(cs.ProposalBlock.Header.Hash(), vote.PartBlockSig.PeerCrossSig)))
 			if err != nil {
 				cs.Logger.Error("generate cross traction signature error, ", err)
 				vote.BlockID.Hash = nil //因为签名出错，可能是自身的密钥有问题，投反对票
@@ -2178,6 +2165,19 @@ func (cs *ConsensusState) signAddVote(type_ types.SignedMsgType, hash []byte, he
 	cs.Logger.Error("Error signing vote", "height", cs.Height, "round", cs.Round, "vote", vote, "err", err)
 	//}
 	return nil
+}
+
+// TODO 什么时候更新消息
+// TODO 根据steptype从ConsensusState中收集消息（how）
+func (cs *ConsensusState) updateSpecialHeart(steptype cstypes.RoundStepType) {
+	cs.Logger.Info(fmt.Sprintf("step: %v attempt tp update special heartmsg", steptype))
+	if tp.IsMonitor() {
+		if cs.SpecialHeart == nil {
+			cs.Logger.Error("Speical Heart Msg is nil when monitor update info.")
+			return
+		}
+		cs.SpecialHeart.CollectInfo(steptype.ToUint8(), nil)
+	}
 }
 
 //---------------------------------------------------------
