@@ -203,7 +203,7 @@ func NewConsensusState(
 	cs.setProposal = cs.defaultSetProposal
 
 	if tp.IsMonitor() {
-		cs.SpecialHeart = new(types.SpecialMsg)
+		cs.SpecialHeart = &types.SpecialMsg{}
 	}
 	cs.updateToState(state)
 
@@ -523,7 +523,7 @@ func (cs *ConsensusState) sendInternalMessage(mi msgInfo) {
 }
 
 // Reconstruct LastCommit from SeenCommit, which we saved along with the block,
-// (which happens even before saving the state)
+// (which happens even before savin©g the state)
 func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	if state.LastBlockHeight == 0 {
 		return
@@ -1657,11 +1657,13 @@ func (cs *ConsensusState) PingPong() {
 		cs.Logger.Error("[signature] threshold signature recover error, %v", err)
 		return
 	}
+
 	heartmsg := types.NewHeartMsg(signature, shardid, nodeid, types.Normal, blockhead)
 
-	fmt.Println("[heart] ", heartmsg)
-
 	// TODO to send
+	if jsondata, err := heartmsg.Marshal(); err == nil {
+		cs.sendmsgToObserver(jsondata)
+	}
 }
 
 func (cs *ConsensusState) isEqual(lastProposer []byte) bool {
@@ -2169,7 +2171,6 @@ func (cs *ConsensusState) signAddVote(type_ types.SignedMsgType, hash []byte, he
 // TODO 什么时候更新消息
 // TODO 根据steptype从ConsensusState中收集消息（how）
 func (cs *ConsensusState) updateSpecialHeart(steptype cstypes.RoundStepType) {
-	cs.Logger.Info(fmt.Sprintf("step: %v attempt tp update special heartmsg", steptype))
 	if tp.IsMonitor() {
 		if cs.SpecialHeart == nil {
 			cs.Logger.Error("Speical Heart Msg is nil when monitor update info.")
@@ -2177,6 +2178,11 @@ func (cs *ConsensusState) updateSpecialHeart(steptype cstypes.RoundStepType) {
 		}
 		cs.SpecialHeart.CollectInfo(steptype.ToUint8(), nil)
 	}
+}
+
+// 向拓扑链中的任意节点发送心跳消息
+func (cs *ConsensusState) sendmsgToObserver([]byte) {
+
 }
 
 //---------------------------------------------------------

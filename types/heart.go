@@ -32,6 +32,15 @@ func NewHeartMsg(sign []byte,
 	}
 }
 
+func (msg *HeartMsg) Marshal() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+func (msg *HeartMsg) Unmarshal(data []byte) error {
+	err := json.Unmarshal(data, msg)
+	return err
+}
+
 // 钦差报告内容
 // TODO
 type SpecialMsg struct {
