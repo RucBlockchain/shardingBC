@@ -202,11 +202,10 @@ func NewConsensusState(
 	cs.doPrevote = cs.defaultDoPrevote
 	cs.setProposal = cs.defaultSetProposal
 
-	cs.updateToState(state)
-
 	if tp.IsMonitor() {
 		cs.SpecialHeart = new(types.SpecialMsg)
 	}
+	cs.updateToState(state)
 
 	// Don't call scheduleRound0 yet.
 	// We do that upon Start().
