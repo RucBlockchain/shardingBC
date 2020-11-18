@@ -1161,6 +1161,35 @@ func (mem *Mempool) notifyTxsAvailable() {
 
 }
 
+//get a sorted list from input txs in which relaytx placed ahead
+//newtxs_relay, newtxs_comm respectively store relaytx and commontx in Mempool
+//added by HUA 2020
+func (mem *Mempool) SortTxs() *clist.CList{
+	newtxs_relay := clist.New()
+	newtxs_comm := clist.New()
+	txs := mem.txs
+
+	for e := txs.Front(); e != nil; e = e.Next() {
+		memTx := e.Value.(*mempoolTx)
+		tmp_tx, err := tp.NewTX(memTx.tx)
+		if err!=nil {
+			mem.logger.Error("cross message decompression failed.")
+			return nil
+		}
+		if tmp_tx.Txtype == "relaytx"{
+			newtxs_relay.PushBack(memTx)
+		} else {
+			newtxs_comm.PushBack(memTx)
+		}
+	}
+	for e := newtxs_comm.Front(); e != nil; e = e.Next() {//把普通交易加到跨片交易之后
+		memTx := e.Value.(*mempoolTx)
+		newtxs_relay.PushBack(memTx)
+		newtxs_comm.Remove(e)//移除已经添加到newtxs_relay中的CElement
+	}
+
+	return newtxs_relay
+}
 // ReapMaxBytesMaxGas reaps transactions from the mempool up to maxBytes bytes total
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
@@ -1179,6 +1208,8 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		time.Sleep(time.Millisecond * 10)
 	}
 
+
+	newtxs := mem.SortTxs()//排序mempool，跨片交易位于队列头部
 	var totalBytes int64
 	var totalGas int64
 	// TODO: we will get a performance boost if we have a good estimate of avg
@@ -1186,7 +1217,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
 	txs := make([]types.Tx, 0, mem.txs.Len())
 
-	for e := mem.txs.Front(); e != nil; e = e.Next() {
+	for e := newtxs.Front(); e != nil; e = e.Next() {
 		//取交易
 		memTx := e.Value.(*mempoolTx)
 
@@ -1465,6 +1496,7 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 
 		txsLeft = append(txsLeft, memTx.tx)
 	}
+	mem.logger.
 	return txsLeft
 }
 
