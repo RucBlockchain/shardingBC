@@ -1190,6 +1190,26 @@ func (mem *Mempool) SortTxs() *clist.CList{
 
 	return newtxs_relay
 }
+
+//modified by Hua 11.24
+//used to calculate the value of a tx in mempool
+//需要插入排序，每次往mempool插入一个交易时需要从头开始遍历mempool中的交易，插入到第一个value小于待插入交易value的交易后面
+//如果把这个插入函数写成Clist的一个成员函数，能不能调用为Mempool成员函数的GetValue函数（该函数给出每个交易的value）
+func GetValue(tx *clist.CElement) int32 {
+	memTx := tx.Value.(*mempoolTx)
+	tmp_tx, err := tp.NewTX(memTx.tx)
+
+	if err!=nil {
+		fmt.Println("error")
+		return 0
+	}
+	if tmp_tx.Txtype == "relaytx"{
+		return 1
+	} else {
+		return 0
+	}
+}
+
 // ReapMaxBytesMaxGas reaps transactions from the mempool up to maxBytes bytes total
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
