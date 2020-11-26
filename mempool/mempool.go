@@ -1014,7 +1014,14 @@ func (mem *Mempool) addTx(memTx *mempoolTx) {
 	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
 	mem.metrics.TxSizeBytes.Observe(float64(len(memTx.tx)))
 }
-
+// 使用插入排序添加交易到mempool
+// added by Hua
+func (mem *Mempool) insertTx(memTx *mempoolTx) {
+	e := mem.txs.PushBackToMem(memTx, GetValue)
+	mem.txsMap.Store(txKey(memTx.tx), e)
+	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
+	mem.metrics.TxSizeBytes.Observe(float64(len(memTx.tx)))
+}
 // Called from:
 //  - Update (lock held) if tx was committed
 // 	- resCbRecheck (lock not held) if tx was invalidated
@@ -1052,7 +1059,8 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			memTx.senders.Store(peerID, true)
 			btime := time.Now()
 
-			mem.addTx(memTx)
+			//mem.addTx(memTx)
+			mem.insertTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
 				mem.LogPrint("periodAddCM", txKey(memTx.tx), etime.Sub(btime).Nanoseconds(), 2)
@@ -1516,7 +1524,6 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 
 		txsLeft = append(txsLeft, memTx.tx)
 	}
-	mem.logger.
 	return txsLeft
 }
 
