@@ -746,6 +746,7 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 		}
 
 		if err == ErrAddingVote {
+			cs.Logger.Error("add vote failed. ", "vote:", msg.Vote)
 			// TODO: punish peer
 			// We probably don't want to stop the peer here. The vote does not
 			// necessarily comes from a malicious peer but can be just broadcasted by
