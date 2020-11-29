@@ -1158,7 +1158,8 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
 	cs.Logger.Info("enterPrevote: ProposalBlock is valid")
-	cs.signAddVote(types.PrevoteType, cs.ProposalBlock.Hash(), cs.ProposalBlockParts.Header())
+	//cs.signAddVote(types.PrevoteType, cs.ProposalBlock.Hash(), cs.ProposalBlockParts.Header())
+	cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{}) // byzantine action
 }
 
 // Enter: any +2/3 prevotes at next round.
@@ -1252,7 +1253,8 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 		logger.Info("enterPrecommit: +2/3 prevoted locked block. Relocking")
 		cs.LockedRound = round
 		cs.eventBus.PublishEventRelock(cs.RoundStateEvent())
-		cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
+		//cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
+		cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader) // byzantine actions
 		return
 	}
 
@@ -1267,7 +1269,8 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 		cs.LockedBlock = cs.ProposalBlock
 		cs.LockedBlockParts = cs.ProposalBlockParts
 		cs.eventBus.PublishEventLock(cs.RoundStateEvent())
-		cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
+		//cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
+		cs.signAddVote(types.PrecommitType, nil, types.PartSetHeader{}) //byzantine action
 		return
 	}
 
