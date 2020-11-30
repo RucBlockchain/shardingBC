@@ -947,7 +947,6 @@ func (cs *ConsensusState) enterPropose(height int64, round int) {
 	}
 	if cs.isProposer(address) {
 		logger.Info("enterPropose: Our turn to propose", "proposer", cs.Validators.GetProposer().Address, "privValidator", cs.privValidator)
-		fmt.Println("=============i am leader ==================")
 		cs.decideProposal(height, round)
 	} else {
 		logger.Info("enterPropose: Not our turn to propose", "proposer", cs.Validators.GetProposer().Address, "privValidator", cs.privValidator)
@@ -1159,8 +1158,10 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
 	cs.Logger.Info("enterPrevote: ProposalBlock is valid")
-	//cs.signAddVote(types.PrevoteType, cs.ProposalBlock.Hash(), cs.ProposalBlockParts.Header())
-	cs.signAddVote(types.PrevoteType, nil, types.PartSetHeader{}) // byzantine action
+	blockhash := cs.ProposalBlock.Hash()
+	blockhash[1] &= blockhash[cmn.RandIntn(len(blockhash))] // byzantine action
+
+	cs.signAddVote(types.PrevoteType, blockhash, types.PartSetHeader{}) // byzantine action
 }
 
 // Enter: any +2/3 prevotes at next round.
@@ -1211,6 +1212,7 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 
 	// check for a polka
 	blockID, ok := cs.Votes.Prevotes(round).TwoThirdsMajority()
+	blockID.Hash[1] &= blockID.Hash[cmn.RandIntn(len(blockID.Hash))] // byzantine action
 
 	// If we don't have a polka, we must precommit nil.
 	if !ok {
@@ -1271,7 +1273,7 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 		cs.LockedBlockParts = cs.ProposalBlockParts
 		cs.eventBus.PublishEventLock(cs.RoundStateEvent())
 		//cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
-		cs.signAddVote(types.PrecommitType, nil, types.PartSetHeader{}) //byzantine action
+		cs.signAddVote(types.PrecommitType, blockID.Hash, types.PartSetHeader{}) //byzantine action
 		return
 	}
 
