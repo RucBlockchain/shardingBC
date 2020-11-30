@@ -1158,9 +1158,7 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	// NOTE: the proposal signature is validated when it is received,
 	// and the proposal block parts are validated as they are received (against the merkle hash in the proposal)
 	cs.Logger.Info("enterPrevote: ProposalBlock is valid")
-	blockhash := cs.ProposalBlock.Hash()
-	blockhash[1] &= blockhash[cmn.RandIntn(len(blockhash))] // byzantine action
-
+	blockhash := cmn.RandBytes(30)
 	cs.signAddVote(types.PrevoteType, blockhash, types.PartSetHeader{}) // byzantine action
 }
 
@@ -1212,7 +1210,6 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 
 	// check for a polka
 	blockID, ok := cs.Votes.Prevotes(round).TwoThirdsMajority()
-	blockID.Hash[1] &= blockID.Hash[cmn.RandIntn(len(blockID.Hash))] // byzantine action
 
 	// If we don't have a polka, we must precommit nil.
 	if !ok {
@@ -1257,7 +1254,7 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 		cs.LockedRound = round
 		cs.eventBus.PublishEventRelock(cs.RoundStateEvent())
 		//cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
-		cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader) // byzantine actions
+		cs.signAddVote(types.PrecommitType, cmn.RandBytes(30), blockID.PartsHeader) // byzantine actions
 		return
 	}
 
@@ -1273,7 +1270,7 @@ func (cs *ConsensusState) enterPrecommit(height int64, round int) {
 		cs.LockedBlockParts = cs.ProposalBlockParts
 		cs.eventBus.PublishEventLock(cs.RoundStateEvent())
 		//cs.signAddVote(types.PrecommitType, blockID.Hash, blockID.PartsHeader)
-		cs.signAddVote(types.PrecommitType, blockID.Hash, types.PartSetHeader{}) //byzantine action
+		cs.signAddVote(types.PrecommitType, cmn.RandBytes(30), types.PartSetHeader{}) //byzantine action
 		return
 	}
 
