@@ -161,8 +161,8 @@ type ConsensusState struct {
 	// for reporting metrics
 	metrics *Metrics
 
-	// 特殊的心跳消息
-	SpecialHeart *types.SpecialMsg
+	// 发生共识错误时的记错本
+	notebook *Normalbook
 }
 type node struct {
 	target map[string][]string
@@ -202,9 +202,6 @@ func NewConsensusState(
 	cs.doPrevote = cs.defaultDoPrevote
 	cs.setProposal = cs.defaultSetProposal
 
-	if tp.IsMonitor() {
-		cs.SpecialHeart = &types.SpecialMsg{}
-	}
 	cs.updateToState(state)
 
 	// Don't call scheduleRound0 yet.
@@ -214,6 +211,11 @@ func NewConsensusState(
 	for _, option := range options {
 		option(cs)
 	}
+
+	// 设置normal notebook
+	cs.notebook = NewNormalBook(SendDelta)
+	cs.notebook.SetConsensusState(cs)
+	cs.notebook.SetLogger(cs.Logger.With("submodule", "notebook"))
 	return cs
 }
 
@@ -378,6 +380,8 @@ go run scripts/json2wal/main.go wal.json $WALFILE # rebuild the file without cor
 	// use GetRoundState so we don't race the receiveRoutine for access
 	cs.scheduleRound0(cs.GetRoundState())
 
+	// 启动normal notebook
+	cs.notebook.OnStart()
 	return nil
 
 }
@@ -491,9 +495,6 @@ func (cs *ConsensusState) updateHeight(height int64) {
 func (cs *ConsensusState) updateRoundStep(round int, step cstypes.RoundStepType) {
 	cs.Round = round
 	cs.Step = step
-
-	// 每次更新step时尝试去更新钦差信息
-	cs.updateSpecialHeart(step)
 }
 
 // enterNewRound(height, 0) at cs.StartTime.
@@ -1323,6 +1324,10 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 
 	if cs.Height != height || cstypes.RoundStepCommit <= cs.Step {
 		logger.Debug(fmt.Sprintf("enterCommit(%v/%v): Invalid args. Current step: %v/%v/%v", height, commitRound, cs.Height, cs.Round, cs.Step))
+
+		// TODO 在这里记录现有的投票信息
+		// TODO 如何从cs.Votes中抽取出我们需要的消息 如何 猜想的组织形式round&height-> voteSet
+
 		return
 	}
 	logger.Info(fmt.Sprintf("enterCommit(%v/%v). Current: %v/%v/%v", height, commitRound, cs.Height, cs.Round, cs.Step))
@@ -1515,6 +1520,9 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 		return
 	}
 
+	// 触发notebook的更新
+	cs.notebook.Trigger()
+
 	//	go
 	cs.finalizeCommit(height)
 }
@@ -1589,9 +1597,6 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// NOTE The block.AppHash wont reflect these txs until the next block.
 	cs.Logger.Debug("try add aggragate")
 
-	// 生成普通心跳信息 - 只在commit阶段生成心跳消息
-	cs.PingPong()
-
 	//对区块进行修改,由于会改变tx的内容所以在这里进行处理
 	cs.tryAddAggragate2Block()
 
@@ -1633,7 +1638,7 @@ func (cs *ConsensusState) PingPong() {
 	// 获取2/3的投票的子签名
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
 
-	shardid, nodeid := getShard(), getNode()
+	//shardid, nodeid := getShard(), getNode()
 
 	var ids = make([]int64, 0, len(voteSet.PartSigs))
 	var sigs = make([][]byte, 0, len(voteSet.PartSigs))
@@ -1649,24 +1654,18 @@ func (cs *ConsensusState) PingPong() {
 		threshold = 3
 	}
 
-	blockhead, err := cs.ProposalBlock.Marshal()
+	_, err = cs.ProposalBlock.Marshal()
 	if err != nil {
 		cs.Logger.Error("marshal block head failed, err: %v", err)
 		return
 	}
 
-	signature, err := bls.SignatureRecovery(threshold, sigs, ids)
+	_, err = bls.SignatureRecovery(threshold, sigs, ids)
 	if err != nil {
 		cs.Logger.Error("[signature] threshold signature recover error, %v", err)
 		return
 	}
 
-	heartmsg := types.NewHeartMsg(signature, shardid, nodeid, types.Normal, blockhead)
-
-	// TODO to send
-	if jsondata, err := heartmsg.Marshal(); err == nil {
-		cs.sendmsgToObserver(jsondata)
-	}
 }
 
 func (cs *ConsensusState) isEqual(lastProposer []byte) bool {
@@ -2169,23 +2168,6 @@ func (cs *ConsensusState) signAddVote(type_ types.SignedMsgType, hash []byte, he
 	cs.Logger.Error("Error signing vote", "height", cs.Height, "round", cs.Round, "vote", vote, "err", err)
 	//}
 	return nil
-}
-
-// TODO 什么时候更新消息
-// TODO 根据steptype从ConsensusState中收集消息（how）
-func (cs *ConsensusState) updateSpecialHeart(steptype cstypes.RoundStepType) {
-	if tp.IsMonitor() {
-		if cs.SpecialHeart == nil {
-			cs.Logger.Error("Speical Heart Msg is nil when monitor update info.")
-			return
-		}
-		cs.SpecialHeart.CollectInfo(steptype.ToUint8(), nil)
-	}
-}
-
-// 向拓扑链中的任意节点发送心跳消息
-func (cs *ConsensusState) sendmsgToObserver([]byte) {
-
 }
 
 //---------------------------------------------------------
