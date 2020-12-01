@@ -215,7 +215,7 @@ func NewConsensusState(
 	// 设置normal notebook
 	cs.notebook = NewNormalBook(SendDelta)
 	cs.notebook.SetConsensusState(cs)
-	cs.notebook.SetLogger(cs.Logger.With("submodule", "notebook"))
+	cs.notebook.SetLogger(cs.Logger.With("module", "notebook"))
 	return cs
 }
 

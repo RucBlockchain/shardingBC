@@ -62,7 +62,7 @@ func (nb *Normalbook) Cleanup() error {
 // 共识成功时添加投票信息
 // 重置定时器
 func (nb *Normalbook) Trigger() error {
-	nb.Logger.Debug(
+	nb.Logger.Info(
 		fmt.Sprintf("Current: %v/%v/%v trigger notebook",
 			nb.cs.Height, nb.cs.CommitRound, nb.cs.Step),
 	)
@@ -102,7 +102,7 @@ func (nb *Normalbook) OnStart() error {
 		for {
 			select {
 			case <-tmp.deltaTicker.C:
-				nb.Logger.Debug("time to send evidence", "evidence", nb.evidence)
+				nb.Logger.Info("time to send evidence", "evidence", len(nb.evidence))
 				_ = nb.Generate()
 				// TODO 实现发送函数
 				//nb.sendCb(1) //调用发送回调 接口待定
