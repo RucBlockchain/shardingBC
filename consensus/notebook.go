@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"github.com/tendermint/tendermint/libs/common"
+	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/types"
 	"time"
 )
@@ -48,6 +49,10 @@ type Normalbook struct {
 	cs          *ConsensusState
 }
 
+func (nb *Normalbook) SetLogger(l log.Logger) {
+	nb.BaseService.Logger = l
+}
+
 func (nb *Normalbook) SetConsensusState(cs *ConsensusState) {
 	nb.cs = cs
 }
@@ -62,10 +67,10 @@ func (nb *Normalbook) Cleanup() error {
 // 共识成功时添加投票信息
 // 重置定时器
 func (nb *Normalbook) Trigger() error {
-	nb.Logger.Info(
+	logger := nb.Logger.With("action", "Trigger")
+	logger.Info(
 		fmt.Sprintf("Current: %v/%v/%v trigger notebook",
-			nb.cs.Height, nb.cs.CommitRound, nb.cs.Step),
-	)
+			nb.cs.Height, nb.cs.CommitRound, nb.cs.Step))
 
 	// TODO 直接用precommit的投票信息可能不够
 	voteset := nb.cs.Votes.Precommits(nb.cs.Round)
@@ -94,7 +99,7 @@ func NewNormalBook(delta int64) *Normalbook {
 func (nb *Normalbook) OnStart() error {
 	// initialize private fields
 	// start subroutines, etc.
-	nb.Logger.Info("normal notebook start. trigger window(s): ", nb.delta)
+	nb.Logger.Info("normal notebook start.", "trigger window(s)", nb.delta)
 	nb.deltaTicker = time.NewTicker(time.Duration(nb.delta) * time.Second)
 	nb.IsTicker = true
 	go func(tmp *Normalbook) {
