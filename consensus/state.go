@@ -160,6 +160,9 @@ type ConsensusState struct {
 
 	// for reporting metrics
 	metrics *Metrics
+
+	// 发生共识错误时的记错本
+	notebook *Normalbook
 }
 type node struct {
 	target map[string][]string
@@ -208,6 +211,11 @@ func NewConsensusState(
 	for _, option := range options {
 		option(cs)
 	}
+
+	// 设置normal notebook
+	cs.notebook = NewNormalBook(SendDelta)
+	cs.notebook.SetConsensusState(cs)
+	cs.notebook.SetLogger(cs.Logger.With("submodule", "notebook"))
 	return cs
 }
 
@@ -372,6 +380,8 @@ go run scripts/json2wal/main.go wal.json $WALFILE # rebuild the file without cor
 	// use GetRoundState so we don't race the receiveRoutine for access
 	cs.scheduleRound0(cs.GetRoundState())
 
+	// 启动normal notebook
+	cs.notebook.OnStart()
 	return nil
 
 }
@@ -1311,6 +1321,10 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 
 	if cs.Height != height || cstypes.RoundStepCommit <= cs.Step {
 		logger.Debug(fmt.Sprintf("enterCommit(%v/%v): Invalid args. Current step: %v/%v/%v", height, commitRound, cs.Height, cs.Round, cs.Step))
+
+		// TODO 在这里记录现有的投票信息
+		// TODO 如何从cs.Votes中抽取出我们需要的消息 如何 猜想的组织形式round&height-> voteSet
+
 		return
 	}
 	logger.Info(fmt.Sprintf("enterCommit(%v/%v). Current: %v/%v/%v", height, commitRound, cs.Height, cs.Round, cs.Step))
@@ -1502,6 +1516,9 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 		logger.Info("Attempt to finalize failed. We don't have the commit block.", "proposal-block", cs.ProposalBlock.Hash(), "commit-block", blockID.Hash)
 		return
 	}
+
+	// 触发notebook的更新
+	cs.notebook.Trigger()
 
 	//	go
 	cs.finalizeCommit(height)

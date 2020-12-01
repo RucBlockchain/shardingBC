@@ -1,7 +1,8 @@
-package types
+package consensus
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/tendermint/tendermint/types"
 	"testing"
 	"time"
 )
@@ -44,7 +45,7 @@ func TestNormalbook_Cleanup(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	t.Log("notebook work again")
-	nb.Add(VoteSet{})
+	nb.Add(types.VoteSet{})
 
 	time.Sleep(5 * time.Second)
 
