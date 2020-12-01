@@ -215,7 +215,6 @@ func NewConsensusState(
 	// 设置normal notebook
 	cs.notebook = NewNormalBook(SendDelta)
 	cs.notebook.SetConsensusState(cs)
-	cs.notebook.SetLogger(cs.Logger.With("module", "notebook"))
 	return cs
 }
 
@@ -381,6 +380,7 @@ go run scripts/json2wal/main.go wal.json $WALFILE # rebuild the file without cor
 	cs.scheduleRound0(cs.GetRoundState())
 
 	// 启动normal notebook
+	cs.notebook.SetLogger(cs.Logger.With("submodule", "notebook"))
 	cs.notebook.OnStart()
 	return nil
 
