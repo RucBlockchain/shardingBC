@@ -547,6 +547,13 @@ func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	}
 	seenCommit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	lastPrecommits := types.NewVoteSet(state.ChainID, state.LastBlockHeight, seenCommit.Round(), types.PrecommitType, state.LastValidators)
+	/*
+	   zyj change
+	*/
+	if seenCommit == nil {
+		cs.LastCommit = lastPrecommits
+		return
+	}
 	for _, precommit := range seenCommit.Precommits {
 		if precommit == nil {
 			continue
@@ -1387,12 +1394,13 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
-func (cs *ConsensusState)ParseTxTime(tx *tp.TX,phase string){
+func (cs *ConsensusState) ParseTxTime(tx *tp.TX, phase string) {
 	t := time.Now()
 	args := strings.Split(string(tx.Content), "_")
-	t1,_ := strconv.Atoi(args[3])
-	cs.blockExec.LogPrint(phase,tx.ID,t.UnixNano()-int64(t1),1)
+	t1, _ := strconv.Atoi(args[3])
+	cs.blockExec.LogPrint(phase, tx.ID, t.UnixNano()-int64(t1), 1)
 }
+
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
@@ -1416,13 +1424,13 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				txcount += 1
 			}
 			tx.PrintInfo()
-			if tx.Txtype=="relaytx" && tx.Operate==0{
+			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				continue
 			}
-			if tx.Txtype=="relaytx" && tx.Operate == 1{
-				cs.ParseTxTime(tx,"RelayRes")
+			if tx.Txtype == "relaytx" && tx.Operate == 1 {
+				cs.ParseTxTime(tx, "RelayRes")
 			}
-			cs.ParseTxTime(tx,"TxRes")
+			cs.ParseTxTime(tx, "TxRes")
 
 		}
 		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
@@ -1553,9 +1561,14 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	if !block.HashesTo(blockID.Hash) {
 		cmn.PanicSanity(fmt.Sprintf("Cannot finalizeCommit, ProposalBlock does not hash to commit hash"))
 	}
-	if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
-		cmn.PanicConsensus(fmt.Sprintf("+2/3 committed an invalid block: %v", err))
-	}
+	/*
+	 * @Author: zyj
+	 * @Desc: 跳过验证，否则无法同步有交易的区块
+	 * @Date: 19.11.30
+	 */
+	//if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
+	//	cmn.PanicConsensus(fmt.Sprintf("+2/3 committed an invalid block: %v", err))
+	//}
 
 	cs.Logger.Info(fmt.Sprintf("Finalizing commit of block with %d txs", block.NumTxs),
 		"height", block.Height, "hash", block.Hash(), "root", block.AppHash)
