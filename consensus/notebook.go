@@ -2,6 +2,8 @@ package consensus
 
 import (
 	"fmt"
+	cstypes "github.com/tendermint/tendermint/consensus/types"
+	"github.com/tendermint/tendermint/identypes"
 	"github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/types"
@@ -40,8 +42,8 @@ const (
 type Normalbook struct {
 	common.BaseService
 
-	delta       int64 // 区块共识失败窗口 单位秒
-	evidence    []*types.VoteSet
+	delta       int64            // 区块共识失败窗口 单位秒
+	evidence    []*types.VoteSet // 直接保存拜占庭节点的投票信息
 	IsTicker    bool
 	deltaTicker *time.Ticker
 	statsMsg    chan byte
@@ -60,30 +62,56 @@ func (nb *Normalbook) SetConsensusState(cs *ConsensusState) {
 func (nb *Normalbook) Cleanup() error {
 	nb.evidence = nb.evidence[0:0]
 	nb.deltaTicker.Stop()
-	nb.IsTicker = false
 	return nil
 }
 
-// 共识成功时添加投票信息
-// 重置定时器
+// 共识成功时重置窗口定时
 func (nb *Normalbook) Trigger() error {
 	logger := nb.Logger.With("action", "Trigger")
 	logger.Info(
 		fmt.Sprintf("Current: %v/%v/%v trigger notebook",
 			nb.cs.Height, nb.cs.CommitRound, nb.cs.Step))
 
-	// TODO 直接用precommit的投票信息可能不够
-	voteset := nb.cs.Votes.Precommits(nb.cs.Round)
-
 	// 重置定时器 建立新的窗口
 	nb.deltaTicker.Reset(time.Duration(nb.delta) * time.Second)
-
-	nb.evidence = append(nb.evidence, voteset)
 	return nil
 }
 
-func (nb *Normalbook) Generate() []byte {
-	return []byte("marshall voteset to tx")
+// 添加一条拜占庭节点恶意投票的证据
+func (nb *Normalbook) AddEvidence(v types.Vote) error {
+	return nil
+}
+
+// 整理consensusState的voteset和收集到的节点恶意投票的证据，形成最终的举报信息并返回
+// TODO 需要再定修订取证逻辑
+func (nb *Normalbook) Generate() *identypes.TX {
+	if nb.cs == nil {
+		nb.Logger.Error("notebook didn't set consenesusState")
+		return nil
+	}
+
+	var content string
+	switch nb.cs.Step {
+	case cstypes.RoundStepPrevote:
+	case cstypes.RoundStepPrevoteWait:
+		content = nb.cs.Votes.Prevotes(nb.cs.Round).String()
+	case cstypes.RoundStepPrecommitWait:
+	case cstypes.RoundStepPrecommit:
+		content = nb.cs.Votes.Precommits(nb.cs.Round).String()
+	}
+
+	tx := &identypes.TX{
+		Txtype:      "reporttx",
+		Sender:      getShard(),
+		Receiver:    "TuoPuLian",
+		ID:          [32]byte{},
+		Content:     content,
+		TxSignature: "",
+		Operate:     0,
+		Height:      0,
+	}
+
+	return tx
 }
 
 func NewNormalBook(delta int64) *Normalbook {
@@ -108,12 +136,15 @@ func (nb *Normalbook) OnStart() error {
 			select {
 			case <-tmp.deltaTicker.C:
 				nb.Logger.Info("time to send evidence", "evidence", len(nb.evidence))
-				_ = nb.Generate()
-				// TODO 实现发送函数
-				//nb.sendCb(1) //调用发送回调 接口待定
+				tx := nb.Generate()
+
+				// 异步方式发送举报报告
+				// TODO 从配置文件中获取拓扑链地址
+				nb.cs.blockExec.SendTxAsync("1111", *tx)
 
 			case s := <-tmp.statsMsg:
 				if s == MsgNoteBookStop {
+					tmp.deltaTicker.Stop()
 					nb.Logger.Info("received stop msg, normal notebook stopped.")
 					// 退出信号
 					break
