@@ -174,12 +174,10 @@ func (pubKey PubKeyBLS) Bytes() []byte {
 
 func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	if len(sig) == 0 {
-		fmt.Println("签名为空")
 		return false
 	}
 	pub := bn256_suite.G2().Point()
 	if err := pub.UnmarshalBinary(pubKey); err != nil {
-		fmt.Println("公钥反序列化失败")
 		return false
 	}
 
@@ -187,8 +185,6 @@ func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	if err := bls.Verify(bn256_suite, pub, msg, sig); err == nil {
 		return true
 	} else {
-		fmt.Println(err)
-		fmt.Println("签名验证失败")
 		return false
 	}
 }
