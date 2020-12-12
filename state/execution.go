@@ -173,6 +173,9 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	}
 
 	startTime := time.Now().UnixNano()
+	// 在Proxy执行交易 同时把该轮共识的byz验证者揪出来
+	// 确定default proxyApp的实现类 KV store -> localClient
+	// [trace] EndBlock.ValidatorUpdates
 	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block, state.LastValidators, blockExec.db)
 	endTime := time.Now().UnixNano()
 	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime-startTime) / 1000000)
@@ -189,10 +192,14 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 	// validate the validator updates and convert to tendermint types
 	abciValUpdates := abciResponses.EndBlock.ValidatorUpdates
+
+	// state.validators - byz.validators(从ABCI得到的byz节点 - votePower<0)
 	err = validateValidatorUpdates(abciValUpdates, state.ConsensusParams.Validator)
 	if err != nil {
 		return state, fmt.Errorf("Error in validator updates: %v", err)
 	}
+
+	// 在这里根据ABCI的结果组织validators的更新 - 类型转换
 	validatorUpdates, err := types.PB2TM.ValidatorUpdates(abciValUpdates)
 	if err != nil {
 		return state, err

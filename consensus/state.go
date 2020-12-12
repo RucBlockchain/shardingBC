@@ -545,6 +545,8 @@ func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	if state.LastBlockHeight == 0 {
 		return
 	}
+
+	// BUG 如何处理seenCommit为空的情况
 	seenCommit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	lastPrecommits := types.NewVoteSet(state.ChainID, state.LastBlockHeight, seenCommit.Round(), types.PrecommitType, state.LastValidators)
 	/*
@@ -770,7 +772,8 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 		}
 
 		if err == ErrAddingVote {
-			cs.Logger.Error("erraddingVote", "error", err)
+			// BUG 该错误经常发送 快照同步以后无法收集其他节点的投票，原因：bls签名验证失败
+			cs.Logger.Error("erraddingVote", "error", err, msg.Vote)
 			// TODO: punish peer
 			// We probably don't want to stop the peer here. The vote does not
 			// necessarily comes from a malicious peer but can be just broadcasted by
@@ -852,6 +855,12 @@ func (cs *ConsensusState) handleTxsAvailable() {
 // Enter: +2/3 prevotes any or +2/3 precommits for block or any from (height, round)
 // NOTE: cs.StartTime was already set for height.
 func (cs *ConsensusState) enterNewRound(height int64, round int) {
+	fmt.Println("new round, Validators.size = ", cs.Validators.Size())
+	for i := 0; i < cs.Validators.Size(); i++ {
+		_, val := cs.Validators.GetByIndex(i)
+		fmt.Println(val.Address.String(), " = ", val.VotingPower)
+	}
+
 	logger := cs.Logger.With("height", height, "round", round)
 
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cs.Step != cstypes.RoundStepNewHeight) {
@@ -1095,6 +1104,7 @@ func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts 
 		commit = cs.LastCommit.MakeCommit()
 	} else {
 		// This shouldn't happen.
+		// BUG 快照同步后有几率发生
 		cs.Logger.Error("enterPropose: Cannot propose anything: No commit for the previous block.")
 		return
 	}
@@ -1610,6 +1620,13 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 
 	// Create a copy of the state for staging and an event cache for txs.
 	stateCopy := cs.state.Copy()
+	for i := 0; i < stateCopy.Validators.Size(); i++ {
+		_, val := cs.Validators.GetByIndex(i)
+		if val.Address.String() == "4C61F1BD46F2FEA6FB49BD8FE9318A61B81E2BCD" {
+			fmt.Println("update tt0s4 power")
+			val.VotingPower = 0
+		}
+	}
 	//判断leader是否换了的依据
 	//lastLeaderAddress := cs.state.Validators.GetProposer().Address
 	flag := cs.isLeader()
@@ -1621,6 +1638,11 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	cs.tryAddAggragate2Block()
 	var err error
 	stateCopy, err = cs.blockExec.ApplyBlock(stateCopy, types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}, block, flag)
+	fmt.Println("after")
+	for i := 0; i < stateCopy.Validators.Size(); i++ {
+		_, val := cs.Validators.GetByIndex(i)
+		fmt.Println(val.Address, " = ", val.VotingPower)
+	}
 	if err != nil {
 		cs.Logger.Error("Error on ApplyBlock. Did the application crash? Please restart tendermint", "err", err)
 		err := cmn.Kill()
