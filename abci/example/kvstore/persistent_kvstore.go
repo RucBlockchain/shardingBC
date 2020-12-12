@@ -90,11 +90,15 @@ func (app *PersistentKVStoreApplication) Query(reqQuery types.RequestQuery) type
 // Save the validators in the merkle tree
 func (app *PersistentKVStoreApplication) InitChain(req types.RequestInitChain) types.ResponseInitChain {
 	for _, v := range req.Validators {
+		fmt.Println(v.String(), v.Power)
 		r := app.updateValidator(v)
 		if r.IsErr() {
 			app.logger.Error("Error updating validators", "r", r)
 		}
 	}
+
+	// TODO 如果自己不在validators list里 发送新的交易把自己加进去
+
 	return types.ResponseInitChain{}
 }
 
@@ -171,6 +175,7 @@ func (app *PersistentKVStoreApplication) execValidatorTx(tx []byte) types.Respon
 }
 
 // add, update, or remove a validator
+// 默认的abci应该是调用该接口
 func (app *PersistentKVStoreApplication) updateValidator(v types.ValidatorUpdate) types.ResponseDeliverTx {
 	key := []byte("val:" + string(v.PubKey.Data))
 	if v.Power == 0 {
