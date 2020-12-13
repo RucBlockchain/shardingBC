@@ -165,20 +165,20 @@ func (accountLog *AccountLog) Save() {
 		}
 		_setState([]byte(accountLog.To), _digit2byte(balanceTo))
 	}
-	logger.Error("交易完成：")
-	logger.Error("交易完成：" + accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
+	//logger.Error("交易完成：")
+	//logger.Error("交易完成：" + accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
 	//balanceA := _getState([]byte(accountLog.From))
 	//balanceB := _getState([]byte(accountLog.To))
 	//logger.Error(accountLog.From + "账户余额: " + string(balanceA) + ", " + accountLog.To + "账户余额: " + string(balanceB))
-	statesByte, _ := json.Marshal(GetAllStates())
-	logger.Error(fmt.Sprintf("状态集合为: %v", string(statesByte)))
+	//statesByte, _ := json.Marshal(GetAllStates())
+	//logger.Error(fmt.Sprintf("状态集合为: %v", string(statesByte)))
 
 	// 快照增量缓存
 	SetSnapshotCache(accountLog.From, accountLog.Amount, false)
 	SetSnapshotCache(accountLog.To, accountLog.Amount, true)
 
-	cacheByte, _ := json.Marshal(snapshotCache)
-	logger.Error(fmt.Sprintf("快照缓存集合为: %v", string(cacheByte)))
+	//cacheByte, _ := json.Marshal(snapshotCache)
+	//logger.Error(fmt.Sprintf("快照缓存集合为: %v", string(cacheByte)))
 	// logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
 }
 
@@ -363,8 +363,8 @@ func GenerateSnapshotFast(version int64) {
 	}
 	snapshot.Version = version
 
-	snapshotByte, _ := json.Marshal(snapshot)
-	logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
+	//snapshotByte, _ := json.Marshal(snapshot)
+	//logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
 }
 
 // 生成快照 v3.0版本
@@ -386,11 +386,11 @@ func GenerateSnapshotWithSecurity(version int64) {
 	snapshot.Version = version
 
 	snapshotByte, _ := json.Marshal(snapshot)
-	logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
+	//logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
 
 	// TODO: 增加签名
 	hash := DoHash(string(snapshotByte))
-	logger.Info("快照hash:", "hash", hash)
+	//logger.Info("快照hash:", "hash", hash)
 	SnapshotHash = hash
 }
 

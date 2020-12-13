@@ -1620,13 +1620,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 
 	// Create a copy of the state for staging and an event cache for txs.
 	stateCopy := cs.state.Copy()
-	for i := 0; i < stateCopy.Validators.Size(); i++ {
-		_, val := cs.Validators.GetByIndex(i)
-		if val.Address.String() == "4C61F1BD46F2FEA6FB49BD8FE9318A61B81E2BCD" {
-			fmt.Println("update tt0s4 power")
-			val.VotingPower = 0
-		}
-	}
+
 	//判断leader是否换了的依据
 	//lastLeaderAddress := cs.state.Validators.GetProposer().Address
 	flag := cs.isLeader()
@@ -1638,11 +1632,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	cs.tryAddAggragate2Block()
 	var err error
 	stateCopy, err = cs.blockExec.ApplyBlock(stateCopy, types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}, block, flag)
-	fmt.Println("after")
-	for i := 0; i < stateCopy.Validators.Size(); i++ {
-		_, val := cs.Validators.GetByIndex(i)
-		fmt.Println(val.Address, " = ", val.VotingPower)
-	}
+
 	if err != nil {
 		cs.Logger.Error("Error on ApplyBlock. Did the application crash? Please restart tendermint", "err", err)
 		err := cmn.Kill()
