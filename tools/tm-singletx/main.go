@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/ed25519"
+	tp "github.com/tendermint/tendermint/identypes"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/privval"
@@ -69,7 +71,7 @@ func main() {
 		return
 	}
 
-	tx := generateChangeTx(fpv.PubKey, Power)
+	tx := generateNormalTx(generateChangeTx(fpv.PubKey, Power))
 	paramsJSON, err := json.Marshal(map[string]interface{}{"tx": tx})
 	if err != nil {
 		fmt.Printf("failed to encode params: %v\n", err)
@@ -119,8 +121,23 @@ func loadFilePV(keyFilePath string) *privval.FilePVKey {
 
 // 生成tendermint格式的update tx
 // TODO 适配为shardingbc的tx
-func generateChangeTx(pubkey crypto.PubKey, power int) []byte {
+func generateChangeTx(pubkey crypto.PubKey, power int) string {
 	tmpubkey := types.TM2PB.PubKey(pubkey)
-	fmt.Println(fmt.Sprintf("val:%X/%d", tmpubkey.Data, power))
-	return []byte(fmt.Sprintf("val:%X/%d", tmpubkey.Data, power))
+	return fmt.Sprintf("val:%X/%d", tmpubkey.Data, power)
+	//return []byte(fmt.Sprintf("val:%X/%d", tmpubkey.Data, power))
+}
+
+// 适配为shardingbc的tx
+func generateNormalTx(content string) []byte {
+	tx := &tp.TX{
+		Txtype:      "relaytx",
+		Sender:      "topo",
+		Receiver:    "0",
+		ID:          sha256.Sum256([]byte(content)),
+		Content:     content,
+		TxSignature: nil,
+		Operate:     0}
+
+	res, _ := json.Marshal(tx)
+	return res
 }

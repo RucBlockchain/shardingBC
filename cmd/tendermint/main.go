@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"github.com/tendermint/tendermint/account"
+	"github.com/tendermint/tendermint/libs/cli"
 	"os"
 	"path/filepath"
-	"strconv"
-
-	"github.com/tendermint/tendermint/libs/cli"
 
 	cmd "github.com/tendermint/tendermint/cmd/tendermint/commands"
 	cfg "github.com/tendermint/tendermint/config"
@@ -15,18 +12,6 @@ import (
 )
 
 func main() {
-	/*
-	 * @Author: zyj
-	 * @Desc: 命令行参数解析
-	 * @Date: 20.04.25
-	 */
-	for idx, args := range os.Args {
-		fmt.Println("参数"+strconv.Itoa(idx)+":", args)
-		if args == "--snapshot" && len(os.Args) > idx+1 {
-			account.SetSnapshotVersion(os.Args[idx+1])
-			break
-		}
-	}
 	rootCmd := cmd.RootCmd
 	rootCmd.AddCommand(
 		cmd.GenValidatorCmd,
@@ -53,6 +38,8 @@ func main() {
 	// DefaultNewNode function
 	nodeFunc := nm.DefaultNewNode
 
+	// 设置快照版本 暂时无法从外部参数修改
+	account.SetSnapshotVersion("v2.0")
 	// Create & start node
 	rootCmd.AddCommand(cmd.NewRunNodeCmd(nodeFunc))
 

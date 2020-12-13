@@ -220,8 +220,7 @@ func GetContent(tx []byte) []byte {
 	if tmptx, err := NewTX(tx); err != nil {
 		res = tx
 	} else {
-		res := make([]byte, len(tmptx.Content))
-		copy(res, tmptx.Content)
+		res = []byte(tmptx.Content)
 	}
 	return res
 }

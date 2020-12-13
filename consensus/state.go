@@ -1425,15 +1425,9 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
-		relaycount := 0
-		txcount := 0
 		for i := 0; i < len(cs.ProposalBlock.Txs); i++ { //将每条交易时间打印出来
 			tx, _ := tp.NewTX(cs.ProposalBlock.Txs[i])
-			if tx.Txtype == "relaytx" {
-				relaycount += 1
-			} else if tx.Txtype == "tx" || tx.Txtype == "init" {
-				txcount += 1
-			}
+
 			tx.PrintInfo()
 			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				continue
@@ -1442,10 +1436,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 				cs.ParseTxTime(tx, "RelayRes")
 			}
 			cs.ParseTxTime(tx, "TxRes")
-
 		}
-		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
-		fmt.Printf("[tx_statistics]rate=%f relaycount=%d txcount=%d", rate, relaycount, txcount)
 		begin_time := time.Now()
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
