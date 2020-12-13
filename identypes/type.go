@@ -43,6 +43,8 @@ Tx的type有五种：
 	checkpoint
 初始化tx:
 	init
+tendermint 原始tx：
+- deliver tx DeliverTx
 
 content内容g格式
 {sender}_{receiver}_{amount)
@@ -211,6 +213,17 @@ func (tx *TX) digest() []byte {
 	digest_md5.Write(origin)
 
 	return digest_md5.Sum(nil)
+}
+
+func GetContent(tx []byte) []byte {
+	var res []byte
+	if tmptx, err := NewTX(tx); err != nil {
+		res = tx
+	} else {
+		res := make([]byte, len(tmptx.Content))
+		copy(res, tmptx.Content)
+	}
+	return res
 }
 
 func Content2PubKey(tx_content string) (*ecdsa.PublicKey, error) {

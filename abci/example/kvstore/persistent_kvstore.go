@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
 	"strconv"
 	"strings"
 
@@ -67,7 +68,7 @@ func (app *PersistentKVStoreApplication) DeliverTx(tx []byte) types.ResponseDeli
 	if isValidatorTx(tx) {
 		// update validators in the merkle tree
 		// and in app.ValUpdates
-		return app.execValidatorTx(tx)
+		return app.execValidatorTx(identypes.GetContent(tx))
 	}
 
 	// otherwise, update the key-value store
@@ -137,7 +138,7 @@ func MakeValSetChangeTx(pubkey types.PubKey, power int64) []byte {
 }
 
 func isValidatorTx(tx []byte) bool {
-	return strings.HasPrefix(string(tx), ValidatorSetChangePrefix)
+	return strings.HasPrefix(string(identypes.GetContent(tx)), ValidatorSetChangePrefix)
 }
 
 // format is "val:pubkey/power"
