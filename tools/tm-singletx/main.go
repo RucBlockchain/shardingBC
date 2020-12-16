@@ -2,24 +2,29 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/btcsuite/websocket"
 	"github.com/tendermint/go-amino"
+	types2 "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/ed25519"
+	"github.com/tendermint/tendermint/crypto/bls"
 	tp "github.com/tendermint/tendermint/identypes"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/privval"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"os"
-	"time"
 )
 
 var logger = log.NewNopLogger()
@@ -27,12 +32,12 @@ var cdc = amino.NewCodec()
 
 func init() {
 	cdc.RegisterInterface((*crypto.PubKey)(nil), nil)
-	cdc.RegisterConcrete(ed25519.PubKeyEd25519{},
-		"tendermint/PubKeyEd25519", nil)
+	cdc.RegisterConcrete(bls.PubKeyBLS{},
+		"tendermint/PubKeyBLS", nil)
 
 	cdc.RegisterInterface((*crypto.PrivKey)(nil), nil)
-	cdc.RegisterConcrete(ed25519.PrivKeyEd25519{},
-		"tendermint/PrivKeyEd25519", nil)
+	cdc.RegisterConcrete(bls.PrivKeyBLS{},
+		"tendermint/PrivKeyBLS", nil)
 }
 
 func main() {
@@ -63,14 +68,13 @@ func main() {
 	fmt.Println(keypath, Power)
 	// 根据path加载公钥
 	fpv := loadFilePV(keypath)
-
+	fmt.Println(fpv)
 	// 建立client连接准备发送tx
 	conn, _, err := connect(endpoint)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
 	tx := generateNormalTx(generateChangeTx(fpv.PubKey, Power))
 	paramsJSON, err := json.Marshal(map[string]interface{}{"tx": tx})
 	if err != nil {
@@ -122,7 +126,11 @@ func loadFilePV(keyFilePath string) *privval.FilePVKey {
 // 生成tendermint格式的update tx
 // TODO 适配为shardingbc的tx
 func generateChangeTx(pubkey crypto.PubKey, power int) string {
+	fmt.Println("===================")
+	fmt.Println([]byte(pubkey.(bls.PubKeyBLS)))
 	tmpubkey := types.TM2PB.PubKey(pubkey)
+	fmt.Println("===================")
+	fmt.Println(fmt.Sprintf("val:%X/%d", tmpubkey.Data, power))
 	return fmt.Sprintf("val:%X/%d", tmpubkey.Data, power)
 	//return []byte(fmt.Sprintf("val:%X/%d", tmpubkey.Data, power))
 }
@@ -130,14 +138,42 @@ func generateChangeTx(pubkey crypto.PubKey, power int) string {
 // 适配为shardingbc的tx
 func generateNormalTx(content string) []byte {
 	tx := &tp.TX{
-		Txtype:      "relaytx",
+		Txtype:      "DeliverTx",
 		Sender:      "topo",
 		Receiver:    "0",
 		ID:          sha256.Sum256([]byte(content)),
 		Content:     content,
-		TxSignature: nil,
+		TxSignature: "",
 		Operate:     0}
 
 	res, _ := json.Marshal(tx)
 	return res
+}
+
+func mockexec(keypath string) {
+	fpv := loadFilePV(keypath)
+	fmt.Println("origin pubkey: ", fpv.PubKey.(bls.PubKeyBLS))
+
+	tx := generateChangeTx(fpv.PubKey, 10)[4:]
+
+	//get the pubkey and power
+	pubKeyAndPower := strings.Split(string(tx), "/")
+	pubkeyS, powerS := pubKeyAndPower[0], pubKeyAndPower[1]
+	// decode the pubkey
+	pubkey, err := hex.DecodeString(pubkeyS)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(pubkey)
+
+	// decode the power
+	power, err := strconv.ParseInt(powerS, 10, 64)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	vu := types2.BlsValidatorUpdate(pubkey, power)
+
+	v1, err := types.PB2TM.ValidatorUpdates([]types2.ValidatorUpdate{vu})
+	fmt.Println("recover: ", []byte(v1[0].PubKey.(bls.PubKeyBLS)))
 }

@@ -3,11 +3,12 @@ package consensus
 import (
 	"bytes"
 	"fmt"
-	"github.com/tendermint/tendermint/crypto/bls"
 	"net"
 	"reflect"
 	"runtime/debug"
 	"strconv"
+
+	"github.com/tendermint/tendermint/crypto/bls"
 
 	"strings"
 	"sync"
@@ -1406,6 +1407,9 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	return true
 }
 func (cs *ConsensusState) ParseTxTime(tx *tp.TX, phase string) {
+	if tx.Txtype == "DeliverTx" {
+		return
+	}
 	t := time.Now()
 	args := strings.Split(string(tx.Content), "_")
 	t1, _ := strconv.Atoi(args[3])

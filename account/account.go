@@ -16,12 +16,13 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	dbm "github.com/tendermint/tendermint/libs/db"
-	"github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
+
+	dbm "github.com/tendermint/tendermint/libs/db"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 func PrintLog(ID [sha256.Size]byte) bool {
@@ -245,7 +246,7 @@ func _parseTx(tx []byte) *AccountLog {
 		// logger.Error("交易解析失败")
 		return nil
 	}
-	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" {
+	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" || txArgs.TxType == "DeliverTx" {
 		accountLog.TxType = txArgs.TxType
 		return accountLog
 	}
@@ -568,7 +569,6 @@ func SetSnapshotVersion(version string) {
 	if version == "v1.0" || version == "v2.0" || version == "v3.0" {
 		SnapshotVersion = version
 	}
-	fmt.Println("快照生成算法版本为: " + SnapshotVersion)
 }
 
 // 保存增量缓存

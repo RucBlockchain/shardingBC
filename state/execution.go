@@ -4,6 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net"
+	"strconv"
+	"syscall"
+	"time"
+
 	"github.com/gorilla/websocket"
 	abci "github.com/tendermint/tendermint/abci/types"
 	account "github.com/tendermint/tendermint/account"
@@ -17,11 +23,6 @@ import (
 	"github.com/tendermint/tendermint/proxy"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
-	"math/rand"
-	"net"
-	"strconv"
-	"syscall"
-	"time"
 )
 
 //-----------------------------------------------------------------------------
@@ -204,6 +205,7 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	if err != nil {
 		return state, err
 	}
+
 	if len(validatorUpdates) > 0 {
 		blockExec.logger.Info("Updates to validators", "updates", types.ValidatorListString(validatorUpdates))
 	}

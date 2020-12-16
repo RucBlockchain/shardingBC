@@ -679,8 +679,8 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 		//fmt.Println("交易合法性验证")
 		accountLog := account.NewAccountLog(cm.Txlist[i])
 		if accountLog == nil {
-			fmt.Println("交易解析失败")
-			return errors.New("交易解析失败")
+			fmt.Println("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
+			return errors.New("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
 		mem.LogPrint("tCheckCM", txKey(tmp_tx), time.Now().UnixNano(), 2)
@@ -897,7 +897,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
 		if accountLog == nil {
-			return errors.New("交易解析失败")
+			return errors.New("[CheckTxWithInfo] 交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
 		checkRes := accountLog.Check()

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/tendermint/tendermint/identypes"
 	"strconv"
 	"strings"
+
+	"github.com/tendermint/tendermint/identypes"
 
 	"github.com/tendermint/tendermint/abci/example/code"
 	"github.com/tendermint/tendermint/abci/types"
@@ -172,7 +173,7 @@ func (app *PersistentKVStoreApplication) execValidatorTx(tx []byte) types.Respon
 	}
 
 	// update
-	return app.updateValidator(types.Ed25519ValidatorUpdate(pubkey, int64(power)))
+	return app.updateValidator(types.BlsValidatorUpdate(pubkey, int64(power)))
 }
 
 // add, update, or remove a validator

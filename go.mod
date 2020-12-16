@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
 	github.com/coreos/etcd v3.3.25+incompatible
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/go-kit/kit v0.10.0
@@ -28,6 +29,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tendermint/go-amino v0.15.1
+	github.com/tendermint/tmlibs v0.9.0
 	go.dedis.ch/kyber/v3 v3.0.12
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/exp v0.0.0-20200908183739-ae8ad444f925
