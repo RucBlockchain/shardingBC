@@ -312,6 +312,61 @@ func (l *CList) WaitChan() <-chan struct{} {
 	return l.waitCh
 }
 
+
+//modified by Hua
+// insert an element into clist according to value
+func (l *CList) PushBackToMem(v interface{}, GetValue func (tx *CElement) int32 ) *CElement {
+	l.mtx.Lock()
+
+	// Construct a new element
+	e := &CElement{
+		prev:       nil,
+		prevWg:     waitGroup1(),
+		prevWaitCh: make(chan struct{}),
+		next:       nil,
+		nextWg:     waitGroup1(),
+		nextWaitCh: make(chan struct{}),
+		removed:    false,
+		Value:      v,
+	}
+
+	// Release waiters on FrontWait/BackWait maybe
+	if l.len == 0 {
+		l.wg.Done()
+		close(l.waitCh)
+	}
+	if l.len >= l.maxLen {
+		panic(fmt.Sprintf("clist: maximum length list reached %d", l.maxLen))
+	}
+	l.len++
+
+	// Modify the tail
+	if l.tail == nil {
+		l.head = e
+		l.tail = e
+	} else { // iterate from head
+		curVal := GetValue(e)
+		var c *CElement
+		for c = l.Front(); c != nil; c = c.Next() { // 循环结束，c是第一个value<=待插入元素value的元素
+			if GetValue(c) < curVal {
+				break
+			}
+		}
+
+		if c != nil { // 在链表中间插入
+			e.SetPrev(c.Prev())
+			e.SetNext(c)
+		} else { // 插入到链表末尾
+			e.SetPrev(l.tail)
+			l.tail.SetNext(e)
+			l.tail = e
+		}
+	}
+
+	l.mtx.Unlock()
+	return e
+}
+
 // Panics if list grows beyond its max length.
 func (l *CList) PushBack(v interface{}) *CElement {
 	l.mtx.Lock()

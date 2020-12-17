@@ -1014,7 +1014,14 @@ func (mem *Mempool) addTx(memTx *mempoolTx) {
 	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
 	mem.metrics.TxSizeBytes.Observe(float64(len(memTx.tx)))
 }
-
+// 使用插入排序添加交易到mempool
+// added by Hua
+func (mem *Mempool) insertTx(memTx *mempoolTx) {
+	e := mem.txs.PushBackToMem(memTx, GetValue)
+	mem.txsMap.Store(txKey(memTx.tx), e)
+	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
+	mem.metrics.TxSizeBytes.Observe(float64(len(memTx.tx)))
+}
 // Called from:
 //  - Update (lock held) if tx was committed
 // 	- resCbRecheck (lock not held) if tx was invalidated
@@ -1052,7 +1059,8 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			memTx.senders.Store(peerID, true)
 			btime := time.Now()
 
-			mem.addTx(memTx)
+			//mem.addTx(memTx)
+			mem.insertTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
 				mem.LogPrint("periodAddCM", txKey(memTx.tx), etime.Sub(btime).Nanoseconds(), 2)
@@ -1161,6 +1169,55 @@ func (mem *Mempool) notifyTxsAvailable() {
 
 }
 
+//get a sorted list from input txs in which relaytx placed ahead
+//newtxs_relay, newtxs_comm respectively store relaytx and commontx in Mempool
+//added by HUA 2020
+func (mem *Mempool) SortTxs() *clist.CList{
+	newtxs_relay := clist.New()
+	newtxs_comm := clist.New()
+	txs := mem.txs
+
+	for e := txs.Front(); e != nil; e = e.Next() {
+		memTx := e.Value.(*mempoolTx)
+		tmp_tx, err := tp.NewTX(memTx.tx)
+		if err!=nil {
+			mem.logger.Error("cross message decompression failed.")
+			return nil
+		}
+		if tmp_tx.Txtype == "relaytx"{
+			newtxs_relay.PushBack(memTx)
+		} else {
+			newtxs_comm.PushBack(memTx)
+		}
+	}
+	for e := newtxs_comm.Front(); e != nil; e = e.Next() {//把普通交易加到跨片交易之后
+		memTx := e.Value.(*mempoolTx)
+		newtxs_relay.PushBack(memTx)
+		newtxs_comm.Remove(e)//移除已经添加到newtxs_relay中的CElement
+	}
+
+	return newtxs_relay
+}
+
+//modified by Hua 11.24
+//used to calculate the value of a tx in mempool
+//需要插入排序，每次往mempool插入一个交易时需要从头开始遍历mempool中的交易，插入到第一个value小于待插入交易value的交易后面
+//如果把这个插入函数写成Clist的一个成员函数，能不能调用为Mempool成员函数的GetValue函数（该函数给出每个交易的value）
+func GetValue(tx *clist.CElement) int32 {
+	memTx := tx.Value.(*mempoolTx)
+	tmp_tx, err := tp.NewTX(memTx.tx)
+
+	if err!=nil {
+		fmt.Println("error")
+		return 0
+	}
+	if tmp_tx.Txtype == "relaytx"{
+		return 1
+	} else {
+		return 0
+	}
+}
+
 // ReapMaxBytesMaxGas reaps transactions from the mempool up to maxBytes bytes total
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
@@ -1179,6 +1236,8 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		time.Sleep(time.Millisecond * 10)
 	}
 
+
+	newtxs := mem.SortTxs()//排序mempool，跨片交易位于队列头部
 	var totalBytes int64
 	var totalGas int64
 	// TODO: we will get a performance boost if we have a good estimate of avg
@@ -1186,7 +1245,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
 	txs := make([]types.Tx, 0, mem.txs.Len())
 
-	for e := mem.txs.Front(); e != nil; e = e.Next() {
+	for e := newtxs.Front(); e != nil; e = e.Next() {
 		//取交易
 		memTx := e.Value.(*mempoolTx)
 
