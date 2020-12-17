@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
+	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792
 	github.com/coreos/etcd v3.3.25+incompatible
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/fortytw2/leaktest v1.3.0

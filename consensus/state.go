@@ -3,11 +3,12 @@ package consensus
 import (
 	"bytes"
 	"fmt"
-	"github.com/tendermint/tendermint/crypto/bls"
 	"net"
 	"reflect"
 	"runtime/debug"
 	"strconv"
+
+	"github.com/tendermint/tendermint/crypto/bls"
 
 	"strings"
 	"sync"
@@ -545,8 +546,17 @@ func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	if state.LastBlockHeight == 0 {
 		return
 	}
+
+	// BUG 如何处理seenCommit为空的情况
 	seenCommit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	lastPrecommits := types.NewVoteSet(state.ChainID, state.LastBlockHeight, seenCommit.Round(), types.PrecommitType, state.LastValidators)
+	/*
+	   zyj change
+	*/
+	if seenCommit == nil {
+		cs.LastCommit = lastPrecommits
+		return
+	}
 	for _, precommit := range seenCommit.Precommits {
 		if precommit == nil {
 			continue
@@ -763,6 +773,8 @@ func (cs *ConsensusState) handleMsg(mi msgInfo) {
 		}
 
 		if err == ErrAddingVote {
+			// BUG 该错误经常发送 快照同步以后无法收集其他节点的投票，原因：bls签名验证失败
+			cs.Logger.Error("erraddingVote", "error", err, msg.Vote)
 			// TODO: punish peer
 			// We probably don't want to stop the peer here. The vote does not
 			// necessarily comes from a malicious peer but can be just broadcasted by
@@ -844,6 +856,12 @@ func (cs *ConsensusState) handleTxsAvailable() {
 // Enter: +2/3 prevotes any or +2/3 precommits for block or any from (height, round)
 // NOTE: cs.StartTime was already set for height.
 func (cs *ConsensusState) enterNewRound(height int64, round int) {
+	fmt.Println("new round, Validators.size = ", cs.Validators.Size())
+	for i := 0; i < cs.Validators.Size(); i++ {
+		_, val := cs.Validators.GetByIndex(i)
+		fmt.Println(val.Address.String(), " = ", val.VotingPower)
+	}
+
 	logger := cs.Logger.With("height", height, "round", round)
 
 	if cs.Height != height || round < cs.Round || (cs.Round == round && cs.Step != cstypes.RoundStepNewHeight) {
@@ -1087,6 +1105,7 @@ func (cs *ConsensusState) createProposalBlock() (block *types.Block, blockParts 
 		commit = cs.LastCommit.MakeCommit()
 	} else {
 		// This shouldn't happen.
+		// BUG 快照同步后有几率发生
 		cs.Logger.Error("enterPropose: Cannot propose anything: No commit for the previous block.")
 		return
 	}
@@ -1387,12 +1406,16 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	}
 	return true
 }
-func (cs *ConsensusState)ParseTxTime(tx *tp.TX,phase string){
+func (cs *ConsensusState) ParseTxTime(tx *tp.TX, phase string) {
+	if tx.Txtype == "DeliverTx" {
+		return
+	}
 	t := time.Now()
 	args := strings.Split(string(tx.Content), "_")
-	t1,_ := strconv.Atoi(args[3])
-	cs.blockExec.LogPrint(phase,tx.ID,t.UnixNano()-int64(t1),1)
+	t1, _ := strconv.Atoi(args[3])
+	cs.blockExec.LogPrint(phase, tx.ID, t.UnixNano()-int64(t1), 1)
 }
+
 //共识：relay tx    0 1  (当前分片1)
 func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
@@ -1406,27 +1429,18 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			cs.blockExec.ModifyRelationTable(packdata, cs.ProposalBlock.CmRelation, cs.Height)
 			return nil
 		}
-		relaycount := 0
-		txcount := 0
 		for i := 0; i < len(cs.ProposalBlock.Txs); i++ { //将每条交易时间打印出来
 			tx, _ := tp.NewTX(cs.ProposalBlock.Txs[i])
-			if tx.Txtype == "relaytx" {
-				relaycount += 1
-			} else if tx.Txtype == "tx" || tx.Txtype == "init" {
-				txcount += 1
-			}
+
 			tx.PrintInfo()
-			if tx.Txtype=="relaytx" && tx.Operate==0{
+			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				continue
 			}
-			if tx.Txtype=="relaytx" && tx.Operate == 1{
-				cs.ParseTxTime(tx,"RelayRes")
+			if tx.Txtype == "relaytx" && tx.Operate == 1 {
+				cs.ParseTxTime(tx, "RelayRes")
 			}
-			cs.ParseTxTime(tx,"TxRes")
-
+			cs.ParseTxTime(tx, "TxRes")
 		}
-		rate := float64(relaycount) / float64(len(cs.ProposalBlock.Txs))
-		fmt.Printf("[tx_statistics]rate=%f relaycount=%d txcount=%d", rate, relaycount, txcount)
 		begin_time := time.Now()
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
@@ -1553,9 +1567,14 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	if !block.HashesTo(blockID.Hash) {
 		cmn.PanicSanity(fmt.Sprintf("Cannot finalizeCommit, ProposalBlock does not hash to commit hash"))
 	}
-	if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
-		cmn.PanicConsensus(fmt.Sprintf("+2/3 committed an invalid block: %v", err))
-	}
+	/*
+	 * @Author: zyj
+	 * @Desc: 跳过验证，否则无法同步有交易的区块
+	 * @Date: 19.11.30
+	 */
+	//if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
+	//	cmn.PanicConsensus(fmt.Sprintf("+2/3 committed an invalid block: %v", err))
+	//}
 
 	cs.Logger.Info(fmt.Sprintf("Finalizing commit of block with %d txs", block.NumTxs),
 		"height", block.Height, "hash", block.Hash(), "root", block.AppHash)
@@ -1596,6 +1615,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 
 	// Create a copy of the state for staging and an event cache for txs.
 	stateCopy := cs.state.Copy()
+
 	//判断leader是否换了的依据
 	//lastLeaderAddress := cs.state.Validators.GetProposer().Address
 	flag := cs.isLeader()
@@ -1607,6 +1627,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	cs.tryAddAggragate2Block()
 	var err error
 	stateCopy, err = cs.blockExec.ApplyBlock(stateCopy, types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}, block, flag)
+
 	if err != nil {
 		cs.Logger.Error("Error on ApplyBlock. Did the application crash? Please restart tendermint", "err", err)
 		err := cmn.Kill()

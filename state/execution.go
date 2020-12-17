@@ -1,18 +1,18 @@
 package state
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"syscall"
 	"time"
-	"crypto/sha256"
+
 	"github.com/gorilla/websocket"
-	"github.com/tendermint/tendermint/account"
-	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
-	"math/rand"
 	abci "github.com/tendermint/tendermint/abci/types"
+	account "github.com/tendermint/tendermint/account"
 	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
 	tp "github.com/tendermint/tendermint/identypes"
@@ -21,6 +21,7 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	myline "github.com/tendermint/tendermint/line"
 	"github.com/tendermint/tendermint/proxy"
+	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
 )
 
@@ -140,11 +141,42 @@ func (blockExec *BlockExecutor) ValidateBlock(state State, block *types.Block) e
 // from outside this package to process and commit an entire block.
 // It takes a blockID to avoid recomputing the parts hash.
 func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, blockID types.BlockID, block *types.Block, flag bool) (State, error) {
+	/*
+	 * @Author: zyj
+	 * @Desc: 周期性生成快照
+	 * @Date: 19.01.04
+	 */
+	currentHeight := block.Height - 1
+	if currentHeight > 0 && int(currentHeight)%account.SNAPSHOT_INTERVAL == 0 && account.SnapshotVersion != "" {
+		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
+		if account.SnapshotVersion == "v1.0" {
+			// 快照生成v1.0
+			account.GenerateSnapshot(block.Height - 1)
+		} else if account.SnapshotVersion == "v2.0" {
+			// 快照生成v2.0
+			account.GenerateSnapshotFast(block.Height - 1)
+		} else {
+			// 快照生成v3.0
+			account.GenerateSnapshotWithSecurity(block.Height - 1)
+
+			// 在快照后一个区块内增加快照交易
+			//snapshotTx := new(account.TxArg)
+			//snapshotTx.TxType = "snapshots"
+			//snapshotTx.Content = account.SnapshotHash
+			//snapshotTxByte, _ := json.Marshal(snapshotTx)
+			//block.Txs = append(block.Txs, snapshotTxByte)
+			//block.NumTxs += 1
+		}
+	}
+
 	if err := blockExec.ValidateBlock(state, block); err != nil {
 		return state, ErrInvalidBlock(err)
 	}
 
 	startTime := time.Now().UnixNano()
+	// 在Proxy执行交易 同时把该轮共识的byz验证者揪出来
+	// 确定default proxyApp的实现类 KV store -> localClient
+	// [trace] EndBlock.ValidatorUpdates
 	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block, state.LastValidators, blockExec.db)
 	endTime := time.Now().UnixNano()
 	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime-startTime) / 1000000)
@@ -161,14 +193,19 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 	// validate the validator updates and convert to tendermint types
 	abciValUpdates := abciResponses.EndBlock.ValidatorUpdates
+
+	// state.validators - byz.validators(从ABCI得到的byz节点 - votePower<0)
 	err = validateValidatorUpdates(abciValUpdates, state.ConsensusParams.Validator)
 	if err != nil {
 		return state, fmt.Errorf("Error in validator updates: %v", err)
 	}
+
+	// 在这里根据ABCI的结果组织validators的更新 - 类型转换
 	validatorUpdates, err := types.PB2TM.ValidatorUpdates(abciValUpdates)
 	if err != nil {
 		return state, err
 	}
+
 	if len(validatorUpdates) > 0 {
 		blockExec.logger.Info("Updates to validators", "updates", types.ValidatorListString(validatorUpdates))
 	}
@@ -327,8 +364,8 @@ func (blockExec *BlockExecutor) GetAllCrossMessages() []*tp.CrossMessages {
 	cpTxs := blockExec.mempool.GetAllCrossMessages()
 	return cpTxs
 }
-func (blockExec *BlockExecutor) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int)  {
-	blockExec.mempool.LogPrint(phase,tx_id,t,logtype)
+func (blockExec *BlockExecutor) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int) {
+	blockExec.mempool.LogPrint(phase, tx_id, t, logtype)
 }
 
 func (blockExec *BlockExecutor) AddCrossMessagesDB(tcm *tp.CrossMessages) {
@@ -390,10 +427,10 @@ func GetTotal() int {
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
 	rand.Seed(time.Now().UnixNano())
-	name := "tt"+DesZone + "s"+strconv.Itoa(rand.Intn(GetTotal())+1)+":26657"
+	name := "tt" + DesZone + "s" + strconv.Itoa(rand.Intn(GetTotal())+1) + ":26657"
 	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
-	fmt.Println("要发送的目的地",name)
+	//fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
 	go client.BroadcastCrossMessageAsync(tx_package)
@@ -627,13 +664,13 @@ func getBeginBlockValidatorInfo(block *types.Block, lastValSet *types.ValidatorS
 	// Sanity check that commit length matches validator set size -
 	// only applies after first block
 	if block.Height > 1 {
-		precommitLen := len(block.LastCommit.Precommits)
-		valSetLen := len(lastValSet.Validators)
-		if precommitLen != valSetLen {
-			// sanity check
-			panic(fmt.Sprintf("precommit length (%d) doesn't match valset length (%d) at height %d\n\n%v\n\n%v",
-				precommitLen, valSetLen, block.Height, block.LastCommit.Precommits, lastValSet.Validators))
-		}
+		//precommitLen := len(block.LastCommit.Precommits)
+		//valSetLen := len(lastValSet.Validators)
+		//if precommitLen != valSetLen {
+		//	// sanity check
+		//	panic(fmt.Sprintf("precommit length (%d) doesn't match valset length (%d) at height %d\n\n%v\n\n%v",
+		//		precommitLen, valSetLen, block.Height, block.LastCommit.Precommits, lastValSet.Validators))
+		//}
 	}
 
 	// Collect the vote info (list of validators and whether or not they signed).

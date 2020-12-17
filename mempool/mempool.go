@@ -591,7 +591,7 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
-			name := "tt"+dbtx.SrcZone + "s" + cm.SrcIndex + ":26657"
+			name := "tt" + dbtx.SrcZone + "s" + cm.SrcIndex + ":26657"
 			//	fmt.Println("发送",name)
 			// fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
 			//)
@@ -679,8 +679,8 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 		//fmt.Println("交易合法性验证")
 		accountLog := account.NewAccountLog(cm.Txlist[i])
 		if accountLog == nil {
-			fmt.Println("交易解析失败")
-			return errors.New("交易解析失败")
+			fmt.Println("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
+			return errors.New("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
 		mem.LogPrint("tCheckCM", txKey(tmp_tx), time.Now().UnixNano(), 2)
@@ -897,7 +897,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
 		if accountLog == nil {
-			return errors.New("交易解析失败")
+			return errors.New("[CheckTxWithInfo] 交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
 		checkRes := accountLog.Check()
@@ -1669,28 +1669,20 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
 		return false
 	}
-	//fmt.Println("sig: ", cm.Sig)
-	//fmt.Println("root: ", cm.CrossMerkleRoot)
-	//fmt.Println("pub: ", cm.Pubkeys)
 	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.Sig); !res {
-		mem.logger.Error("验证CrossMessage的signature出错")
-		fmt.Println(cm.Sig)
-		fmt.Println(cm.CrossMerkleRoot)
-		fmt.Println(cm.Pubkeys)
+		mem.logger.Error("验证CrossMessage的signature出错", "signature", cm.Sig, "merkle root", cm.CrossMerkleRoot)
 		return false
 	}
-	//fmt.Println("门限签名验证通过！")
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
 
 	// 生成分片的tree root，获得该分片的merkle tree root来验证路径的正确性
 	smt := merkle.SimpleTreeFromByteSlices(txs)
-	//fmt.Println("生成树")
 	if smt == nil {
-		fmt.Println("生成树失败")
+		mem.logger.Error("还原merkle树失败")
 		return false
 	}
-	//fmt.Println("生成树成功")
+
 	currentRoot := smt.ComputeRootHash()
 	if currentRoot == nil || len(currentRoot) == 0 {
 		return false

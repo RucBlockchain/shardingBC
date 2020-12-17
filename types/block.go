@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
 	//       "io/ioutil"
 	//       "encoding/json"
 	//	"path/filepath"
@@ -576,10 +577,10 @@ func (commit *Commit) VoteSignBytes(chainID string, cs *CommitSig) []byte {
 // memoizeHeightRound memoizes the height and round of the commit using
 // the first non-nil vote.
 func (commit *Commit) memoizeHeightRound() {
-	if len(commit.Precommits) == 0 {
+	if commit.height > 0 {
 		return
 	}
-	if commit.height > 0 {
+	if len(commit.Precommits) == 0 {
 		return
 	}
 	for _, precommit := range commit.Precommits {

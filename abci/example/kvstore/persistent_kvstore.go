@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tendermint/tendermint/identypes"
+
 	"github.com/tendermint/tendermint/abci/example/code"
 	"github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tendermint/libs/db"
@@ -67,7 +69,7 @@ func (app *PersistentKVStoreApplication) DeliverTx(tx []byte) types.ResponseDeli
 	if isValidatorTx(tx) {
 		// update validators in the merkle tree
 		// and in app.ValUpdates
-		return app.execValidatorTx(tx)
+		return app.execValidatorTx(identypes.GetContent(tx))
 	}
 
 	// otherwise, update the key-value store
@@ -90,11 +92,15 @@ func (app *PersistentKVStoreApplication) Query(reqQuery types.RequestQuery) type
 // Save the validators in the merkle tree
 func (app *PersistentKVStoreApplication) InitChain(req types.RequestInitChain) types.ResponseInitChain {
 	for _, v := range req.Validators {
+		fmt.Println(v.String(), v.Power)
 		r := app.updateValidator(v)
 		if r.IsErr() {
 			app.logger.Error("Error updating validators", "r", r)
 		}
 	}
+
+	// TODO 如果自己不在validators list里 发送新的交易把自己加进去
+
 	return types.ResponseInitChain{}
 }
 
@@ -133,7 +139,7 @@ func MakeValSetChangeTx(pubkey types.PubKey, power int64) []byte {
 }
 
 func isValidatorTx(tx []byte) bool {
-	return strings.HasPrefix(string(tx), ValidatorSetChangePrefix)
+	return strings.HasPrefix(string(identypes.GetContent(tx)), ValidatorSetChangePrefix)
 }
 
 // format is "val:pubkey/power"
@@ -167,10 +173,11 @@ func (app *PersistentKVStoreApplication) execValidatorTx(tx []byte) types.Respon
 	}
 
 	// update
-	return app.updateValidator(types.Ed25519ValidatorUpdate(pubkey, int64(power)))
+	return app.updateValidator(types.BlsValidatorUpdate(pubkey, int64(power)))
 }
 
 // add, update, or remove a validator
+// 默认的abci应该是调用该接口
 func (app *PersistentKVStoreApplication) updateValidator(v types.ValidatorUpdate) types.ResponseDeliverTx {
 	key := []byte("val:" + string(v.PubKey.Data))
 	if v.Power == 0 {

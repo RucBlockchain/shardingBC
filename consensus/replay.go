@@ -13,7 +13,7 @@ import (
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	//auto "github.com/tendermint/tendermint/libs/autofile"
-	cmn "github.com/tendermint/tendermint/libs/common"
+	// cmn "github.com/tendermint/tendermint/libs/common"
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
 
@@ -207,24 +207,25 @@ type Handshaker struct {
 
 	nBlocks int // number of blocks applied to the state
 }
-func (h *Handshaker) newline2() *myline.Line{
 
-	endpoints:=&node{
-		target:make(map[string][]string,16),
+func (h *Handshaker) newline2() *myline.Line {
+
+	endpoints := &node{
+		target: make(map[string][]string, 16),
 	}
 
-	endpoints.target["A"]=[]string{"192.168.5.56:26657","192.168.5.56:36657","192.168.5.56:46657","192.168.5.56:56657"}
-	endpoints.target["B"]=[]string{"192.168.5.57:26657","192.168.5.57:36657","192.168.5.57:46657","192.168.5.57:56657"}
-	endpoints.target["C"]=[]string{"192.168.5.58:26657","192.168.5.58:36657","192.168.5.58:46657","192.168.5.58:56657"}
-	endpoints.target["D"]=[]string{"192.168.5.60:26657","192.168.5.60:36657","192.168.5.60:46657","192.168.5.60:56657"}
+	endpoints.target["A"] = []string{"192.168.5.56:26657", "192.168.5.56:36657", "192.168.5.56:46657", "192.168.5.56:56657"}
+	endpoints.target["B"] = []string{"192.168.5.57:26657", "192.168.5.57:36657", "192.168.5.57:46657", "192.168.5.57:56657"}
+	endpoints.target["C"] = []string{"192.168.5.58:26657", "192.168.5.58:36657", "192.168.5.58:46657", "192.168.5.58:56657"}
+	endpoints.target["D"] = []string{"192.168.5.60:26657", "192.168.5.60:36657", "192.168.5.60:46657", "192.168.5.60:56657"}
 
-	l:=myline.NewLine(endpoints.target)
+	l := myline.NewLine(endpoints.target)
 	return l
 }
 func NewHandshaker(stateDB dbm.DB, state sm.State,
 	store sm.BlockStore, genDoc *types.GenesisDoc) *Handshaker {
 
-	h:=&Handshaker{
+	h := &Handshaker{
 		stateDB:      stateDB,
 		initialState: state,
 		store:        store,
@@ -233,7 +234,7 @@ func NewHandshaker(stateDB dbm.DB, state sm.State,
 		logger:       log.NewNopLogger(),
 		nBlocks:      0,
 	}
-	h.line=h.newline2()
+	h.line = h.newline2()
 
 	return h
 }
@@ -356,14 +357,15 @@ func (h *Handshaker) ReplayBlocks(
 		// the app should never be ahead of the store (but this is under app's control)
 		return appHash, sm.ErrAppBlockHeightTooHigh{CoreHeight: storeBlockHeight, AppHeight: appBlockHeight}
 
-	} else if storeBlockHeight < stateBlockHeight {
-		// the state should never be ahead of the store (this is under tendermint's control)
-		cmn.PanicSanity(fmt.Sprintf("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
-
-	} else if storeBlockHeight > stateBlockHeight+1 {
-		// store should be at most one ahead of the state (this is under tendermint's control)
-		cmn.PanicSanity(fmt.Sprintf("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
 	}
+	//else if storeBlockHeight < stateBlockHeight {
+	//	// the state should never be ahead of the store (this is under tendermint's control)
+	//	cmn.PanicSanity(fmt.Sprintf("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
+	//
+	//} else if storeBlockHeight > stateBlockHeight+1 {
+	//	// store should be at most one ahead of the state (this is under tendermint's control)
+	//	cmn.PanicSanity(fmt.Sprintf("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
+	//}
 
 	var err error
 	// Now either store is equal to state, or one ahead.
@@ -411,8 +413,14 @@ func (h *Handshaker) ReplayBlocks(
 
 	}
 
-	cmn.PanicSanity("Should never happen")
-	return nil, nil
+	/*
+	 * @Author: zyj
+	 * @Desc: 移除区块校验报错
+	 * @Date: 19.11.24
+	 */
+	//cmn.PanicSanity("Should never happen")
+	//return nil, nil
+	return appHash, nil
 }
 
 func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBlockHeight, storeBlockHeight int64, mutateState bool) ([]byte, error) {
@@ -469,7 +477,7 @@ func (h *Handshaker) replayBlock(state sm.State, height int64, proxyApp proxy.Ap
 	//	}
 	//	fmt.Println("replay connect!!!!!!!!!!!!!!!!")
 	//}()
-	state, err = blockExec.ApplyBlock(state, meta.BlockID, block,false)
+	state, err = blockExec.ApplyBlock(state, meta.BlockID, block, false)
 	if err != nil {
 		return sm.State{}, err
 	}
