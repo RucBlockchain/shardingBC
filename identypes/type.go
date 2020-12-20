@@ -19,6 +19,10 @@ import (
 
 const (
 	SepTxContent = "_"
+	ConfigTx     = "configtx"
+	DeliverTx    = "DeliverTx"
+	RelayTx      = "relaytx"
+	AddTx        = "addtx"
 )
 
 var (

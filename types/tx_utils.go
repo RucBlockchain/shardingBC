@@ -56,12 +56,11 @@ func HandleSortTx(txs Txs) Txs {
 	buckets := ClassifyTx(txs)
 	cShard := getShard()
 
-        keys := make([]string, 0, len(buckets))
-        for k := range buckets {
-                keys = append(keys, k)
-        }
-        sort.Sort(sort.StringSlice(keys))
-
+	keys := make([]string, 0, len(buckets))
+	for k := range buckets {
+		keys = append(keys, k)
+	}
+	sort.Sort(sort.StringSlice(keys))
 
 	// newTxs先放入跨片交易
 	newTxs := txs[:0]

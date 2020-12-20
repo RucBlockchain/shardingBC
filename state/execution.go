@@ -98,6 +98,51 @@ func (blockExec *BlockExecutor) SetEventBus(eventBus types.BlockEventPublisher) 
 	blockExec.eventBus = eventBus
 }
 
+// 每一轮newround & 每一个节点都会尝试调用该函数
+// 如果有返回交易则表示该交易的config已经更新到consensus state中
+func (blockExec *BlockExecutor) ApplyDelviverTx(state *State) types.Tx {
+	var tx types.Tx
+
+	// 从mempool直接reap configtxs并且提前执行 => 只reap deliver tx且一次只reap一条；防止同一条多次被reap
+	tx = blockExec.mempool.ReapDeliverTx()
+	if tx == nil {
+		return nil
+	}
+
+	// 执行configtx
+	validatorUpdates, err := types.ExecuteConfigTx(tx)
+
+	// 执行tx错误
+	if err != nil {
+		// 因为是交易本身的错误，所以退出前先先从mempool中删除该交易再退出
+		// 防止阻碍共识流程以及后面正确的交易的执行
+		blockExec.mempool.Update(-1, types.Txs{tx}, nil, nil)
+		blockExec.logger.Error("[ApplyDelviverTx] ExecuteConfigTx failed. reason: " + err.Error())
+		return nil
+	}
+
+	// 尝试更新当前状态待validators
+	// 先拷贝一份副本模拟更新
+	tmpValidators := state.Validators.Copy()
+	err = tmpValidators.UpdateWithChangeSet(validatorUpdates)
+	if err == nil {
+		fmt.Println("[ApplyDelviverTx] validators更新完成")
+		// 模拟更新成功 直接更新state
+		state.Validators.UpdateWithChangeSet(validatorUpdates)
+
+		// 从mempool中删除该交易 防止再次执行
+		blockExec.mempool.Update(-1, types.Txs{tx}, nil, nil)
+
+		return tx
+	} else {
+		// 副本更新失败 退出 但不删除交易 因为可能只是某个节点一时更新失败
+		blockExec.logger.Error("validators update failded. reason: " + err.Error())
+		return nil
+	}
+	return nil
+
+}
+
 // CreateProposalBlock calls state.MakeBlock with evidence from the evpool
 // and txs from the mempool. The max bytes must be big enough to fit the commit.
 // Up to 1/10th of the block space is allcoated for maximum sized evidence.
@@ -117,12 +162,18 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 
 	// Fetch a limited amount of valid txs
 	maxDataBytes := types.MaxDataBytes(maxBytes, state.Validators.Size(), len(evidence))
-	//拿到相关的txs
-	txs := blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas, height)
+
+	var txs types.Txs
+	// 如果state中存在configtx类型的交易则优先打包 且只打包一条
+	if len(state.SpTxBuf) > 0 {
+		txs = state.SpTxBuf[:1]
+	} else {
+		txs = blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas, height)
+	}
+
 	Packages := blockExec.mempool.SearchRelationTable(height)
 	//将相关的txs进行排序
 	txs = types.HandleSortTx(txs)
-	// TODO 更新交易的operate属性
 
 	return state.MakeBlock(height, txs, commit, evidence, proposerAddr, Packages)
 }
@@ -202,6 +253,7 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 	// 在这里根据ABCI的结果组织validators的更新 - 类型转换
 	validatorUpdates, err := types.PB2TM.ValidatorUpdates(abciValUpdates)
+	fmt.Println(validatorUpdates)
 	if err != nil {
 		return state, err
 	}

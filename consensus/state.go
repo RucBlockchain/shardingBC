@@ -163,6 +163,7 @@ type ConsensusState struct {
 	// for reporting metrics
 	metrics *Metrics
 }
+
 type node struct {
 	target map[string][]string
 }
@@ -856,6 +857,12 @@ func (cs *ConsensusState) handleTxsAvailable() {
 // Enter: +2/3 prevotes any or +2/3 precommits for block or any from (height, round)
 // NOTE: cs.StartTime was already set for height.
 func (cs *ConsensusState) enterNewRound(height int64, round int) {
+	//尝试更新当前round的validators
+	if tx := cs.blockExec.ApplyDelviverTx(&cs.state); tx != nil {
+		// 执行成功 将该交易放到优先打包列表中
+		cs.state.SpTxBuf = append(cs.state.SpTxBuf, tx)
+	}
+
 	fmt.Println("new round, Validators.size = ", cs.Validators.Size())
 	for i := 0; i < cs.Validators.Size(); i++ {
 		_, val := cs.Validators.GetByIndex(i)
@@ -1612,6 +1619,13 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	cs.wal.WriteSync(EndHeightMessage{height}) // NOTE: fsync
 
 	fail.Fail() // XXX
+
+	// 更新state中SpTxBuf
+	if len(cs.ProposalBlock.Txs) == 1 {
+		if bytes.Equal(cs.ProposalBlock.Txs[0], cs.state.SpTxBuf[0]) {
+			cs.state.SpTxBuf = cs.state.SpTxBuf[1:]
+		}
+	}
 
 	// Create a copy of the state for staging and an event cache for txs.
 	stateCopy := cs.state.Copy()
