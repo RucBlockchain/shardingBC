@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"github.com/tendermint/tendermint/types"
 	"math/big"
 	"os"
 	"strconv"
@@ -187,6 +188,7 @@ func (accountLog *AccountLog) Save() {
 type Snapshot struct {
 	Version int64             // 版本
 	Content map[string]string // 内容
+	ValSet  *types.ValidatorSet // 当前快照的val集合
 }
 
 /*
@@ -335,18 +337,21 @@ func _byte2digit(digitByte []byte) int {
 func _digit2byte(num int) []byte {
 	return []byte(strconv.Itoa(num))
 }
+func GenerateValidator(set types.ValidatorSet){
 
+}
 // 生成快照 v1.0版本
-func GenerateSnapshot(version int64) {
+func GenerateSnapshot(version int64,set *types.ValidatorSet) {
 	newSnapshot := Snapshot{}
 	newSnapshot.Version = version
 	// 快照内容，仅供测试
 	newSnapshot.Content = GetAllStates()
 	snapshot = newSnapshot
+	snapshot.ValSet = set
 }
 
 // 生成快照 v2.0版本
-func GenerateSnapshotFast(version int64) {
+func GenerateSnapshotFast(version int64,set *types.ValidatorSet) {
 	// 如果当前快照不存在，则初始化
 	if snapshot.Content == nil {
 		snapshot.Content = make(map[string]string)
@@ -363,13 +368,13 @@ func GenerateSnapshotFast(version int64) {
 		snapshot.Content[k] = strconv.Itoa(oldVal + v)
 	}
 	snapshot.Version = version
-
+	snapshot.ValSet = set
 	//snapshotByte, _ := json.Marshal(snapshot)
 	//logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
 }
 
 // 生成快照 v3.0版本
-func GenerateSnapshotWithSecurity(version int64) {
+func GenerateSnapshotWithSecurity(version int64,set *types.ValidatorSet) {
 	// 如果当前快照不存在，则初始化
 	if snapshot.Content == nil {
 		snapshot.Content = make(map[string]string)
@@ -393,6 +398,7 @@ func GenerateSnapshotWithSecurity(version int64) {
 	hash := DoHash(string(snapshotByte))
 	//logger.Info("快照hash:", "hash", hash)
 	SnapshotHash = hash
+	snapshot.ValSet = set
 }
 
 // 获取所有状态集合

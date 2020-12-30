@@ -200,15 +200,17 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	currentHeight := block.Height - 1
 	if currentHeight > 0 && int(currentHeight)%account.SNAPSHOT_INTERVAL == 0 && account.SnapshotVersion != "" {
 		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
+		val := state.Validators.Copy()
 		if account.SnapshotVersion == "v1.0" {
 			// 快照生成v1.0
-			account.GenerateSnapshot(block.Height - 1)
+			account.GenerateSnapshot(block.Height - 1,val)
 		} else if account.SnapshotVersion == "v2.0" {
 			// 快照生成v2.0
-			account.GenerateSnapshotFast(block.Height - 1)
+			account.GenerateSnapshotFast(block.Height - 1,val)
+
 		} else {
 			// 快照生成v3.0
-			account.GenerateSnapshotWithSecurity(block.Height - 1)
+			account.GenerateSnapshotWithSecurity(block.Height - 1,val)
 
 			// 在快照后一个区块内增加快照交易
 			//snapshotTx := new(account.TxArg)
