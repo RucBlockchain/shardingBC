@@ -251,7 +251,8 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		// 获取所有状态集合
 		snapshot := ac.GetSnapshot()
 		snapShopMap, _ := json.Marshal(snapshot.Content)
-		msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotResponseMessage{snapshot.Version, snapShopMap})
+		snapValSet,_ := json.Marshal(snapshot.ValSet)
+		msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotResponseMessage{snapshot.Version, snapShopMap,snapValSet})
 		src.TrySend(BlockchainChannel, msgBytes)
 
 	case *bcSnapshotResponseMessage:
@@ -259,6 +260,8 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		// 处理快照
 		myMap := make(map[string]string)
 		json.Unmarshal(msg.Content, &myMap)
+		var myVal *types.ValidatorSet
+		json.Unmarshal(msg.ValSet,&myVal)
 		count := 0
 		for k, v := range myMap {
 			// 快照写入
@@ -267,7 +270,7 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		}
 		bcR.Logger.Error(fmt.Sprintf("快照写入完成, 长度为%v", count))
 		// 更新当前快照
-		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap})
+		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap,myVal})
 
 		// 更新当前区块高度为快照版本
 		if msg.Version > 0 && msg.Version < 0x7fffffff {
@@ -604,6 +607,7 @@ func (m *bcSnapshotRequestMessage) String() string {
 type bcSnapshotResponseMessage struct {
 	Version int64
 	Content []byte
+	ValSet  []byte
 }
 
 func (m *bcSnapshotResponseMessage) ValidateBasic() error {
