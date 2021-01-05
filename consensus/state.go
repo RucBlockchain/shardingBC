@@ -858,11 +858,14 @@ func (cs *ConsensusState) handleTxsAvailable() {
 // NOTE: cs.StartTime was already set for height.
 func (cs *ConsensusState) enterNewRound(height int64, round int) {
 	//尝试更新当前round的validators
-	if tx := cs.blockExec.ApplyDelviverTx(&cs.state); tx != nil {
+	if tx, validatorUpdates := cs.blockExec.ApplyDelviverTx(&cs.state); tx != nil {
 		// 执行成功 将该交易放到优先打包列表中
+		cs.Validators.UpdateWithChangeSet(validatorUpdates)
 		cs.state.SpTxBuf = append(cs.state.SpTxBuf, tx)
+		cs.Votes.SetvalSet(cs.Validators) // 更新votes里面的validators
 	}
 
+	fmt.Println("current SpTxBuf", len(cs.state.SpTxBuf))
 	fmt.Println("new round, Validators.size = ", cs.Validators.Size())
 	for i := 0; i < cs.Validators.Size(); i++ {
 		_, val := cs.Validators.GetByIndex(i)
@@ -1414,7 +1417,7 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	return true
 }
 func (cs *ConsensusState) ParseTxTime(tx *tp.TX, phase string) {
-	if tx.Txtype == "DeliverTx" {
+	if tx.Txtype != "relaytx" || tx.Txtype != "addtx" {
 		return
 	}
 	t := time.Now()
@@ -1621,8 +1624,9 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	fail.Fail() // XXX
 
 	// 更新state中SpTxBuf
-	if len(cs.ProposalBlock.Txs) == 1 {
+	if len(cs.state.SpTxBuf) > 0 {
 		if bytes.Equal(cs.ProposalBlock.Txs[0], cs.state.SpTxBuf[0]) {
+			fmt.Println("[SpTxBuf] remove config tx in SpTxBuf")
 			cs.state.SpTxBuf = cs.state.SpTxBuf[1:]
 		}
 	}

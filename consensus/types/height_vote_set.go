@@ -53,6 +53,13 @@ func NewHeightVoteSet(chainID string, height int64, valSet *types.ValidatorSet) 
 	return hvs
 }
 
+func (hvs *HeightVoteSet) SetvalSet(valSet *types.ValidatorSet) {
+	hvs.mtx.Lock()
+	defer hvs.mtx.Unlock()
+
+	hvs.valSet = valSet
+}
+
 func (hvs *HeightVoteSet) Reset(height int64, valSet *types.ValidatorSet) {
 	hvs.mtx.Lock()
 	defer hvs.mtx.Unlock()
