@@ -48,6 +48,7 @@ type Mempool interface {
 
 	TxsAvailable() <-chan struct{}
 	EnableTxsAvailable()
+	CalculateHealthScore(int) float64
 }
 
 // MockMempool is an empty implementation of a Mempool, useful for testing.
@@ -103,6 +104,10 @@ func (MockMempool) GetAllCrossMessages() []*tp.CrossMessages {
 
 func (MockMempool) ReapDeliverTx() types.Tx {
 	return nil
+}
+
+func (MockMempool) CalculateHealthScore(int) float64 {
+	return 0
 }
 
 //------------------------------------------------------

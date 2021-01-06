@@ -158,7 +158,7 @@ func TimePhase(phase string, tx_id [sha256.Size]byte, time string) string {
 	if PrintLog(tx_id) {
 		fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, time)
 	}
-	return fmt.Sprintf("[tx_phase%d] tx_id:%X time:%s", phase, tx_id, time)
+	return fmt.Sprintf("[tx_phase%v] tx_id:%X time:%s", phase, tx_id, time)
 }
 
 // PreCheckAminoMaxBytes checks that the size of the transaction plus the amino
@@ -270,6 +270,10 @@ type Mempool struct {
 	logger log.Logger
 
 	metrics *Metrics
+
+	// 健康指数 [0, 1] 影响打包时的大小和跨片交易的比例
+	// 1.0为正常状态
+	HealthScore float64
 }
 
 //--------------------------------------------
@@ -281,16 +285,6 @@ type CrossMessage struct {
 	Content *tp.CrossMessages
 	Height  int
 }
-
-//type relaytxDB struct {
-//	relaytx []RTx //RelayTx结构的切片
-//}
-//
-//type RTx struct {
-//	Tx     tp.TX
-//	Height int
-//	CrossMessageIndex tp.CrossMessageIndex
-//}
 
 //-------------------------------------------
 
@@ -317,6 +311,7 @@ func NewMempool(
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
 		Plog:          1,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
+		HealthScore:   1.0,
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -338,6 +333,45 @@ func newcmDB() CrossMessagesDB {
 	cmdb.CrossMessages = cm
 	return cmdb
 }
+
+// 每一轮共识结束完成后调用该函数来更新下一轮的健康指数
+// 该指数会决定下一轮打包策略
+// 同时节点也会根据健康值决定是否向拓扑链报告
+func (mem *Mempool) CalculateHealthScore(validTxs int) float64 {
+	// 根据上一轮共识处理的交易数和当前mempool的交易比例做比较
+	// 不使用上一轮共识时间的原因是各节点之间的共识耗时并不一致，用处理的交易数和
+	// 当前mempool里的交易数的比例来反映共识的快慢
+	// TODO 设定计算逻辑
+	var newscore = mem.HealthScore
+
+	if mem.txs.Len() > mem.config.Size*3/4 {
+		// 整个mempool压力太大了
+		// f(x) = -2x + 2  [0.75, 1] -> [0.5, 0]
+		newscore = -2*float64(mem.txs.Len())/float64(mem.config.Size) + 2.0
+	} else {
+		// mempool尚未饱和
+		if mem.txs.Len() > validTxs*2 {
+			// 超过共识处理速度了
+			newscore = 0.75
+		} else {
+			newscore = 1.0
+		}
+	}
+
+	mem.HealthScore = newscore
+	fmt.Println(fmt.Sprintf(
+		"[health] Mem.Size=%v,"+
+			" mem.Len=%v, "+
+			"consensus.validtx=%v, "+
+			"newScore=%v",
+		mem.config.Size,
+		mem.txs.Len(),
+		validTxs,
+		newscore,
+	))
+	return newscore
+}
+
 func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
 	cm := &CrossMessage{
 		Content: tcm,
@@ -347,6 +381,7 @@ func (mem *Mempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {
 	mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages, cm)
 	//fmt.Println("添加CmDB，容量为",len(mem.cmDB.CrossMessages))
 }
+
 func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 	//删除交易包
 	//对package进行解析
@@ -395,61 +430,6 @@ func (mem *Mempool) GetAllCrossMessages() []*tp.CrossMessages {
 	}
 	return allcm
 }
-
-//func newrDB() relaytxDB {
-//	var rdb relaytxDB
-//	var rtx []RTx
-//	rdb.relaytx = rtx
-//	return rdb
-//}
-//
-//func (mem *Mempool) AddRelaytxDB(tx tp.TX,CIndex tp.CrossMessageIndex) {
-//	var rtx RTx
-//	rtx.Tx = tx
-//	rtx.Height = 0
-//	rtx.CrossMessageIndex = CIndex
-//	mem.rDB.relaytx = append(mem.rDB.relaytx, rtx)
-//}
-//
-//func (mem *Mempool) RemoveRelaytxDB(tx tp.TX) {
-//	for i := 0; i < len(mem.rDB.relaytx); i++ {
-//		if mem.rDB.relaytx[i].Tx.ID == tx.ID {
-//			mem.rDB.relaytx = append(mem.rDB.relaytx[:i], mem.rDB.relaytx[i+1:]...)
-//			i--
-//
-//			break
-//		}
-//	}
-//}
-//func (mem *Mempool) UpdaterDB() []tp.TX {
-//	//检查rDB中的状态，如果有一个区块高度是20，还没有被删除，那么需要重新发送tx，让其被确认
-//
-//	var stx []tp.TX
-//	for i := 0; i < len(mem.rDB.relaytx); i++ {
-//		if mem.rDB.relaytx != nil {
-//			if mem.rDB.relaytx[i].Height == 0 { //第一次高度为0就发布
-//				stx = append(stx, mem.rDB.relaytx[i].Tx)
-//				mem.rDB.relaytx[i].Height += 1 //增加高度
-//			} else if (mem.rDB.relaytx[i].Height == 10) || (mem.rDB.relaytx[i].Height == 20) {
-//				stx = append(stx, mem.rDB.relaytx[i].Tx)
-//				mem.rDB.relaytx[i].Height = 0
-//			} else {
-//				mem.rDB.relaytx[i].Height = mem.rDB.relaytx[i].Height + 1
-//			}
-//		}
-//	}
-//	return stx
-//
-//}
-//func (mem *Mempool) GetAllTxs() []tp.TX {
-//	var alltx []tp.TX
-//	for i := 0; i < len(mem.rDB.relaytx); i++ {
-//		if mem.rDB.relaytx != nil {
-//			alltx = append(alltx, mem.rDB.relaytx[i].Tx)
-//		}
-//	}
-//	return alltx
-//}
 
 //----------------------------------------------------------
 // EnableTxsAvailable initializes the TxsAvailable channel,
@@ -1233,6 +1213,13 @@ func (mem *Mempool) ReapDeliverTx() types.Tx {
 	return nil
 }
 
+// 区块最大容量受healthScore影响
+func ElasticBytes(maxbytes int64, health float64) int64 {
+	// [0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
+	return int64(float64(maxbytes) * (0.5 + health/2.0))
+
+}
+
 // ReapMaxBytesMaxGas reaps transactions from the mempool up to maxBytes bytes total
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
@@ -1242,7 +1229,9 @@ func (mem *Mempool) ReapDeliverTx() types.Tx {
 //
 //}
 func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) types.Txs {
-	//区块能取到最大的数量，最大gas值
+	// 区块最大容量受healthScore影响，[0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
+	maxBytes = ElasticBytes(maxBytes, mem.HealthScore)
+
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
 	//mem.logger.Error("reap txs")
@@ -1251,7 +1240,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	//newtxs := mem.SortTxs()//排序mempool，跨片交易位于队列头部
 	var totalBytes int64
 	var totalGas int64
 	// TODO: we will get a performance boost if we have a good estimate of avg
@@ -1263,8 +1251,11 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		//取交易
 		memTx := e.Value.(*mempoolTx)
 
+		// TODO 根据健康指数调整打包策略
+
 		// Check total size requirement
 		// 删除对应的txlist的relay_out交易
+		// TODO OPT 换一下移除时机？
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
 			t := time.Now()

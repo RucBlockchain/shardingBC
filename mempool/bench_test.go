@@ -22,7 +22,7 @@ func BenchmarkReap(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		mempool.ReapMaxBytesMaxGas(100000000, 10000000)
+		mempool.ReapMaxBytesMaxGas(100000000, 10000000, 1)
 	}
 }
 
