@@ -16,6 +16,8 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"github.com/tendermint/tendermint/crypto"
+	"github.com/tendermint/tendermint/crypto/bls"
 	"github.com/tendermint/tendermint/types"
 	"math/big"
 	"os"
@@ -189,6 +191,7 @@ type Snapshot struct {
 	Version int64             // 版本
 	Content map[string]string // 内容
 	ValSet  *types.ValidatorSet // 当前快照的val集合
+	NextValSet *types.ValidatorSet
 }
 
 /*
@@ -244,24 +247,24 @@ func _parseTx(tx []byte) *AccountLog {
 	err := json.Unmarshal(tx, txArgs)
 	// logger.Error("交易内容: " + string(tx))
 	if err != nil {
-		//fmt.Println("交易解析失败")
+		fmt.Println("unmarshall交易解析失败")
 		// logger.Error("交易解析失败")
 		return nil
 	}
-	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" || txArgs.TxType == "DeliverTx" {
+	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" || txArgs.TxType == "DeliverTx" || txArgs.TxType == "configtx" {
 		accountLog.TxType = txArgs.TxType
 		return accountLog
 	}
 	args := strings.Split(string(txArgs.Content), "_")
 	// fmt.Println(args)
 	if len(args) != 4 { //因为添加时间戳参数，所以个数应该是4个
-		// logger.Error("参数个数错误")
+		fmt.Println("参数个数错误")
 		return nil
 	}
 
 	amount, err := strconv.Atoi(args[2])
 	if err != nil {
-		//fmt.Println("解析失败,金额应为整数")
+		fmt.Println("解析失败,金额应为整数")
 		// logger.Error("解析失败，金额应为整数")
 		return nil
 	}
@@ -341,17 +344,64 @@ func GenerateValidator(set types.ValidatorSet){
 
 }
 // 生成快照 v1.0版本
-func GenerateSnapshot(version int64,set *types.ValidatorSet) {
+func GenerateSnapshot(version int64,set *types.ValidatorSet,nextset *types.ValidatorSet) {
 	newSnapshot := Snapshot{}
 	newSnapshot.Version = version
 	// 快照内容，仅供测试
 	newSnapshot.Content = GetAllStates()
 	snapshot = newSnapshot
-	snapshot.ValSet = set
+	snapshot.ValSet = set.Copy()
+	snapshot.NextValSet = nextset.Copy()
 }
 
+type Vals struct {
+
+	Validators [][]byte //vals的公钥集合
+	Proposer []byte// pro的公钥
+
+}
+//生成Validator集合每一个公钥byte
+func GeneratePubkey(Validators []*types.Validator,Proposer *types.Validator) Vals{
+	var vals Vals
+	for i:=0;i<len(Validators);i++{
+		vals.Validators = append(vals.Validators, Validators[i].PubKey.Bytes())//得到每个vals的byte
+	}
+	vals.Proposer = Proposer.PubKey.Bytes()
+	return vals
+}
+//反序列化返回每个vals的集合
+func ParsePubSet(vals Vals)([]crypto.PubKey,crypto.PubKey){
+	var Validators []crypto.PubKey
+	for i:=0;i<len(vals.Validators);i++{
+		newpub,err:=bls.GetPubkeyFromByte2(vals.Validators[i])
+		Validators = append(Validators, newpub)
+		if err!=nil{
+			logger.Error("反序列化失败")
+		}
+	}
+	var Proposer crypto.PubKey
+	newpub,err:=bls.GetPubkeyFromByte2(vals.Proposer)
+	if err!=nil{
+		logger.Error("Proposer反序列化失败")
+	}
+	Proposer =newpub
+	return Validators,Proposer
+}
+func TogetherParseSet(set []byte,pub []byte)*types.ValidatorSet{
+	var myVal *types.ValidatorSet
+	json.Unmarshal(set,&myVal)
+	var vals Vals
+	json.Unmarshal(pub,&vals)
+	v1,v2:=ParsePubSet(vals)
+	for i:=0;i<len(myVal.Validators);i++{
+		myVal.Validators[i].PubKey = v1[i]
+	}
+	myVal.Proposer.PubKey = v2
+	return myVal
+}
 // 生成快照 v2.0版本
-func GenerateSnapshotFast(version int64,set *types.ValidatorSet) {
+func GenerateSnapshotFast(version int64,set *types.ValidatorSet,nextset *types.ValidatorSet) {
+
 	// 如果当前快照不存在，则初始化
 	if snapshot.Content == nil {
 		snapshot.Content = make(map[string]string)
@@ -368,13 +418,15 @@ func GenerateSnapshotFast(version int64,set *types.ValidatorSet) {
 		snapshot.Content[k] = strconv.Itoa(oldVal + v)
 	}
 	snapshot.Version = version
-	snapshot.ValSet = set
+	snapshot.ValSet = set.Copy()
+	snapshot.NextValSet = nextset.Copy()
+
 	//snapshotByte, _ := json.Marshal(snapshot)
 	//logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
 }
 
 // 生成快照 v3.0版本
-func GenerateSnapshotWithSecurity(version int64,set *types.ValidatorSet) {
+func GenerateSnapshotWithSecurity(version int64,set *types.ValidatorSet,nextset *types.ValidatorSet) {
 	// 如果当前快照不存在，则初始化
 	if snapshot.Content == nil {
 		snapshot.Content = make(map[string]string)
@@ -390,7 +442,8 @@ func GenerateSnapshotWithSecurity(version int64,set *types.ValidatorSet) {
 		snapshot.Content[k] = strconv.Itoa(oldVal + v)
 	}
 	snapshot.Version = version
-
+	snapshot.ValSet = set.Copy()
+	snapshot.NextValSet = nextset.Copy()
 	snapshotByte, _ := json.Marshal(snapshot)
 	//logger.Error(fmt.Sprintf("快照生成: %v", string(snapshotByte)))
 
@@ -398,7 +451,7 @@ func GenerateSnapshotWithSecurity(version int64,set *types.ValidatorSet) {
 	hash := DoHash(string(snapshotByte))
 	//logger.Info("快照hash:", "hash", hash)
 	SnapshotHash = hash
-	snapshot.ValSet = set
+
 }
 
 // 获取所有状态集合
