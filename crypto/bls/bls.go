@@ -204,7 +204,12 @@ func GetPubkeyFromByte(data []byte) (*PubKeyBLS, error) {
 	cdc.MustUnmarshalBinaryBare(data, &pub)
 	return &pub, nil
 }
-
+func GetPubkeyFromByte2(data []byte) (PubKeyBLS, error) {
+	//pub := bn256_suite.G2().Point()
+	pub := PubKeyBLS{}
+	cdc.MustUnmarshalBinaryBare(data, &pub)
+	return pub, nil
+}
 //分割字符串得到相应的内容,默认容器名为：1_0 分片名_分片的index
 func parseId() int64 {
 	v, _ := syscall.Getenv("TASKID")

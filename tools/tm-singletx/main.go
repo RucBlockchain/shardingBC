@@ -144,8 +144,9 @@ func generateNormalTx(content string) []byte {
 		ID:          sha256.Sum256([]byte(content)),
 		Content:     content,
 		TxSignature: "",
-		Operate:     0}
-
+		Operate:     0,
+	}
+	fmt.Println(tx)
 	res, _ := json.Marshal(tx)
 	return res
 }
