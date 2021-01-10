@@ -274,6 +274,7 @@ type Mempool struct {
 	// 健康指数 [0, 1] 影响打包时的大小和跨片交易的比例
 	// 1.0为正常状态
 	HealthScore float64
+	isfull      bool //上一轮打包是否过满 0.8*最大打包大小
 }
 
 //--------------------------------------------
@@ -310,7 +311,7 @@ func NewMempool(
 		metrics:       NopMetrics(),
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:          1,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
+		Plog:          0,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
 		HealthScore:   1.0,
 	}
 	if config.CacheSize > 0 {
@@ -346,12 +347,14 @@ func (mem *Mempool) CalculateHealthScore(validTxs int) float64 {
 
 	if mem.txs.Len() > mem.config.Size*3/4 {
 		// 整个mempool压力太大了
-		// f(x) = -2x + 2  [0.75, 1] -> [0.5, 0]
+		// f(x) = -2x + 2; [0.75, 1] -> [0.5, 0]
+		fmt.Println("[health] 整个mempool压力太大了")
 		newscore = -2*float64(mem.txs.Len())/float64(mem.config.Size) + 2.0
 	} else {
 		// mempool尚未饱和
-		if mem.txs.Len() > validTxs*2 {
-			// 超过共识处理速度了
+		if mem.isfull && validTxs > 0 && mem.txs.Len() > validTxs*2 {
+			// 满负载状态下，超过共识处理速度的2倍
+			fmt.Println("[health] 满负载状态下，超过共识处理速度的2倍")
 			newscore = 0.75
 		} else {
 			newscore = 1.0
@@ -363,11 +366,13 @@ func (mem *Mempool) CalculateHealthScore(validTxs int) float64 {
 		"[health] Mem.Size=%v,"+
 			" mem.Len=%v, "+
 			"consensus.validtx=%v, "+
-			"newScore=%v",
+			"newScore=%v, "+
+			"lastblock=%v",
 		mem.config.Size,
 		mem.txs.Len(),
 		validTxs,
 		newscore,
+		mem.isfull,
 	))
 	return newscore
 }
@@ -1230,7 +1235,11 @@ func ElasticBytes(maxbytes int64, health float64) int64 {
 //}
 func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) types.Txs {
 	// 区块最大容量受healthScore影响，[0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
+	if mem.HealthScore < 1.0 {
+		fmt.Println("[health] 亚健康状态, ", mem.HealthScore)
+	}
 	maxBytes = ElasticBytes(maxBytes, mem.HealthScore)
+	mem.isfull = false
 
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
@@ -1298,6 +1307,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			aminoOverhead := types.ComputeAminoOverhead(total_data, 1)
 			if maxBytes > -1 && totalBytes+int64(len(total_data))+aminoOverhead > maxBytes {
+				mem.isfull = true
 				//fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包失败")
 				return txs
 			}
@@ -1306,27 +1316,17 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			//TODO:映射表的完善
 			mem.AddRelationTable(cm, height, txKey(memTx.tx))
 			totalBytes += int64(len(total_data)) + aminoOverhead
-			//fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包成功")
+
 			// Check total gas requirement.
 			// If maxGas is negative, skip this check.
 			// Since newTotalGas < masGas, which
 			// must be non-negative, it follows that this won't overflow.
-			// gasWanted是什么意思？？？是否需要生成所有的gasWanted？
-			//todo:GasWanted调研
 			newTotalGas := totalGas + memTx.gasWanted
 			if maxGas > -1 && newTotalGas > maxGas {
 				return txs
 			}
 			totalGas = newTotalGas
-			//做测试
-			//for i := 0; i < len(byte_txlist); i++ {
-			//	//tmp_tx1, err := tp.NewTX(byte_txlist[i])
-			//	if err != nil {
-			//		mem.logger.Error("Unmarshall tp.TX error, err: ", err)
-			//	}
-			//	//mem.logger.Info(TimePhase(41, tmp_tx1.ID, strconv.FormatInt(time.Now().UnixNano(), 10))) //第41阶段打印
-			//
-			//}
+
 			parseend_time := time.Now()
 			mem.LogPrint("pickCM", txKey(memTx.tx), parseend_time.Sub(parse_time).Nanoseconds(), 2)
 			mem.LogPrint("tReapMemDone1", txKey(memTx.tx), time.Now().UnixNano(), 2)
@@ -1338,14 +1338,12 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(memTx.tx)
 			mem.LogPrint("tReapMem1", tmp_tx.ID, t.UnixNano(), 1)
-			//if PrintLog(tmp_tx.ID) {
-			//	fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", tmp_tx.ID, strconv.FormatInt(t.UnixNano(), 10))
-			//}
+
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
+				mem.isfull = true
 				return txs
 			}
-			//在这里如果交易通过核验，那么就可以确定要取该交易。那么此时，我们需要在这里对交易进行判断
 
 			totalBytes += int64(len(memTx.tx)) + aminoOverhead
 			// Check total gas requirement.
@@ -1370,6 +1368,11 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			txs = append(txs, memTx.tx)
 		}
 
+	}
+
+	if totalBytes >= maxBytes*4/5 {
+		// 打包大小超过总大小的4/5
+		mem.isfull = true
 	}
 	return txs
 }
