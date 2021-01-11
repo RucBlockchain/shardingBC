@@ -842,11 +842,13 @@ func (cs *ConsensusState) handleTxsAvailable() {
 // NOTE: cs.StartTime was already set for height.
 func (cs *ConsensusState) enterNewRound(height int64, round int) {
 	//尝试更新当前round的validators
-	// if tx,_ := cs.blockExec.ApplyDelviverTx(&cs.state); tx != nil {
-	// 	// 执行成功 将该交易放到优先打包列表中
-	// 	cs.state.SpTxBuf = append(cs.state.SpTxBuf, tx)
-	// }
-	fmt.Println("new round, Validators.size = ", cs.Validators.Size())
+	//if tx := cs.blockExec.ApplyDelviverTx(&cs.state); tx != nil {
+	//	// 执行成功 将该交易放到优先打包列表中
+	//	cs.state.SpTxBuf = append(cs.state.SpTxBuf, tx)
+	//}
+
+	// 执行成功 将该交易放到优先打包列表中
+  // fmt.Println("new round, Validators.size = ", cs.Validators.Size())
 	// for i := 0; i < cs.Validators.Size(); i++ {
 	// 	_, val := cs.Validators.GetByIndex(i)
 	// 	fmt.Println(val.Address.String(), " = ", val.VotingPower)

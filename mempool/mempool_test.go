@@ -78,7 +78,7 @@ func checkTxs(t *testing.T, mempool *Mempool, count int, peerID uint16) types.Tx
 		if err != nil {
 			t.Error(err)
 		}
-		if err := mempool.CheckTxWithInfo(txBytes, nil, txInfo); err != nil {
+		if err := mempool.CheckTxWithInfo(txBytes, nil, txInfo, true); err != nil {
 			// Skip invalid txs.
 			// TestMempoolFilters will fail otherwise. It asserts a number of txs
 			// returned.
@@ -133,7 +133,7 @@ func TestReapMaxBytesMaxGas(t *testing.T) {
 	}
 	for tcIndex, tt := range tests {
 		checkTxs(t, mempool, tt.numTxsToCreate, UnknownPeerID)
-		got := mempool.ReapMaxBytesMaxGas(tt.maxBytes, tt.maxGas)
+		got := mempool.ReapMaxBytesMaxGas(tt.maxBytes, tt.maxGas, 10)
 		assert.Equal(t, tt.expectedNumTxs, len(got), "Got %d txs, expected %d, tc #%d",
 			len(got), tt.expectedNumTxs, tcIndex)
 		mempool.Flush()
@@ -272,7 +272,7 @@ func TestSerialReap(t *testing.T) {
 	}
 
 	reapCheck := func(exp int) {
-		txs := mempool.ReapMaxBytesMaxGas(-1, -1)
+		txs := mempool.ReapMaxBytesMaxGas(-1, -1, 10)
 		require.Equal(t, len(txs), exp, fmt.Sprintf("Expected to reap %v txs but got %v", exp, len(txs)))
 	}
 
@@ -544,7 +544,7 @@ func TestMempoolRemoteAppConcurrency(t *testing.T) {
 		tx := txs[int(txNum)]
 
 		// this will err with ErrTxInCache many times ...
-		mempool.CheckTxWithInfo(tx, nil, TxInfo{PeerID: uint16(peerID)})
+		mempool.CheckTxWithInfo(tx, nil, TxInfo{PeerID: uint16(peerID)}, true)
 	}
 	err := mempool.FlushAppConn()
 	require.NoError(t, err)
@@ -561,7 +561,7 @@ func TestMempool_CheckCrossMessageSig(t *testing.T) {
 	txNum := 10
 	txs := types.HandleSortTx(randTX(txNum))
 
-	for _, tx := range (txs) {
+	for _, tx := range txs {
 		t.Log(tx)
 	}
 
@@ -569,11 +569,28 @@ func TestMempool_CheckCrossMessageSig(t *testing.T) {
 	assert.Nil(t, err, "生成merkle树出错，err: ", err)
 	cms := types.ClassifyTxFromBlock(mts, txs, []byte{0}, []byte{1}, 10)
 
-	for ith, cm := range (cms) {
+	for ith, cm := range cms {
 		data := cm.Data()
 		assert.NotNil(t, data)
-		res := mempool.CheckCrossMessageSig(data)
+		res := mempool.CheckCrossMessageSig(cm)
 		assert.True(t, res, fmt.Sprintf("%v个CrossMessage验证失败", ith))
+	}
+}
+
+func TestHealth2MaxBytes(t *testing.T) {
+	tests := []struct {
+		maxBytes    int64
+		healthScore float64
+		expectBytes int64
+	}{
+		{22020096, 1.0, 22020096},
+		{22020096, 0.5, 16515072},
+		{22020096, 0.0, 11010048},
+		{101, 0.0, 50},
+	}
+	for tcIndex, tt := range tests {
+		res := ElasticBytes(tt.maxBytes, tt.healthScore)
+		require.Equal(t, tt.expectBytes, res, "%v 这都算不对 ", tcIndex)
 	}
 }
 

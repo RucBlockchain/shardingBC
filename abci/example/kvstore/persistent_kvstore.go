@@ -92,7 +92,6 @@ func (app *PersistentKVStoreApplication) Query(reqQuery types.RequestQuery) type
 // Save the validators in the merkle tree
 func (app *PersistentKVStoreApplication) InitChain(req types.RequestInitChain) types.ResponseInitChain {
 	for _, v := range req.Validators {
-		fmt.Println(v.String(), v.Power)
 		r := app.updateValidator(v)
 		if r.IsErr() {
 			app.logger.Error("Error updating validators", "r", r)
