@@ -3,14 +3,15 @@ package blockchain
 import (
 	"errors"
 	"fmt"
-	account "github.com/tendermint/tendermint/account"
-	cmn "github.com/tendermint/tendermint/libs/common"
-	flow "github.com/tendermint/tendermint/libs/flowrate"
-	"github.com/tendermint/tendermint/libs/log"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	account "github.com/tendermint/tendermint/account"
+	cmn "github.com/tendermint/tendermint/libs/common"
+	flow "github.com/tendermint/tendermint/libs/flowrate"
+	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/types"
@@ -123,7 +124,6 @@ func (pool *BlockPool) makeRequestersRoutine() {
 			pool.requestsCh <- BlockRequest{-1, peer.id}
 			break
 		}
-		time.Sleep(time.Second * 10)
 		pool.Logger.Error("节点开始同步区块")
 		pool.Logger.Error(fmt.Sprintf("当前高度为: %v", pool.height))
 	}

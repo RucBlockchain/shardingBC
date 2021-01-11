@@ -119,13 +119,10 @@ func (sc *SignerRemote) SignProposal(chainID string, proposal *types.Proposal) e
 	return nil
 }
 
-// Implements PrivValidator.
-func (sc *SignerRemote) SignCrossTXVote(txs types.Txs, vote *types.Vote) error {
+func (sc *SignerRemote) SigCrossMerkleRoot(SigCrossMerkleRoot []byte, Blockhash []byte, vote *types.Vote) error {
 	return nil
 }
-func (sc *SignerRemote) SigCrossMerkleRoot(SigCrossMerkleRoot []byte, vote *types.Vote) error {
-	return nil
-}
+
 // Ping is used to check connection health.
 func (sc *SignerRemote) Ping() error {
 	err := writeMsg(sc.conn, &PingRequest{})

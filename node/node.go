@@ -687,7 +687,6 @@ func (n *Node) startRPC() ([]net.Listener, error) {
 	listeners := make([]net.Listener, len(listenAddrs))
 	for i, listenAddr := range listenAddrs {
 		mux := http.NewServeMux()
-		//fmt.Println("监听地址",listenAddr)
 		rpcLogger := n.Logger.With("module", "rpc-server")
 		wmLogger := rpcLogger.With("protocol", "websocket")
 		wm := rpcserver.NewWebsocketManager(rpccore.Routes, coreCodec,

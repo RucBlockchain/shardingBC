@@ -95,10 +95,12 @@ func (t *transacter) Start() error {
 		t.conns[i] = c
 	}
 	t.startingWg.Add(t.Connections)
+
 	//发送init交易保证不会出现支付方还没被确认
 	for i := 0; i < t.Connections; i++ {
 		go t.sendLoop(i, t.flag, false)
 	}
+
 	t.startingWg.Wait()
 	time.Sleep(1 * time.Second)
 	t.startingWg.Add(t.Connections)

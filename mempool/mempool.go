@@ -1200,8 +1200,10 @@ func GetValue(tx *clist.CElement) int32 {
 		return 0
 	}
 	if tmp_tx.Txtype == "relaytx" {
-		return 1
-	} else {
+		return 10
+	}else if tmp_tx.Txtype == tp.ConfigTx{
+		return 20
+	}  else {
 		return 0
 	}
 }

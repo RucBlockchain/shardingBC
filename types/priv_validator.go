@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/tendermint/tendermint/identypes"
 	"strconv"
 	"syscall"
 
@@ -19,8 +18,8 @@ type PrivValidator interface {
 
 	SignVote(chainID string, vote *Vote) error
 	SignProposal(chainID string, proposal *Proposal) error
-	SignCrossTXVote(txs Txs, vote *Vote) error // 为每一个跨片交易产生一个签名
-	SigCrossMerkleRoot(MerkleRoot []byte, vote *Vote) error
+
+	SigCrossMerkleRoot(MerkleRoot []byte, Blockhash []byte, vote *Vote) error
 }
 
 //----------------------------------------
@@ -99,42 +98,6 @@ func (pv *MockPV) SignProposal(chainID string, proposal *Proposal) error {
 	return nil
 }
 
-// Implements PrivValidator.
-func (pv *MockPV) SignCrossTXVote(txs Txs, vote *Vote) error {
-	var successNo, errorNo int
-	CTxSigs := make([]identypes.VoteCrossTxSig, 0, len(txs))
-	for _, txdata := range txs {
-		tx, err := identypes.NewTX(txdata)
-		if err != nil {
-			return err
-		}
-		if tx.Txtype != "relaytx" {
-			// 暂时只处理跨片交易的前半程，后半程的addtx没想好
-			continue
-		}
-
-		if sig, err := pv.privKey.Sign(tx.Digest()); err == nil {
-			csig := identypes.VoteCrossTxSig{TxId: tx.ID, CrossTxSig: sig}
-			CTxSigs = append(CTxSigs, csig)
-			successNo += 1
-		} else {
-			errorNo += 1
-		}
-	}
-
-	fmt.Printf("[mockPV] Sign cross traction,  success: %v, error: %v", successNo, errorNo)
-	// log for debug
-	fmt.Println("=============== crossTx Sig ===============")
-
-	for _, csig := range CTxSigs {
-		fmt.Println("txid: ", csig.TxId, "sig: ", csig.CrossTxSig)
-	}
-	fmt.Println("=============== Sig End ===============")
-
-	//copy(vote.CrossTxSigs, CTxSigs)
-	return nil
-}
-
 //分割字符串得到相应的内容,默认容器名为：1_0 分片名_分片的index
 func ParseId() int64 {
 	v, _ := syscall.Getenv("TASKID")
@@ -146,10 +109,14 @@ func ParseId() int64 {
 	return id
 }
 
-func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte, vote *Vote) error {
+func (pv *MockPV) SigCrossMerkleRoot(MerkleRoot []byte, Blockhash []byte, vote *Vote) error {
 	vote.PartSig.Id = ParseId()
+	vote.PartBlockSig.Id = ParseId()
 	if sign, err := pv.privKey.Sign(MerkleRoot); err == nil {
 		vote.PartSig.PeerCrossSig = sign
+	}
+	if sign, err := pv.privKey.Sign(Blockhash); err == nil {
+		vote.PartBlockSig.PeerCrossSig = sign
 	} else {
 		return err
 	}

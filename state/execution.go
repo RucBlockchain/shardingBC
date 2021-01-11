@@ -23,6 +23,11 @@ import (
 	"github.com/tendermint/tendermint/proxy"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
+	"math/rand"
+	"net"
+	"strconv"
+	"syscall"
+	"time"
 )
 
 //-----------------------------------------------------------------------------
@@ -100,13 +105,15 @@ func (blockExec *BlockExecutor) SetEventBus(eventBus types.BlockEventPublisher) 
 
 // 每一轮newround & 每一个节点都会尝试调用该函数
 // 如果有返回交易则表示该交易的config已经更新到consensus state中
-func (blockExec *BlockExecutor) ApplyDelviverTx(state *State) types.Tx {
+// update： 增加validatorupdate的返回 consensus根据该值去更新当前轮的validators
+func (blockExec *BlockExecutor) ApplyDelviverTx(state *State) (types.Tx, []*types.Validator) {
 	var tx types.Tx
 
 	// 从mempool直接reap configtxs并且提前执行 => 只reap deliver tx且一次只reap一条；防止同一条多次被reap
 	tx = blockExec.mempool.ReapDeliverTx()
 	if tx == nil {
-		return nil
+		fmt.Println("[ApplyDelviverTx] reap nil")
+		return nil, nil
 	}
 
 	// 执行configtx
@@ -118,29 +125,29 @@ func (blockExec *BlockExecutor) ApplyDelviverTx(state *State) types.Tx {
 		// 防止阻碍共识流程以及后面正确的交易的执行
 		blockExec.mempool.Update(-1, types.Txs{tx}, nil, nil)
 		blockExec.logger.Error("[ApplyDelviverTx] ExecuteConfigTx failed. reason: " + err.Error())
-		return nil
+		return nil, nil
 	}
+	fmt.Println("[ApplyDelviverTx] ExecuteConfigTx done")
 
 	// 尝试更新当前状态待validators
 	// 先拷贝一份副本模拟更新
 	tmpValidators := state.Validators.Copy()
 	err = tmpValidators.UpdateWithChangeSet(validatorUpdates)
 	if err == nil {
-		fmt.Println("[ApplyDelviverTx] validators更新完成")
 		// 模拟更新成功 直接更新state
 		state.Validators.UpdateWithChangeSet(validatorUpdates)
+		state.NextValidators.UpdateWithChangeSet(validatorUpdates)
 
 		// 从mempool中删除该交易 防止再次执行
 		blockExec.mempool.Update(-1, types.Txs{tx}, nil, nil)
-
-		return tx
+		fmt.Println("[ApplyDelviverTx] validators更新完成")
+		return tx, validatorUpdates
 	} else {
 		// 副本更新失败 退出 但不删除交易 因为可能只是某个节点一时更新失败
 		blockExec.logger.Error("validators update failded. reason: " + err.Error())
-		return nil
+		return nil, nil
 	}
-	return nil
-
+	return nil, nil
 }
 
 // CreateProposalBlock calls state.MakeBlock with evidence from the evpool
@@ -166,6 +173,7 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 	var txs types.Txs
 	// 如果state中存在configtx类型的交易则优先打包 且只打包一条
 	if len(state.SpTxBuf) > 0 {
+		fmt.Println("优先打包SpTxBuf")
 		txs = state.SpTxBuf[:1]
 	} else {
 		txs = blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas, height)
@@ -201,16 +209,16 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	if currentHeight > 0 && int(currentHeight)%account.SNAPSHOT_INTERVAL == 0 && account.SnapshotVersion != "" {
 		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
 		val := state.Validators.Copy()
+		nextval := state.NextValidators.Copy()
 		if account.SnapshotVersion == "v1.0" {
 			// 快照生成v1.0
-			account.GenerateSnapshot(block.Height-1, val)
+			account.GenerateSnapshot(block.Height-1, val, nextval)
 		} else if account.SnapshotVersion == "v2.0" {
 			// 快照生成v2.0
-			account.GenerateSnapshotFast(block.Height-1, val)
-
+			account.GenerateSnapshotFast(block.Height-1, val, nextval)
 		} else {
 			// 快照生成v3.0
-			account.GenerateSnapshotWithSecurity(block.Height-1, val)
+			account.GenerateSnapshotWithSecurity(block.Height-1, val, nextval)
 
 			// 在快照后一个区块内增加快照交易
 			//snapshotTx := new(account.TxArg)
@@ -255,7 +263,6 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 
 	// 在这里根据ABCI的结果组织validators的更新 - 类型转换
 	validatorUpdates, err := types.PB2TM.ValidatorUpdates(abciValUpdates)
-	fmt.Println(validatorUpdates)
 	if err != nil {
 		return state, err
 	}
@@ -478,17 +485,23 @@ func GetTotal() int {
 	count, _ := strconv.Atoi(v)
 	return count
 }
+
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
 	rand.Seed(time.Now().UnixNano())
 	name := "tt" + DesZone + "s" + strconv.Itoa(rand.Intn(GetTotal())+1) + ":26657"
 	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
-	//fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
 	go client.BroadcastCrossMessageAsync(tx_package)
 }
+
+func (blockExec *BlockExecutor) SendTxAsync(endpoint string, tx_data tp.TX) {
+	client := *myclient.NewHTTP(endpoint, "/websocket")
+	client.BroadcastTxAsync([]tp.TX{tx_data})
+}
+
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
 
 	res, _ := json.Marshal(tx_package)
