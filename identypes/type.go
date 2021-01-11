@@ -75,7 +75,7 @@ type EcdsaCoordinate struct {
 // 重命名结构体，容易与types.Tx混淆
 // Txtype变更为使用enum类型
 type TX struct {
-	Txtype      string
+	Txtype      string // 现有的交易类型：tx、addtx、relaytx、reporttx
 	Sender      string
 	Receiver    string
 	ID          [sha256.Size]byte

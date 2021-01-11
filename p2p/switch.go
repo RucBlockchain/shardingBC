@@ -152,10 +152,6 @@ func WithMetrics(metrics *Metrics) SwitchOption {
 // NOTE: Not goroutine safe.
 func (sw *Switch) AddReactor(name string, reactor Reactor) Reactor {
 
-	// 调用reactor的GetChannels方法获取相关的通道描述
-	// 也就是说一个Reactor可以启用好几个通道 但是这个通道ID是所有Reactor
-	// 都不可以重复的。
-
 	// Validate the reactor.
 	// No two reactors can share the same channel.
 	reactorChannels := reactor.GetChannels()
@@ -167,9 +163,6 @@ func (sw *Switch) AddReactor(name string, reactor Reactor) Reactor {
 		sw.chDescs = append(sw.chDescs, chDesc)
 		sw.reactorsByCh[chID] = reactor
 	}
-
-	// 这个接口很重要 它把Switch的对象又传递给你Reactor 这样Reactor也可以调用Switch的函数了
-	// 这回真的是你中有我我中有你了
 
 	sw.reactors[name] = reactor
 	reactor.SetSwitch(sw)
@@ -211,15 +204,6 @@ func (sw *Switch) SetNodeKey(nodeKey *NodeKey) {
 
 // OnStart implements BaseService. It starts all the reactors and peers.
 func (sw *Switch) OnStart() error {
-	// 首先调用Reactor 启动所有的Reactor
-	// Reactor 是一个接口，反正你只要实现此接口函数
-	// 那么函数中啥也不做也没关系。 不过如果啥也不做
-	// 这个Reactor也就没有什么实际意义了。
-	// 在创建Switch中 sw.reactors 里面是空的
-	// 那么这些Reactor是怎么添加进来的呢
-	// 所以Switch提供了一个方法叫做AddReactor 专门添加Reactor
-	// 上面也说了在tendermint里面有6个Reactor 它们是在node/node.go
-	// 文件中被添加的 类似于下面这样
 	// Start reactors
 	for _, reactor := range sw.reactors {
 
@@ -427,7 +411,7 @@ func isPrivateAddr(err error) bool {
 // TODO: remove addrBook arg since it's now set on the switch
 func (sw *Switch) DialPeersAsync(addrBook AddrBook, peers []string, persistent bool) error {
 	netAddrs, errs := NewNetAddressStrings(peers)
-	fmt.Println("要连接的节点", peers)
+
 	// only log errors, dial correct addresses
 	for _, err := range errs {
 		sw.Logger.Error("Error in peer's address", "err", err)

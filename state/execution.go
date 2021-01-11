@@ -23,6 +23,11 @@ import (
 	"github.com/tendermint/tendermint/proxy"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
+	"math/rand"
+	"net"
+	"strconv"
+	"syscall"
+	"time"
 )
 
 //-----------------------------------------------------------------------------
@@ -481,17 +486,23 @@ func GetTotal() int {
 	count, _ := strconv.Atoi(v)
 	return count
 }
+
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	//todo:需要随机选择一个节点
 	rand.Seed(time.Now().UnixNano())
 	name := "tt" + DesZone + "s" + strconv.Itoa(rand.Intn(GetTotal())+1) + ":26657"
 	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
-	//fmt.Println("要发送的目的地",name)
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
 	go client.BroadcastCrossMessageAsync(tx_package)
 }
+
+func (blockExec *BlockExecutor) SendTxAsync(endpoint string, tx_data tp.TX) {
+	client := *myclient.NewHTTP(endpoint, "/websocket")
+	client.BroadcastTxAsync([]tp.TX{tx_data})
+}
+
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
 
 	res, _ := json.Marshal(tx_package)

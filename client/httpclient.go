@@ -199,9 +199,11 @@ func (c *HTTP) broadcastCrossMessages(route string, cms []*tp.CrossMessages) {
 func (c *HTTP) BroadcastCrossMessageAsync(cms []*tp.CrossMessages) {
 	go c.broadcastCrossMessages("broadcast_tx_async", cms)
 }
+
 func (c *HTTP) BroadcastTxAsync(txs []tp.TX) {
 	go c.broadcastTX("broadcast_tx_async", txs)
 }
+
 func (c *HTTP) broadcastTX(route string, cms []tp.TX) {
 
 	for i := 0; i < len(cms); i++ {
@@ -212,6 +214,7 @@ func (c *HTTP) broadcastTX(route string, cms []tp.TX) {
 
 	}
 }
+
 // func (c *HTTP) Status() (*ctypes.ResultStatus, error) {
 // 	result := new(ctypes.ResultStatus)
 // 	_, err := c.rpc.Call("status", map[string]interface{}{}, result)

@@ -101,7 +101,6 @@ type RPCRequest struct {
 // The internal state machine receives input from peers, the internal validator, and from a timer.
 type ConsensusState struct {
 	cmn.BaseService
-	my *myline.Line
 	// config details
 
 	config        *cfg.ConsensusConfig
@@ -162,24 +161,13 @@ type ConsensusState struct {
 
 	// for reporting metrics
 	metrics *Metrics
+
+	// 发生共识错误时的记错本
+	notebook *Normalbook
 }
 
 type node struct {
 	target map[string][]string
-}
-
-func (cs *ConsensusState) newline() *myline.Line {
-	endpoints := &node{
-		target: make(map[string][]string, 16),
-	}
-
-	endpoints.target["A"] = []string{"192.168.5.56:26657", "192.168.5.56:36657", "192.168.5.56:46657", "192.168.5.56:56657"}
-	endpoints.target["B"] = []string{"192.168.5.57:26657", "192.168.5.57:36657", "192.168.5.57:46657", "192.168.5.57:56657"}
-	endpoints.target["C"] = []string{"192.168.5.58:26657", "192.168.5.58:36657", "192.168.5.58:46657", "192.168.5.58:56657"}
-	endpoints.target["D"] = []string{"192.168.5.60:26657", "192.168.5.60:36657", "192.168.5.60:46657", "192.168.5.60:56657"}
-
-	l := myline.NewLine(endpoints.target)
-	return l
 }
 
 // StateOption sets an optional parameter on the ConsensusState.
@@ -217,13 +205,6 @@ func NewConsensusState(
 	cs.setProposal = cs.defaultSetProposal
 
 	cs.updateToState(state)
-	cs.my = cs.newline()
-	//go func(){
-	//	if err:=cs.my.Start();err!=nil{
-	//		fmt.Println(err)
-	//	}
-	//	fmt.Println("state connect!!!!!!!!!!!!!!!!")
-	//}()
 
 	// Don't call scheduleRound0 yet.
 	// We do that upon Start().
@@ -232,6 +213,10 @@ func NewConsensusState(
 	for _, option := range options {
 		option(cs)
 	}
+
+	// 设置normal notebook
+	cs.notebook = NewNormalBook(SendDelta)
+	cs.notebook.SetConsensusState(cs)
 	return cs
 }
 
@@ -395,11 +380,10 @@ go run scripts/json2wal/main.go wal.json $WALFILE # rebuild the file without cor
 	// schedule the first round!
 	// use GetRoundState so we don't race the receiveRoutine for access
 	cs.scheduleRound0(cs.GetRoundState())
-	//if err:=cs.my.Start();err!=nil{
-	//	fmt.Println("启动失败-cs")
-	//	return err
-	//}
-	//fmt.Println("state 连接！！！！！！！！！！！！！！！！！")
+
+	// 启动normal notebook
+	cs.notebook.SetLogger(cs.Logger.With("submodule", "notebook"))
+	cs.notebook.OnStart()
 	return nil
 
 }
@@ -542,7 +526,7 @@ func (cs *ConsensusState) sendInternalMessage(mi msgInfo) {
 }
 
 // Reconstruct LastCommit from SeenCommit, which we saved along with the block,
-// (which happens even before saving the state)
+// (which happens even before savin©g the state)
 func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	if state.LastBlockHeight == 0 {
 		return
@@ -1027,6 +1011,12 @@ func getIp() string {
 	}
 	return ""
 }
+
+func getNode() string {
+	v, _ := syscall.Getenv("TASKINDEX")
+	return v
+}
+
 func getShard() string {
 	v, _ := syscall.Getenv("TASKID")
 	return v
@@ -1356,6 +1346,10 @@ func (cs *ConsensusState) enterCommit(height int64, commitRound int) {
 
 	if cs.Height != height || cstypes.RoundStepCommit <= cs.Step {
 		logger.Debug(fmt.Sprintf("enterCommit(%v/%v): Invalid args. Current step: %v/%v/%v", height, commitRound, cs.Height, cs.Round, cs.Step))
+
+		// TODO 在这里记录现有的投票信息
+		// TODO 如何从cs.Votes中抽取出我们需要的消息 如何 猜想的组织形式round&height-> voteSet
+
 		return
 	}
 	logger.Info(fmt.Sprintf("enterCommit(%v/%v). Current: %v/%v/%v", height, commitRound, cs.Height, cs.Round, cs.Step))
@@ -1437,7 +1431,6 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		}
 		for i := 0; i < len(cs.ProposalBlock.Txs); i++ { //将每条交易时间打印出来
 			tx, _ := tp.NewTX(cs.ProposalBlock.Txs[i])
-
 			tx.PrintInfo()
 			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				continue
@@ -1447,6 +1440,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			}
 			cs.ParseTxTime(tx, "TxRes")
 		}
+
 		begin_time := time.Now()
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
@@ -1550,6 +1544,9 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 		return
 	}
 
+	// 触发notebook的更新
+	cs.notebook.Trigger()
+
 	//	go
 	cs.finalizeCommit(height)
 }
@@ -1636,8 +1633,10 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// Execute and commit the block, update and save the state, and update the mempool.
 	// NOTE The block.AppHash wont reflect these txs until the next block.
 	cs.Logger.Debug("try add aggragate")
+
 	//对区块进行修改,由于会改变tx的内容所以在这里进行处理
 	cs.tryAddAggragate2Block()
+
 	var err error
 	stateCopy, err = cs.blockExec.ApplyBlock(stateCopy, types.BlockID{Hash: block.Hash(), PartsHeader: blockParts.Header()}, block, flag)
 
@@ -1664,21 +1663,46 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	// Schedule Round0 to start soon.
 	cs.scheduleRound0(&cs.RoundState)
 
-	//leader数据库不用再重建
-	/*
-		if !cs.isEqual(lastLeaderAddress) {
-			if cs.isLeader() {
-				e := useetcd.NewEtcd()
-				e.Update(getShard(), getIp())
-				fmt.Println("------change the leader--------")
-				cs.reactorViaCheckpoint(height)
-			}
-		}
-	*/
 	// By here,
 	// * cs.Height has been increment to height+1
 	// * cs.Step is now cstypes.RoundStepNewHeight
 	// * cs.StartTime is set to when we will start round0.
+
+}
+
+func (cs *ConsensusState) PingPong() {
+	var err error
+
+	// 获取2/3的投票的子签名
+	voteSet := cs.Votes.Prevotes(cs.CommitRound)
+
+	//shardid, nodeid := getShard(), getNode()
+
+	var ids = make([]int64, 0, len(voteSet.PartSigs))
+	var sigs = make([][]byte, 0, len(voteSet.PartSigs))
+	for i := 0; i < len(voteSet.PartSigs); i++ {
+		ids = append(ids, voteSet.PartSigs[i].Id)
+		sigs = append(sigs, voteSet.PartSigs[i].PeerCrossSig)
+	}
+
+	var threshold int // 系统参数 外部获取
+	if s, found := syscall.Getenv("THRESHOLD"); found {
+		threshold, _ = strconv.Atoi(s)
+	} else {
+		threshold = 3
+	}
+
+	_, err = cs.ProposalBlock.Marshal()
+	if err != nil {
+		cs.Logger.Error("marshal block head failed, err: %v", err)
+		return
+	}
+
+	_, err = bls.SignatureRecovery(threshold, sigs, ids)
+	if err != nil {
+		cs.Logger.Error("[signature] threshold signature recover error, %v", err)
+		return
+	}
 
 }
 
@@ -2105,11 +2129,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 	addr := cs.privValidator.GetPubKey().Address()
 	valIndex, _ := cs.Validators.GetByAddress(addr)
 
-	//crossTxNum := 0
-	//if cs.ProposalBlock != nil && cs.ProposalBlock.Txs != nil {
-	//	crossTxNum = len(cs.ProposalBlock.Txs)
-	//}
-
 	vote := &types.Vote{
 		ValidatorAddress: addr,
 		ValidatorIndex:   valIndex,
@@ -2119,7 +2138,7 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		Type:             type_,
 		BlockID:          types.BlockID{Hash: hash, PartsHeader: header},
 		PartSig:          &tp.PartSig{PeerCrossSig: nil, Id: types.ParseId()},
-		//CrossTxSigs:      make([]tp.VoteCrossTxSig, 0, crossTxNum),
+		PartBlockSig:     &tp.PartSig{PeerCrossSig: nil, Id: types.ParseId()},
 	}
 
 	//这里是对跨片进行签名
@@ -2131,8 +2150,13 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 			cs.Logger.Error("在mempool未找到对应交易，投反对票")
 			vote.BlockID.Hash = nil //投反对票
 		} else {
-			err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, vote)
-			// log for DEBUG
+			// 生成两个门限签名的子签名 - 跨片交易的merkle tree root & 当前block header的hash
+			err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, cs.ProposalBlock.Header.Hash(), vote)
+
+			// [DEBUG] log for DEBUG
+			cs.Logger.Debug(fmt.Sprintf("[SIGN] signature: %v, varify: %v",
+				vote.PartBlockSig.PeerCrossSig,
+				cs.privValidator.GetPubKey().VerifyBytes(cs.ProposalBlock.Header.Hash(), vote.PartBlockSig.PeerCrossSig)))
 			if err != nil {
 				cs.Logger.Error("generate cross traction signature error, ", err)
 				vote.BlockID.Hash = nil //因为签名出错，可能是自身的密钥有问题，投反对票
@@ -2140,8 +2164,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		}
 		end_time := time.Now()
 		PrintinfoTime(3, cs.ProposalBlock.Hash(), strconv.FormatInt(end_time.Sub(begin_time).Nanoseconds(), 10))
-		// prevote阶段对每条跨片交易生成签名
-		// 没有想好怎么处理这里的错误
 
 	}
 

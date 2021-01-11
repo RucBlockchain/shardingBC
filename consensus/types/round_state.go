@@ -59,6 +59,10 @@ func (rs RoundStepType) String() string {
 	}
 }
 
+func (rs RoundStepType) ToUint8() uint8 {
+	return uint8(rs)
+}
+
 //-----------------------------------------------------------------------------
 
 // RoundState defines the internal consensus state.
