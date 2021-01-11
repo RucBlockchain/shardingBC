@@ -1,10 +1,10 @@
 package main
 
 import (
+	"github.com/tendermint/tendermint/account"
+	"github.com/tendermint/tendermint/libs/cli"
 	"os"
 	"path/filepath"
-
-	"github.com/tendermint/tendermint/libs/cli"
 
 	cmd "github.com/tendermint/tendermint/cmd/tendermint/commands"
 	cfg "github.com/tendermint/tendermint/config"
@@ -38,6 +38,8 @@ func main() {
 	// DefaultNewNode function
 	nodeFunc := nm.DefaultNewNode
 
+	// 设置快照版本 暂时无法从外部参数修改
+	account.SetSnapshotVersion("v2.0")
 	// Create & start node
 	rootCmd.AddCommand(cmd.NewRunNodeCmd(nodeFunc))
 

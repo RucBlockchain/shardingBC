@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/tendermint/go-amino"
 
+	ac "github.com/tendermint/tendermint/account"
 	"github.com/tendermint/tendermint/libs/log"
 	myline "github.com/tendermint/tendermint/line"
 	"github.com/tendermint/tendermint/p2p"
@@ -238,6 +240,62 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 	case *bcStatusResponseMessage:
 		// Got a peer status. Unverified.
 		bcR.pool.SetPeerHeight(src.ID(), msg.Height)
+
+	/*
+	 * @Author: zyj
+	 * @Desc: 增加快照请求和响应的逻辑处理
+	 * @Date: 19.12.07
+	 */
+	case *bcSnapshotRequestMessage:
+		bcR.Logger.Error("收到快照请求! 现在发送快照")
+		// 获取所有状态集合
+		snapshot := ac.GetSnapshot()
+		snapShopMap, _ := json.Marshal(snapshot.Content)
+		snapValSet,_ := json.Marshal(snapshot.ValSet)
+		snapValNextSet,_ := json.Marshal(snapshot.NextValSet)
+		Pubsbytes,_ := json.Marshal(ac.GeneratePubkey(snapshot.ValSet.Validators,snapshot.ValSet.Proposer))
+		NextPubsbytes,_ := json.Marshal(ac.GeneratePubkey(snapshot.NextValSet.Validators,snapshot.NextValSet.Proposer))
+
+		msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotResponseMessage{snapshot.Version, snapShopMap,snapValSet,Pubsbytes,snapValNextSet,NextPubsbytes})
+		src.TrySend(BlockchainChannel, msgBytes)
+
+	case *bcSnapshotResponseMessage:
+		bcR.Logger.Error(fmt.Sprintf("收到快照版本为 %v", msg.Version))
+		// 处理快照
+		myMap := make(map[string]string)
+		json.Unmarshal(msg.Content, &myMap)
+		var myVal *types.ValidatorSet
+		myVal = ac.TogetherParseSet(msg.ValSet,msg.Vals)
+		var nextmyVal *types.ValidatorSet
+		nextmyVal = ac.TogetherParseSet(msg.NextVal,msg.NextPub)
+
+		count := 0
+		for k, v := range myMap {
+			// 快照写入
+			ac.SetState([]byte(k), []byte(v))
+			count++
+		}
+		bcR.Logger.Error(fmt.Sprintf("快照写入完成, 长度为%v", count))
+		// 更新当前快照
+		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap,myVal,nextmyVal})
+
+		// 更新当前区块高度为快照版本
+		if msg.Version > 0 && msg.Version < 0x7fffffff {
+			bcR.store.height = msg.Version // just for test
+			// 更新pool中的高度为当前高度+1
+			bcR.pool.height = bcR.store.height + 1
+			bcR.initialState.LastBlockHeight = bcR.store.height
+			bcR.initialState.Validators = myVal//更新
+			bcR.initialState.NextValidators = nextmyVal//更新
+
+			// 修改consensus模块中的区块高度
+			//cs := consensus.GetConsensusState()
+			//cs.Height = bcR.store.height
+		}
+
+		// 标记为新加入节点
+		ac.IsNewPeer = true
+		/* ---------- zyj change --------- */
 	default:
 		bcR.Logger.Error(fmt.Sprintf("Unknown message type %v", reflect.TypeOf(msg)))
 	}
@@ -273,6 +331,18 @@ func (bcR *BlockchainReactor) poolRoutine() {
 				if peer == nil {
 					continue
 				}
+				/*
+				 * @Author: zyj
+				 * @Desc: 增加快照请求发送逻辑，当requestsCh通道中高度为-1时触发
+				 * @Date: 19.11.24
+				 */
+				if request.Height == -1 {
+					bcR.Logger.Error(fmt.Sprintf("现在发送同步快照请求: %v", request.PeerID))
+					msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotRequestMessage{})
+					peer.TrySend(BlockchainChannel, msgBytes)
+					continue
+				}
+				/* ---------- zyj change --------- */
 				msgBytes := cdc.MustMarshalBinaryBare(&bcBlockRequestMessage{request.Height})
 				queued := peer.TrySend(BlockchainChannel, msgBytes)
 				if !queued {
@@ -300,9 +370,20 @@ FOR_LOOP:
 			bcR.Logger.Debug("Consensus ticker", "numPending", numPending, "total", lenRequesters,
 				"outbound", outbound, "inbound", inbound)
 			if bcR.pool.IsCaughtUp() {
-				bcR.Logger.Info("Time to switch to consensus reactor!", "height", height)
+				bcR.Logger.Error("Time to switch to consensus reactor!", "height", height)
+				/*
+				 * @Author: zyj
+				 * @Desc: 更新高度，同步至consensus模块，否则会从高度1开始共识
+				 * @Date: 19.11.24
+				*/
+				state.LastBlockHeight = height - 1
+				//fmt.Println("同步")
+				state.Validators = bcR.initialState.Validators.Copy()//添加其validator数量
+
+				// ------------------------------------
 				bcR.pool.Stop()
 				conR, ok := bcR.Switch.Reactor("CONSENSUS").(consensusReactor)
+
 				if ok {
 					conR.SwitchToConsensus(state, blocksSynced)
 				} else {
@@ -345,6 +426,8 @@ FOR_LOOP:
 			// NOTE: we can probably make this more efficient, but note that calling
 			// first.Hash() doesn't verify the tx contents, so MakePartSet() is
 			// currently necessary.
+			state.Validators = bcR.initialState.Validators.Copy()
+			state.NextValidators = bcR.initialState.NextValidators.Copy()
 			err := state.Validators.VerifyCommit(
 				chainID, firstID, first.Height, second.LastCommit)
 			if err != nil {
@@ -411,6 +494,11 @@ type BlockchainMessage interface {
 	ValidateBasic() error
 }
 
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型注册
+ * @Date: 19.11.24
+ */
 func RegisterBlockchainMessages(cdc *amino.Codec) {
 	cdc.RegisterInterface((*BlockchainMessage)(nil), nil)
 	cdc.RegisterConcrete(&bcBlockRequestMessage{}, "tendermint/blockchain/BlockRequest", nil)
@@ -418,6 +506,8 @@ func RegisterBlockchainMessages(cdc *amino.Codec) {
 	cdc.RegisterConcrete(&bcNoBlockResponseMessage{}, "tendermint/blockchain/NoBlockResponse", nil)
 	cdc.RegisterConcrete(&bcStatusResponseMessage{}, "tendermint/blockchain/StatusResponse", nil)
 	cdc.RegisterConcrete(&bcStatusRequestMessage{}, "tendermint/blockchain/StatusRequest", nil)
+	cdc.RegisterConcrete(&bcSnapshotRequestMessage{}, "tendermint/blockchain/SnapshotRequest", nil)
+	cdc.RegisterConcrete(&bcSnapshotResponseMessage{}, "tendermint/blockchain/SnapshotResponse", nil)
 }
 
 func decodeMsg(bz []byte) (msg BlockchainMessage, err error) {
@@ -511,4 +601,38 @@ func (m *bcStatusResponseMessage) ValidateBasic() error {
 
 func (m *bcStatusResponseMessage) String() string {
 	return fmt.Sprintf("[bcStatusResponseMessage %v]", m.Height)
+}
+
+//-------------------------------------
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型定义
+ * @Date: 19.11.24
+ */
+type bcSnapshotRequestMessage struct {
+}
+
+func (m *bcSnapshotRequestMessage) ValidateBasic() error {
+	return nil
+}
+
+func (m *bcSnapshotRequestMessage) String() string {
+	return fmt.Sprintf("[bcStatusResponseMessage %v]")
+}
+
+type bcSnapshotResponseMessage struct {
+	Version int64
+	Content []byte
+	ValSet  []byte
+	Vals    []byte
+	NextVal []byte
+	NextPub []byte
+}
+
+func (m *bcSnapshotResponseMessage) ValidateBasic() error {
+	return nil
+}
+
+func (m *bcSnapshotResponseMessage) String() string {
+	return fmt.Sprintf("[bcStatusResponseMessage %v]", m.Version)
 }

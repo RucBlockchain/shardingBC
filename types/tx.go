@@ -2,8 +2,12 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/tendermint/tendermint/identypes"
+	"strconv"
+	"strings"
 
 	amino "github.com/tendermint/go-amino"
 
@@ -30,6 +34,46 @@ func (tx Tx) String() string {
 
 // Txs is a slice of Tx.
 type Txs []Tx
+
+// TODO 从configtx中解析出待更新待validators
+func ExecuteConfigTx(origin Tx) ([]*Validator, error) {
+	validators := make([]*Validator, 0, 0)
+
+	tx, err := identypes.NewTX(origin)
+	if err != nil {
+		return nil, errors.New("[ExecuteConfigTx] parse tx failed. err" + err.Error())
+	} else if tx.Txtype != identypes.ConfigTx {
+		return nil, errors.New("[ExecuteConfigTx] tx type is wrong, expect 'configtx' but got " + tx.Txtype)
+	}
+
+	// 暂用tendermint deliver tx的格式
+	ValidatorSetChangePrefix := "val:"
+	content := tx.Content[len(ValidatorSetChangePrefix):]
+
+	//get the pubkey and power
+	pubKeyAndPower := strings.Split(content, "/")
+	if len(pubKeyAndPower) != 2 {
+		fmt.Println("[ExecuteConfigTx] 解析交易内容错误")
+		return nil, errors.New("[ExecuteConfigTx] parse config tx error, wrong format")
+	}
+	pubkeyS, powerS := pubKeyAndPower[0], pubKeyAndPower[1]
+	pubkey, err := hex.DecodeString(pubkeyS)
+	power, err := strconv.ParseInt(powerS, 10, 64)
+	fmt.Println("[ExecuteConfigTx] parsed tx: ", pubkey, power)
+
+	tmppub := abci.BlsValidatorUpdate(pubkey, int64(power))
+	// conver abci.Pubkey 2 crypto.Pubkey
+	pub, err := PB2TM.PubKey(tmppub.PubKey)
+	if err != nil {
+		fmt.Println("[ExecuteConfigTx] conver abci.Pubkey 2 crypto.Pubkey failed. err: ", err)
+		return validators, errors.New("[ExecuteConfigTx] conver abci.Pubkey 2 crypto.Pubkey failed. err: " + err.Error())
+	}
+
+	validator := NewValidator(pub, power)
+	validators = append(validators, validator)
+
+	return validators, nil
+}
 
 // Hash returns the Merkle root hash of the transaction hashes.
 // i.e. the leaves of the tree are the hashes of the txs.

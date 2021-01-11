@@ -65,6 +65,30 @@ func TestSmall(t *testing.T) {
 
 }
 
+func TestPriority(t *testing.T) {
+	l := New()
+
+	getval := func(e *CElement) int32 {
+		return int32(e.Value.(int) % 2)
+	}
+
+	testvals := []int{7, 1, 6, 2, 4, 2, 3, 1, 7, 2, 5, 7}
+
+	for _, val := range testvals {
+		l.PushBackToMem(val, getval)
+	}
+
+	if l.Len() != len(testvals) {
+		t.Errorf("Expected len %v, got %v", len(testvals), l.Len())
+	}
+
+	for e := l.Front(); e != nil; e = e.Next() {
+		fmt.Printf(" %v", e.Value)
+	}
+
+	fmt.Println()
+}
+
 // This test is quite hacky because it relies on SetFinalizer
 // which isn't guaranteed to run at all.
 //nolint:unused,deadcode

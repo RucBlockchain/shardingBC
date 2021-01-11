@@ -83,6 +83,10 @@ type State struct {
 
 	// the latest AppHash we've received from calling abci.Commit()
 	AppHash []byte
+
+	// 提前执行的交易 打包时候的优先打包里面的交易且一次只打包一条
+	// 理论上最多只会有一条交易存在
+	SpTxBuf types.Txs
 }
 
 // Copy makes a copy of the State for mutating.
@@ -107,6 +111,7 @@ func (state State) Copy() State {
 		AppHash: state.AppHash,
 
 		LastResultsHash: state.LastResultsHash,
+		SpTxBuf:         make([]types.Tx, 0, 10), // TODO maybe bug
 	}
 }
 
@@ -258,5 +263,6 @@ func MakeGenesisState(genDoc *types.GenesisDoc) (State, error) {
 		LastHeightConsensusParamsChanged: 1,
 
 		AppHash: genDoc.AppHash,
+		SpTxBuf: make([]types.Tx, 0, 10),
 	}, nil
 }

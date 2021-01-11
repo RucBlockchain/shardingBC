@@ -591,7 +591,7 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
-			name := "tt"+dbtx.SrcZone + "s" + cm.SrcIndex + ":26657"
+			name := "tt" + dbtx.SrcZone + "s" + cm.SrcIndex + ":26657"
 			//	fmt.Println("发送",name)
 			// fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
 			//)
@@ -679,8 +679,8 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 		//fmt.Println("交易合法性验证")
 		accountLog := account.NewAccountLog(cm.Txlist[i])
 		if accountLog == nil {
-			fmt.Println("交易解析失败")
-			return errors.New("交易解析失败")
+			fmt.Println("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
+			return errors.New("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
 		mem.LogPrint("tCheckCM", txKey(tmp_tx), time.Now().UnixNano(), 2)
@@ -897,7 +897,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 		}
 		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
 		if accountLog == nil {
-			return errors.New("交易解析失败")
+			return errors.New("[CheckTxWithInfo] 交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
 		checkRes := accountLog.Check()
@@ -1015,6 +1015,15 @@ func (mem *Mempool) addTx(memTx *mempoolTx) {
 	mem.metrics.TxSizeBytes.Observe(float64(len(memTx.tx)))
 }
 
+// 使用插入排序添加交易到mempool
+// added by Hua
+func (mem *Mempool) insertTx(memTx *mempoolTx) {
+	e := mem.txs.PushBackToMem(memTx, GetValue)
+	mem.txsMap.Store(txKey(memTx.tx), e)
+	atomic.AddInt64(&mem.txsBytes, int64(len(memTx.tx)))
+	mem.metrics.TxSizeBytes.Observe(float64(len(memTx.tx)))
+}
+
 // Called from:
 //  - Update (lock held) if tx was committed
 // 	- resCbRecheck (lock not held) if tx was invalidated
@@ -1036,6 +1045,7 @@ func (mem *Mempool) removeTx(tx types.Tx, elem *clist.CElement, removeFromCache 
 func time2string(t int64) string {
 	return strconv.FormatInt(t, 10)
 }
+
 func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response) {
 	switch r := res.Value.(type) {
 	case *abci.Response_CheckTx:
@@ -1052,7 +1062,8 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			memTx.senders.Store(peerID, true)
 			btime := time.Now()
 
-			mem.addTx(memTx)
+			//mem.addTx(memTx)
+			mem.insertTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
 				mem.LogPrint("periodAddCM", txKey(memTx.tx), etime.Sub(btime).Nanoseconds(), 2)
@@ -1161,6 +1172,69 @@ func (mem *Mempool) notifyTxsAvailable() {
 
 }
 
+//get a sorted list from input txs in which relaytx placed ahead
+//newtxs_relay, newtxs_comm respectively store relaytx and commontx in Mempool
+//added by HUA 2020
+func (mem *Mempool) SortTxs() *clist.CList {
+	newtxs_relay := clist.New()
+	newtxs_comm := clist.New()
+	txs := mem.txs
+
+	for e := txs.Front(); e != nil; e = e.Next() {
+		memTx := e.Value.(*mempoolTx)
+		tmp_tx, err := tp.NewTX(memTx.tx)
+		if err != nil {
+			mem.logger.Error("cross message decompression failed.")
+			return nil
+		}
+		if tmp_tx.Txtype == "relaytx" {
+			newtxs_relay.PushBack(memTx)
+		} else {
+			newtxs_comm.PushBack(memTx)
+		}
+	}
+	for e := newtxs_comm.Front(); e != nil; e = e.Next() { //把普通交易加到跨片交易之后
+		memTx := e.Value.(*mempoolTx)
+		newtxs_relay.PushBack(memTx)
+		newtxs_comm.Remove(e) //移除已经添加到newtxs_relay中的CElement
+	}
+
+	return newtxs_relay
+}
+
+// modified by Hua 11.24
+// used to calculate the value of a tx in mempool
+// 需要插入排序，每次往mempool插入一个交易时需要从头开始遍历mempool中的交易，插入到第一个value小于待插入交易value的交易后面
+// 如果把这个插入函数写成Clist的一个成员函数，能不能调用为Mempool成员函数的GetValue函数（该函数给出每个交易的value）
+func GetValue(tx *clist.CElement) int32 {
+	memTx := tx.Value.(*mempoolTx)
+	tmp_tx, err := tp.NewTX(memTx.tx)
+
+	if err != nil {
+		fmt.Println("error")
+		return 0
+	}
+	if tmp_tx.Txtype == "relaytx" {
+		return 10
+	}else if tmp_tx.Txtype == tp.ConfigTx{
+		return 20
+	}  else {
+		return 0
+	}
+}
+
+// 找到第一条configtx
+func (mem *Mempool) ReapDeliverTx() types.Tx {
+	// reap deliver tx
+	for e := mem.txs.Front(); e != nil; e = e.Next() {
+		memTx := e.Value.(*mempoolTx)
+		if tx, err := tp.NewTX(memTx.tx); err == nil && tx.Txtype == tp.ConfigTx {
+			return memTx.tx
+		}
+	}
+	return nil
+}
+
 // ReapMaxBytesMaxGas reaps transactions from the mempool up to maxBytes bytes total
 // with the condition that the total gasWanted must be less than maxGas.
 // If both maxes are negative, there is no cap on the size of all returned
@@ -1179,6 +1253,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		time.Sleep(time.Millisecond * 10)
 	}
 
+	//newtxs := mem.SortTxs()//排序mempool，跨片交易位于队列头部
 	var totalBytes int64
 	var totalGas int64
 	// TODO: we will get a performance boost if we have a good estimate of avg
@@ -1339,7 +1414,6 @@ func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 // NOTE: unsafe; Lock/Unlock must be managed by caller
 func DetectTx(tx types.Tx) bool {
 	parsetx, _ := tp.NewTX(tx)
-	//fmt.Println("该区块的tx",parsetx)
 	//说明是relay_out交易
 	if parsetx.Txtype == "relaytx" && parsetx.Receiver == getShard() {
 		//将该条交易删除
@@ -1388,7 +1462,9 @@ func (mem *Mempool) Update(
 	postCheck PostCheckFunc,
 ) error {
 	// Set height
-	mem.height = height
+	if mem.height > 0 {
+		mem.height = height
+	}
 	mem.notifiedTxsAvailable = false
 
 	if preCheck != nil {
@@ -1463,6 +1539,10 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 			continue
 		}
 
+		// 如果是ConfigTx 则会触发两次删除：第一次是在ReapDeliverTx执行成功时删除；第二次会在block成功commit时执行删除
+		if tx, err := tp.NewTX(memTx.tx); err == nil && tx.Txtype == tp.ConfigTx {
+			continue
+		}
 		txsLeft = append(txsLeft, memTx.tx)
 	}
 	return txsLeft
@@ -1610,28 +1690,20 @@ func (mem *Mempool) CheckCrossMessageSig(cm *tp.CrossMessages) bool {
 		mem.logger.Error("公钥还原出错，", cm.Pubkeys, ", err: ", err)
 		return false
 	}
-	//fmt.Println("sig: ", cm.Sig)
-	//fmt.Println("root: ", cm.CrossMerkleRoot)
-	//fmt.Println("pub: ", cm.Pubkeys)
 	if res := pubkey.VerifyBytes(cm.CrossMerkleRoot, cm.Sig); !res {
-		mem.logger.Error("验证CrossMessage的signature出错")
-		fmt.Println(cm.Sig)
-		fmt.Println(cm.CrossMerkleRoot)
-		fmt.Println(cm.Pubkeys)
+		mem.logger.Error("验证CrossMessage的signature出错", "signature", cm.Sig, "merkle root", cm.CrossMerkleRoot)
 		return false
 	}
-	//fmt.Println("门限签名验证通过！")
 	// 根据交易重构当前交易包的tree root，该root也是CrossMerkle tree的一个叶子节点
 	txs := cm.Txlist
 
 	// 生成分片的tree root，获得该分片的merkle tree root来验证路径的正确性
 	smt := merkle.SimpleTreeFromByteSlices(txs)
-	//fmt.Println("生成树")
 	if smt == nil {
-		fmt.Println("生成树失败")
+		mem.logger.Error("还原merkle树失败")
 		return false
 	}
-	//fmt.Println("生成树成功")
+
 	currentRoot := smt.ComputeRootHash()
 	if currentRoot == nil || len(currentRoot) == 0 {
 		return false

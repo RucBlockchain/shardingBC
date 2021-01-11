@@ -1,11 +1,11 @@
 package state
 
 import (
-	abci "github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/mempool"
-	"github.com/tendermint/tendermint/types"	
-	tp "github.com/tendermint/tendermint/identypes"
 	"crypto/sha256"
+	abci "github.com/tendermint/tendermint/abci/types"
+	tp "github.com/tendermint/tendermint/identypes"
+	"github.com/tendermint/tendermint/mempool"
+	"github.com/tendermint/tendermint/types"
 )
 
 //------------------------------------------------------
@@ -32,15 +32,16 @@ type Mempool interface {
 	RemoveCrossMessagesDB(tcm *tp.CrossMessages)
 	UpdatecmDB() []*tp.CrossMessages
 	GetAllCrossMessages() []*tp.CrossMessages
-	SearchRelationTable(Height int64)[]tp.Package
-	ModifyRelationTable(packages []byte,cfs []byte,height int64)
-	SearchPackageExist(pack tp.Package)bool
+	SearchRelationTable(Height int64) []tp.Package
+	ModifyRelationTable(packages []byte, cfs []byte, height int64)
+	SearchPackageExist(pack tp.Package) bool
 	LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int)
-	SyncRelationTable(pack tp.Package,height int64)
+	SyncRelationTable(pack tp.Package, height int64)
 	Size() int
 	CheckTx(types.Tx, func(*abci.Response)) error
-	CheckTxWithInfo(types.Tx, func(*abci.Response), mempool.TxInfo,bool) error
-	ReapMaxBytesMaxGas(maxBytes, maxGas int64,height int64) types.Txs
+	CheckTxWithInfo(types.Tx, func(*abci.Response), mempool.TxInfo, bool) error
+	ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) types.Txs
+	ReapDeliverTx() types.Tx
 	Update(int64, types.Txs, mempool.PreCheckFunc, mempool.PostCheckFunc) error
 	Flush()
 	FlushAppConn() error
@@ -52,23 +53,21 @@ type Mempool interface {
 // MockMempool is an empty implementation of a Mempool, useful for testing.
 type MockMempool struct{}
 
-
-
 var _ Mempool = MockMempool{}
 
-func (MockMempool) Lock()     {}
-func (MockMempool) Unlock()   {}
-func (MockMempool) Size() int { return 0 }
-func (MockMempool)LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int){}
+func (MockMempool) Lock()                                                                {}
+func (MockMempool) Unlock()                                                              {}
+func (MockMempool) Size() int                                                            { return 0 }
+func (MockMempool) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int) {}
 
 func (MockMempool) CheckTx(_ types.Tx, _ func(*abci.Response)) error {
 	return nil
 }
 func (MockMempool) CheckTxWithInfo(_ types.Tx, _ func(*abci.Response),
-	_ mempool.TxInfo,_ bool) error {
+	_ mempool.TxInfo, _ bool) error {
 	return nil
 }
-func (MockMempool) ReapMaxBytesMaxGas(_, _ int64,_ int64) types.Txs { return types.Txs{} }
+func (MockMempool) ReapMaxBytesMaxGas(_, _ int64, _ int64) types.Txs { return types.Txs{} }
 func (MockMempool) Update(
 	_ int64,
 	_ types.Txs,
@@ -77,30 +76,35 @@ func (MockMempool) Update(
 ) error {
 	return nil
 }
-func (MockMempool) Flush()                        {}
-func (MockMempool) FlushAppConn() error           { return nil }
-func (MockMempool) TxsAvailable() <-chan struct{} { return make(chan struct{}) }
-func (MockMempool) EnableTxsAvailable()           {}
-func (MockMempool)AddCrossMessagesDB(tcm *tp.CrossMessages){}
+func (MockMempool) Flush()                                   {}
+func (MockMempool) FlushAppConn() error                      { return nil }
+func (MockMempool) TxsAvailable() <-chan struct{}            { return make(chan struct{}) }
+func (MockMempool) EnableTxsAvailable()                      {}
+func (MockMempool) AddCrossMessagesDB(tcm *tp.CrossMessages) {}
 func (MockMempool) SearchRelationTable(Height int64) []tp.Package {
 	var pack []tp.Package
 	return pack
 }
-func (MockMempool)SyncRelationTable(tp tp.Package,height int64){}
-func (MockMempool)ModifyRelationTable(packages []byte,cfs []byte,height int64){}
+func (MockMempool) SyncRelationTable(tp tp.Package, height int64)                 {}
+func (MockMempool) ModifyRelationTable(packages []byte, cfs []byte, height int64) {}
 func (MockMempool) SearchPackageExist(tp tp.Package) bool {
 
 	return true
 }
-func (MockMempool)RemoveCrossMessagesDB(tcm *tp.CrossMessages){}
-func (MockMempool)UpdatecmDB() []*tp.CrossMessages{
+func (MockMempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {}
+func (MockMempool) UpdatecmDB() []*tp.CrossMessages {
 	var cms []*tp.CrossMessages
 	return cms
 }
-func (MockMempool)GetAllCrossMessages()[]*tp.CrossMessages{
+func (MockMempool) GetAllCrossMessages() []*tp.CrossMessages {
 	var cms []*tp.CrossMessages
 	return cms
 }
+
+func (MockMempool) ReapDeliverTx() types.Tx {
+	return nil
+}
+
 //------------------------------------------------------
 // blockstore
 

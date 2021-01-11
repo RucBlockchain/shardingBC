@@ -174,12 +174,10 @@ func (pubKey PubKeyBLS) Bytes() []byte {
 
 func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	if len(sig) == 0 {
-		fmt.Println("签名为空")
 		return false
 	}
 	pub := bn256_suite.G2().Point()
 	if err := pub.UnmarshalBinary(pubKey); err != nil {
-		fmt.Println("公钥反序列化失败")
 		return false
 	}
 
@@ -187,8 +185,6 @@ func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	if err := bls.Verify(bn256_suite, pub, msg, sig); err == nil {
 		return true
 	} else {
-		fmt.Println(err)
-		fmt.Println("签名验证失败")
 		return false
 	}
 }
@@ -208,7 +204,12 @@ func GetPubkeyFromByte(data []byte) (*PubKeyBLS, error) {
 	cdc.MustUnmarshalBinaryBare(data, &pub)
 	return &pub, nil
 }
-
+func GetPubkeyFromByte2(data []byte) (PubKeyBLS, error) {
+	//pub := bn256_suite.G2().Point()
+	pub := PubKeyBLS{}
+	cdc.MustUnmarshalBinaryBare(data, &pub)
+	return pub, nil
+}
 //分割字符串得到相应的内容,默认容器名为：1_0 分片名_分片的index
 func parseId() int64 {
 	v, _ := syscall.Getenv("TASKID")

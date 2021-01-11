@@ -312,6 +312,69 @@ func (l *CList) WaitChan() <-chan struct{} {
 	return l.waitCh
 }
 
+//modified by Hua
+// insert an element into clist according to value
+// fix: 需要精细加读写锁的范围 不能简单的在入口和出口处加减锁
+func (l *CList) PushBackToMem(v interface{}, GetValue func(tx *CElement) int32) *CElement {
+	// Construct a new element
+	e := &CElement{
+		prev:       nil,
+		prevWg:     waitGroup1(),
+		prevWaitCh: make(chan struct{}),
+		next:       nil,
+		nextWg:     waitGroup1(),
+		nextWaitCh: make(chan struct{}),
+		removed:    false,
+		Value:      v,
+	}
+
+	// Release waiters on FrontWait/BackWait maybe
+	if l.len == 0 {
+		l.wg.Done()
+		close(l.waitCh)
+	}
+	if l.len >= l.maxLen {
+		panic(fmt.Sprintf("clist: maximum length list reached %d", l.maxLen))
+	}
+	l.len++
+
+	// Modify the tail
+	if l.tail == nil {
+		// 需要修改数据 加写锁
+		l.mtx.Lock()
+		l.head = e
+		l.tail = e
+		l.mtx.Unlock()
+	} else { // iterate from head
+		curVal := GetValue(e)
+		var c *CElement
+
+		// 遍历列表查询插入位置 加读锁
+		l.mtx.RLock()
+		for c = l.Front(); c != nil; c = c.Next() { // 循环结束，c是第一个value<=待插入元素value的元素
+			if GetValue(c) < curVal {
+				break
+			}
+		}
+		l.mtx.RUnlock()
+
+		l.mtx.Lock()
+		if c != nil { // 在链表中间插入
+			c.Prev().SetNext(e)
+			e.SetPrev(c.Prev())
+			e.SetNext(c)
+			c.SetPrev(e)
+		} else { // 插入到链表末尾
+			e.SetPrev(l.tail)
+			l.tail.SetNext(e)
+			l.tail = e
+		}
+		l.mtx.Unlock()
+	}
+
+	return e
+}
+
 // Panics if list grows beyond its max length.
 func (l *CList) PushBack(v interface{}) *CElement {
 	l.mtx.Lock()

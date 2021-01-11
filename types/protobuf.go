@@ -2,9 +2,10 @@ package types
 
 import (
 	"fmt"
-	"github.com/tendermint/tendermint/crypto/bls"
 	"reflect"
 	"time"
+
+	"github.com/tendermint/tendermint/crypto/bls"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
@@ -213,9 +214,10 @@ func (pb2tm) PubKey(pubKey abci.PubKey) (crypto.PubKey, error) {
 		copy(pk[:], pubKey.Data)
 		return pk, nil
 	case ABCIPubKeyTypeBLS:
-		var pk bls.PubKeyBLS
-		copy(pk[:], pubKey.Data)
-		return pk, nil
+		// var pk bls.PubKeyBLS
+		pk_tmp := make([]byte, len(pubKey.Data), len(pubKey.Data))
+		copy(pk_tmp, pubKey.Data)
+		return bls.PubKeyBLS(pk_tmp), nil
 	default:
 		return nil, fmt.Errorf("Unknown pubkey type %v", pubKey.Type)
 	}
