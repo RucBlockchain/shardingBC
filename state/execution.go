@@ -23,11 +23,6 @@ import (
 	"github.com/tendermint/tendermint/proxy"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
 	"github.com/tendermint/tendermint/types"
-	"math/rand"
-	"net"
-	"strconv"
-	"syscall"
-	"time"
 )
 
 //-----------------------------------------------------------------------------
