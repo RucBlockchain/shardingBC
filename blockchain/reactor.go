@@ -251,12 +251,12 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		// 获取所有状态集合
 		snapshot := ac.GetSnapshot()
 		snapShopMap, _ := json.Marshal(snapshot.Content)
-		snapValSet,_ := json.Marshal(snapshot.ValSet)
-		snapValNextSet,_ := json.Marshal(snapshot.NextValSet)
-		Pubsbytes,_ := json.Marshal(ac.GeneratePubkey(snapshot.ValSet.Validators,snapshot.ValSet.Proposer))
-		NextPubsbytes,_ := json.Marshal(ac.GeneratePubkey(snapshot.NextValSet.Validators,snapshot.NextValSet.Proposer))
+		snapValSet, _ := json.Marshal(snapshot.ValSet)
+		snapValNextSet, _ := json.Marshal(snapshot.NextValSet)
+		Pubsbytes, _ := json.Marshal(ac.GeneratePubkey(snapshot.ValSet.Validators, snapshot.ValSet.Proposer))
+		NextPubsbytes, _ := json.Marshal(ac.GeneratePubkey(snapshot.NextValSet.Validators, snapshot.NextValSet.Proposer))
 
-		msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotResponseMessage{snapshot.Version, snapShopMap,snapValSet,Pubsbytes,snapValNextSet,NextPubsbytes})
+		msgBytes := cdc.MustMarshalBinaryBare(&bcSnapshotResponseMessage{snapshot.Version, snapShopMap, snapValSet, Pubsbytes, snapValNextSet, NextPubsbytes})
 		src.TrySend(BlockchainChannel, msgBytes)
 
 	case *bcSnapshotResponseMessage:
@@ -265,9 +265,9 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		myMap := make(map[string]string)
 		json.Unmarshal(msg.Content, &myMap)
 		var myVal *types.ValidatorSet
-		myVal = ac.TogetherParseSet(msg.ValSet,msg.Vals)
+		myVal = ac.TogetherParseSet(msg.ValSet, msg.Vals)
 		var nextmyVal *types.ValidatorSet
-		nextmyVal = ac.TogetherParseSet(msg.NextVal,msg.NextPub)
+		nextmyVal = ac.TogetherParseSet(msg.NextVal, msg.NextPub)
 
 		count := 0
 		for k, v := range myMap {
@@ -277,7 +277,7 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 		}
 		bcR.Logger.Error(fmt.Sprintf("快照写入完成, 长度为%v", count))
 		// 更新当前快照
-		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap,myVal,nextmyVal})
+		ac.SetSnapshot(ac.Snapshot{msg.Version, myMap, myVal, nextmyVal})
 
 		// 更新当前区块高度为快照版本
 		if msg.Version > 0 && msg.Version < 0x7fffffff {
@@ -285,8 +285,8 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 			// 更新pool中的高度为当前高度+1
 			bcR.pool.height = bcR.store.height + 1
 			bcR.initialState.LastBlockHeight = bcR.store.height
-			bcR.initialState.Validators = myVal//更新
-			bcR.initialState.NextValidators = nextmyVal//更新
+			bcR.initialState.Validators = myVal         //更新
+			bcR.initialState.NextValidators = nextmyVal //更新
 
 			// 修改consensus模块中的区块高度
 			//cs := consensus.GetConsensusState()
@@ -375,10 +375,10 @@ FOR_LOOP:
 				 * @Author: zyj
 				 * @Desc: 更新高度，同步至consensus模块，否则会从高度1开始共识
 				 * @Date: 19.11.24
-				*/
+				 */
 				state.LastBlockHeight = height - 1
 				//fmt.Println("同步")
-				state.Validators = bcR.initialState.Validators.Copy()//添加其validator数量
+				state.Validators = bcR.initialState.Validators.Copy() //添加其validator数量
 
 				// ------------------------------------
 				bcR.pool.Stop()

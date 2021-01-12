@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/tendermint/tendermint/account"
 
 	cmn "github.com/tendermint/tendermint/libs/common"
 	nm "github.com/tendermint/tendermint/node"
@@ -40,6 +41,10 @@ func AddNodeFlags(cmd *cobra.Command) {
 
 	// consensus flags
 	cmd.Flags().Bool("consensus.create_empty_blocks", config.Consensus.CreateEmptyBlocks, "Set this to false to only produce blocks when there are txs or when the AppHash changes")
+	//---------
+	// snapshot flags
+	cmd.Flags().Bool("snapshot",config.Snapshot,"set snapshot")
+	//---------
 }
 
 // NewRunNodeCmd returns the command that allows the CLI to start a node.
@@ -49,8 +54,11 @@ func NewRunNodeCmd(nodeProvider nm.NodeProvider) *cobra.Command {
 		Use:   "node",
 		Short: "Run the tendermint node",
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			n, err := nodeProvider(config, logger)
+			//设置参数，是否初始启动，如果是则不需要同步
+			//设置版本信息
+			account.SetSnapshotopen(config.Snapshot)
+
 			if err != nil {
 				return fmt.Errorf("Failed to create node: %v", err)
 			}

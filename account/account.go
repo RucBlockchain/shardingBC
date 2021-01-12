@@ -216,6 +216,7 @@ var SnapshotHash string
 
 var SnapshotVersion = ""
 
+var SnapshotOpen = false
 // 获取db和logger句柄
 func InitAccountDB(db1 dbm.DB, logger1 log.Logger) {
 	db = db1
@@ -625,11 +626,16 @@ func GenerateKey(priKeyPath string, pubKeyPath string) error {
  * 设置快照算法版本
  */
 func SetSnapshotVersion(version string) {
+
 	if version == "v1.0" || version == "v2.0" || version == "v3.0" {
 		SnapshotVersion = version
 	}
 }
+func SetSnapshotopen(Open bool) {
+	SnapshotOpen = Open
+	SetSnapshotVersion("v2.0")
 
+}
 // 保存增量缓存
 func SetSnapshotCache(key string, amount int, incr bool) {
 	if key == "" {

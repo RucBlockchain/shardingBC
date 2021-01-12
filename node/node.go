@@ -154,7 +154,7 @@ type Node struct {
 	nodeInfo    p2p.NodeInfo
 	nodeKey     *p2p.NodeKey // our node privkey
 	isListening bool
-
+	Snapshot    bool
 	// services
 	eventBus         *types.EventBus // pub/sub for services
 	stateDB          dbm.DB
@@ -687,6 +687,7 @@ func (n *Node) startRPC() ([]net.Listener, error) {
 	listeners := make([]net.Listener, len(listenAddrs))
 	for i, listenAddr := range listenAddrs {
 		mux := http.NewServeMux()
+		//fmt.Println("监听地址",listenAddr)
 		rpcLogger := n.Logger.With("module", "rpc-server")
 		wmLogger := rpcLogger.With("protocol", "websocket")
 		wm := rpcserver.NewWebsocketManager(rpccore.Routes, coreCodec,
