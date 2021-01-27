@@ -81,7 +81,7 @@ func DefaultConfig() *Config {
 		Consensus:       DefaultConsensusConfig(),
 		TxIndex:         DefaultTxIndexConfig(),
 		Instrumentation: DefaultInstrumentationConfig(),
-		Snapshot:false,
+		Snapshot:        false,
 	}
 }
 
@@ -138,7 +138,7 @@ func (cfg *Config) ValidateBasic() error {
 // BaseConfig defines the base configuration for a Tendermint node
 type BaseConfig struct {
 	// chainID is unexposed and immutable but here for convenience
-	chainID string
+	chainID  string
 	Snapshot string
 	// The root directory for all data.
 	// This should be set in viper so it can unmarshal into this struct
@@ -212,7 +212,7 @@ func DefaultBaseConfig() BaseConfig {
 		FilterPeers:        false,
 		DBBackend:          "leveldb",
 		DBPath:             "data",
-		Snapshot:"",
+		Snapshot:           "",
 	}
 }
 
@@ -503,7 +503,6 @@ type P2PConfig struct {
 	TestFuzz       bool            `mapstructure:"test_fuzz"`
 	TestFuzzConfig *FuzzConnConfig `mapstructure:"test_fuzz_config"`
 	Shard          int             `mapstructure:"shard_count"`
-
 }
 
 // DefaultP2PConfig returns a default configuration for the peer-to-peer layer
@@ -611,7 +610,7 @@ func DefaultMempoolConfig() *MempoolConfig {
 		WalPath:   "",
 		// Each signature verification takes .5ms, Size reduced until we implement
 		// ABCI Recheck
-		Size:        5000,
+		Size:        20000,
 		MaxTxsBytes: 1024 * 1024 * 1024, // 1GB
 		CacheSize:   10000,
 	}
@@ -692,7 +691,7 @@ func DefaultConsensusConfig() *ConsensusConfig {
 		TimeoutCommit:               1000 * time.Millisecond,
 		SkipTimeoutCommit:           false,
 		CreateEmptyBlocks:           true,
-		CreateEmptyBlocksInterval:   0 * time.Second,
+		CreateEmptyBlocksInterval:   2 * time.Second,
 		PeerGossipSleepDuration:     100 * time.Millisecond,
 		PeerQueryMaj23SleepDuration: 2000 * time.Millisecond,
 	}

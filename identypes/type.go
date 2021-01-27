@@ -9,12 +9,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/tendermint/tendermint/libs/log"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 	ConfigTx     = "configtx"
 	DeliverTx    = "DeliverTx"
 	RelayTx      = "relaytx"
-	AddTx        = "addtx"
+	AddTx        = "tx"
 )
 
 var (
