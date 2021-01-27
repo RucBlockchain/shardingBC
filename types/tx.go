@@ -5,9 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/tendermint/tendermint/identypes"
 	"strconv"
 	"strings"
+
+	"github.com/tendermint/tendermint/identypes"
 
 	amino "github.com/tendermint/go-amino"
 
@@ -134,6 +135,14 @@ func (txs Txs) Bytes() [][]byte {
 	}
 
 	return bzs
+}
+
+func (txs Txs) Size() int64 {
+	var totalBytes int64
+	for i := 0; i < len(txs); i++ {
+		totalBytes += int64(len(txs[i]))
+	}
+	return totalBytes
 }
 
 // TxProof represents a Merkle proof of the presence of a transaction in the Merkle tree.

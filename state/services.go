@@ -2,6 +2,7 @@ package state
 
 import (
 	"crypto/sha256"
+
 	abci "github.com/tendermint/tendermint/abci/types"
 	tp "github.com/tendermint/tendermint/identypes"
 	"github.com/tendermint/tendermint/mempool"
@@ -48,7 +49,7 @@ type Mempool interface {
 
 	TxsAvailable() <-chan struct{}
 	EnableTxsAvailable()
-	CalculateHealthScore(int) float64
+	CalculateHealthScore(int, int64, int64) float64
 }
 
 // MockMempool is an empty implementation of a Mempool, useful for testing.
@@ -106,7 +107,7 @@ func (MockMempool) ReapDeliverTx() types.Tx {
 	return nil
 }
 
-func (MockMempool) CalculateHealthScore(int) float64 {
+func (MockMempool) CalculateHealthScore(int, int64, int64) float64 {
 	return 0
 }
 

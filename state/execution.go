@@ -625,7 +625,7 @@ func (blockExec *BlockExecutor) Commit(
 	}
 
 	// 更新健康指数
-	newscore := blockExec.mempool.CalculateHealthScore(int(block.NumTxs))
+	newscore := blockExec.mempool.CalculateHealthScore(int(block.NumTxs), block.Data.Txs.Size(), state.ConsensusParams.Block.MaxBytes)
 	blockExec.logger.Info("Calculate Health Score",
 		"newscore", newscore,
 	)

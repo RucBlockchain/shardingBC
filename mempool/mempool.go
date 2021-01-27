@@ -94,6 +94,9 @@ var (
 
 	// ErrTxTooLarge means the tx is too big to be sent in a message to other peers
 	ErrTxTooLarge = fmt.Errorf("Tx too large. Max size is %d", maxTxSize)
+
+	// ErrUnhealth 当分片处于不健康状态将拒绝单片交易、跨片交易的前半程
+	ErrShardUnHealth = errors.New("shard is unhealth, rejected tx.")
 )
 
 // ErrMempoolIsFull means Tendermint & an application can't handle that much load
@@ -271,10 +274,9 @@ type Mempool struct {
 
 	metrics *Metrics
 
-	// 健康指数 [0, 1] 影响打包时的大小和跨片交易的比例
+	// 繁忙指数 [0, 1] 影响打包时的大小和跨片交易的比例
 	// 1.0为正常状态
-	HealthScore float64
-	isfull      bool //上一轮打包是否过满 0.8*最大打包大小
+	BusyScore float64
 }
 
 //--------------------------------------------
@@ -312,7 +314,7 @@ func NewMempool(
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
 		Plog:          0,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
-		HealthScore:   1.0,
+		BusyScore:     1.0,
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -338,30 +340,57 @@ func newcmDB() CrossMessagesDB {
 // 每一轮共识结束完成后调用该函数来更新下一轮的健康指数
 // 该指数会决定下一轮打包策略
 // 同时节点也会根据健康值决定是否向拓扑链报告
-func (mem *Mempool) CalculateHealthScore(validTxs int) float64 {
+func (mem *Mempool) CalculateHealthScore(validTxs int, LastBlockSize, LastBlockMaxSize int64) float64 {
 	// 根据上一轮共识处理的交易数和当前mempool的交易比例做比较
 	// 不使用上一轮共识时间的原因是各节点之间的共识耗时并不一致，用处理的交易数和
 	// 当前mempool里的交易数的比例来反映共识的快慢
 	// TODO 设定计算逻辑
-	var newscore = mem.HealthScore
+	var isfull = false //上一轮打包是否过满 0.8*最大打包大小
 
-	if mem.txs.Len() > mem.config.Size*3/4 {
+	if LastBlockSize >= ElasticBytes(LastBlockMaxSize, mem.BusyScore)*2/3 {
+		// 打包大小超过总大小的2/3
+		isfull = true
+	}
+
+	var newscore float64 = mem.BusyScore
+
+	if mem.txs.Len() > mem.config.Size*2/3 {
+		// 2/3
 		// 整个mempool压力太大了
 		// f(x) = -2x + 2; [0.75, 1] -> [0.5, 0]
-		fmt.Println("[health] 整个mempool压力太大了")
-		newscore = -2*float64(mem.txs.Len())/float64(mem.config.Size) + 2.0
+		fmt.Println("[health] ©")
+		// newscore = -2*float64(mem.txs.Len())/float64(mem.config.Size) + 2.0
+		newscore = 0.1
 	} else {
 		// mempool尚未饱和
-		if mem.isfull && validTxs > 0 && mem.txs.Len() > validTxs*2 {
+		if isfull && validTxs > 0 {
 			// 满负载状态下，超过共识处理速度的2倍
 			fmt.Println("[health] 满负载状态下，超过共识处理速度的2倍")
-			newscore = 0.75
+			// newscore = 0.75
+			if mem.txs.Len() < validTxs {
+				newscore = 0.8
+			} else {
+				// newscore = float64(mem.txs.Len()/validTxs)/(-2.0) + 1.3
+				newscore = 0.8 - 0.15*(float64(mem.txs.Len()/validTxs)-1.0)
+			}
+		} else if validTxs > 0 {
+			if mem.txs.Len() < validTxs {
+				newscore = 1.0
+			} else {
+				newscore = 1.0 - float64(mem.txs.Len()/validTxs)/(25.0)
+			}
 		} else {
 			newscore = 1.0
 		}
 	}
 
-	mem.HealthScore = newscore
+	// 异常修正
+	if newscore < 0.0 {
+		newscore = 0.0
+	} else if newscore > 1.0 {
+		newscore = 1.0
+	}
+	mem.BusyScore = newscore
 	fmt.Println(fmt.Sprintf(
 		"[health] Mem.Size=%v,"+
 			" mem.Len=%v, "+
@@ -372,7 +401,21 @@ func (mem *Mempool) CalculateHealthScore(validTxs int) float64 {
 		mem.txs.Len(),
 		validTxs,
 		newscore,
-		mem.isfull,
+		isfull,
+	))
+
+	// for statistics
+	fmt.Println(fmt.Sprintf(
+		"[health statistics] %v "+
+			"%v "+
+			"%v "+
+			"%v "+
+			"%v",
+		validTxs,
+		newscore,
+		mem.config.Size,
+		mem.txs.Len(),
+		isfull,
 	))
 	return newscore
 }
@@ -833,6 +876,17 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			memSize, mem.config.Size,
 			txsBytes, mem.config.MaxTxsBytes}
 	}
+
+	// author: manabo 根据健康值决定是否拒绝该交易
+	if mem.BusyScore <= 0.25 && mem.Size() > mem.config.Size*4/5 {
+		// mem.Size() > mem.config.Size*2/3 为临时方案 目前BusyScore方案有缺陷 可能mempool为空后才会解除此限制
+		if tmptx, err := tp.NewTX(tx); err == nil {
+			if tmptx.Txtype == tp.AddTx || tmptx.Txtype == tp.RelayTx {
+				return ErrShardUnHealth
+			}
+		}
+	}
+
 	// The size of the corresponding amino-encoded TxMessage
 	// can't be larger than the maxMsgSize, otherwise we can't
 	// relay it to peers.
@@ -1047,8 +1101,8 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			memTx.senders.Store(peerID, true)
 			btime := time.Now()
 
-			//mem.addTx(memTx)
-			mem.insertTx(memTx)
+			mem.addTx(memTx)
+			// mem.insertTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
 				mem.LogPrint("periodAddCM", txKey(memTx.tx), etime.Sub(btime).Nanoseconds(), 2)
@@ -1201,9 +1255,9 @@ func GetValue(tx *clist.CElement) int32 {
 	}
 	if tmp_tx.Txtype == "relaytx" {
 		return 10
-	}else if tmp_tx.Txtype == tp.ConfigTx{
+	} else if tmp_tx.Txtype == tp.ConfigTx {
 		return 20
-	}  else {
+	} else {
 		return 0
 	}
 }
@@ -1220,7 +1274,7 @@ func (mem *Mempool) ReapDeliverTx() types.Tx {
 	return nil
 }
 
-// 区块最大容量受healthScore影响
+// 区块最大容量受BusyScore影响
 func ElasticBytes(maxbytes int64, health float64) int64 {
 	// [0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
 	return int64(float64(maxbytes) * (0.5 + health/2.0))
@@ -1236,12 +1290,14 @@ func ElasticBytes(maxbytes int64, health float64) int64 {
 //
 //}
 func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) types.Txs {
-	// 区块最大容量受healthScore影响，[0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
-	if mem.HealthScore < 1.0 {
-		fmt.Println("[health] 亚健康状态, ", mem.HealthScore)
+	var totalBytes int64
+	var totalGas int64
+
+	// 区块最大容量受BusyScore影响，[0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
+	if mem.BusyScore < 1.0 {
+		fmt.Println("[health] 亚健康状态, ", mem.BusyScore)
 	}
-	maxBytes = ElasticBytes(maxBytes, mem.HealthScore)
-	mem.isfull = false
+	maxBytes = ElasticBytes(maxBytes, mem.BusyScore)
 
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
@@ -1251,8 +1307,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	var totalBytes int64
-	var totalGas int64
 	// TODO: we will get a performance boost if we have a good estimate of avg
 	// size per tx, and set the initial capacity based off of that.
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
@@ -1309,7 +1363,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			aminoOverhead := types.ComputeAminoOverhead(total_data, 1)
 			if maxBytes > -1 && totalBytes+int64(len(total_data))+aminoOverhead > maxBytes {
-				mem.isfull = true
 				//fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包失败")
 				return txs
 			}
@@ -1343,7 +1396,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
-				mem.isfull = true
 				return txs
 			}
 
@@ -1372,10 +1424,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 	}
 
-	if totalBytes >= maxBytes*4/5 {
-		// 打包大小超过总大小的4/5
-		mem.isfull = true
-	}
 	return txs
 }
 
