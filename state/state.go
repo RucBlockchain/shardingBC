@@ -87,6 +87,9 @@ type State struct {
 	// 提前执行的交易 打包时候的优先打包里面的交易且一次只打包一条
 	// 理论上最多只会有一条交易存在
 	SpTxBuf types.Txs
+
+	// 针对该轮block hash的聚合签名
+	HashSignature []byte
 }
 
 // Copy makes a copy of the State for mutating.
@@ -111,7 +114,8 @@ func (state State) Copy() State {
 		AppHash: state.AppHash,
 
 		LastResultsHash: state.LastResultsHash,
-		SpTxBuf:         make([]types.Tx, 0, 10), // TODO maybe bug
+		SpTxBuf:         make([]types.Tx, 0, 10),
+		HashSignature:   state.HashSignature,
 	}
 }
 
@@ -129,6 +133,10 @@ func (state State) Bytes() []byte {
 // IsEmpty returns true if the State is equal to the empty State.
 func (state State) IsEmpty() bool {
 	return state.Validators == nil // XXX can't compare to Empty
+}
+
+func (state *State) SetHashSignature(sign []byte) {
+	state.HashSignature = sign
 }
 
 //------------------------------------------------------------------------
@@ -262,7 +270,8 @@ func MakeGenesisState(genDoc *types.GenesisDoc) (State, error) {
 		ConsensusParams:                  *genDoc.ConsensusParams,
 		LastHeightConsensusParamsChanged: 1,
 
-		AppHash: genDoc.AppHash,
-		SpTxBuf: make([]types.Tx, 0, 10),
+		AppHash:       genDoc.AppHash,
+		SpTxBuf:       make([]types.Tx, 0, 10),
+		HashSignature: nil,
 	}, nil
 }

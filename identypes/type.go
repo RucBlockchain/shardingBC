@@ -19,11 +19,13 @@ import (
 )
 
 const (
-	SepTxContent = "_"
-	ConfigTx     = "configtx"
-	DeliverTx    = "DeliverTx"
-	RelayTx      = "relaytx"
-	AddTx        = "tx"
+	SepTxContent  = "_"
+	ConfigTx      = "configtx"
+	DeliverTx     = "DeliverTx"
+	RelayTx       = "relaytx"
+	AddTx         = "tx"
+	ShardConfigTx = "ShardConfigTx" // 拓扑链向各个分片发送的调整信息 交易格式{分片}_{当前繁忙值}_{增加1\删除0}
+	ReportTx      = "ReportTx"      // 向拓扑链报告自身处于忙碌状态
 )
 
 var (
@@ -72,9 +74,7 @@ type EcdsaCoordinate struct {
 	X, Y *big.Int
 }
 
-// TODO
 // 重命名结构体，容易与types.Tx混淆
-// Txtype变更为使用enum类型
 type TX struct {
 	Txtype      string // 现有的交易类型：tx、addtx、relaytx、reporttx
 	Sender      string
@@ -90,6 +90,22 @@ type TX struct {
 	Height int // 记录该条跨片交易被共识的区块高度
 }
 
+// 向拓扑链报告自身处于忙碌状态
+func GenerateDelayReport(busyScore float64, height int64, blockhash []byte, sign []byte) TX {
+	content := fmt.Sprintf("%X_%v_%v", blockhash, height, busyScore)
+	tx := TX{
+		Txtype:      ReportTx,
+		Sender:      getShard(),
+		Receiver:    "topo",
+		ID:          [32]byte{},
+		Content:     content,
+		TxSignature: string(sign),
+		Operate:     0,
+		Height:      int(height),
+	}
+	return tx
+}
+
 func NewTX(data []byte) (*TX, error) {
 	tx := new(TX)
 
@@ -102,6 +118,7 @@ func NewTX(data []byte) (*TX, error) {
 	}
 	return tx, err
 }
+
 func TimePhase(phase int, tx_id [sha256.Size]byte, t string) string {
 	return fmt.Sprintf("[tx_phase] index:phase%d id:%X time:%s", phase, tx_id, t)
 }

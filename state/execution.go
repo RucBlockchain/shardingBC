@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -194,7 +195,7 @@ func (blockExec *BlockExecutor) ValidateBlock(state State, block *types.Block) e
 // It's the only function that needs to be called
 // from outside this package to process and commit an entire block.
 // It takes a blockID to avoid recomputing the parts hash.
-func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, blockID types.BlockID, block *types.Block, flag bool) (State, error) {
+func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, block *types.Block, flag bool) (State, error) {
 	/*
 	 * @Author: zyj
 	 * @Desc: 周期性生成快照
@@ -229,10 +230,27 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 		return state, ErrInvalidBlock(err)
 	}
 
+	// 遍历所有交易 执行拓扑链的分片调整交易
+	var addlist, removeList []string
+	for _, tx := range block.Txs {
+		if tptx, err := tp.NewTX(tx); err == nil {
+			if tptx.Txtype != tp.ShardConfigTx {
+				continue
+			}
+			parts := strings.Split(tptx.Content, "_")
+			shardname := parts[0]
+			if parts[2] == "1" {
+				addlist = append(addlist, shardname)
+			} else {
+				removeList = append(removeList, shardname)
+			}
+		}
+	}
+	blockExec.mempool.UpdateShardFliters(addlist, removeList)
+
 	startTime := time.Now().UnixNano()
 	// 在Proxy执行交易 同时把该轮共识的byz验证者揪出来
 	// 确定default proxyApp的实现类 KV store -> localClient
-	// [trace] EndBlock.ValidatorUpdates
 	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block, state.LastValidators, blockExec.db)
 	endTime := time.Now().UnixNano()
 	blockExec.metrics.BlockProcessingTime.Observe(float64(endTime-startTime) / 1000000)
@@ -277,6 +295,20 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 		return state, fmt.Errorf("Commit failed for application: %v", err)
 	}
 
+	// 更新健康指数
+	newscore := blockExec.mempool.CalculateBusyScore(int(block.NumTxs), block.Data.Txs.Size(), state.ConsensusParams.Block.MaxBytes)
+	blockExec.logger.Info("Calculate Health Score",
+		"newscore", newscore,
+	)
+
+	// TODO 配置信息（阈值、拓扑链endpoint）
+	if newscore < 0.25 {
+		// 尝试向拓扑链报告自身状态
+		report := tp.GenerateDelayReport(newscore, block.Height, block.Hash(), state.HashSignature)
+		//blockExec.SendTxAsync("", report)
+		fmt.Println("向拓扑链报告状态: ", report)
+	}
+
 	// Update evpool with the block and state.
 	blockExec.evpool.Update(block, state)
 
@@ -287,9 +319,9 @@ func (blockExec *BlockExecutor) ApplyBlock( /*line *myline.Line,*/ state State, 
 	SaveState(blockExec.db, state)
 
 	fail.Fail() // XXX
+
 	//从这里开始添加新的函数
 	//检查自己身份，判断是否是leader,如果是leader再执行检查
-
 	blockExec.CheckRelayTxs(block, flag)
 
 	// Events are fired after everything else.
@@ -318,7 +350,6 @@ func (blockExec *BlockExecutor) CheckRelayTxs(block *types.Block, flag bool) {
 		//将需要跨片的交易按分片归类
 		for i := 0; i < len(resendMessages); i++ {
 			var tx_package []*tp.CrossMessages
-			//由于现在的Zone的名字改动了，所以现在不需要再减65
 			tx_package = append(tx_package, resendMessages[i])
 			go blockExec.SendCrossMessages(len(resendMessages), tx_package)
 		}
@@ -341,67 +372,11 @@ func (blockExec *BlockExecutor) CheckRelayTxs(block *types.Block, flag bool) {
 		if block.Height%5 == 0 {
 			cpCm := blockExec.GetAllCrossMessages()
 			cptx := conver2cptx(cpCm, block.Height)
-			Sendcptx(cptx) //TODO 改为一定要加入成功
+			Sendcptx(cptx)
 		}
 	}
-
 }
 
-//func (blockExec *BlockExecutor) CheckCommitedBlock(block *types.Block)  { //寻找需要回复的tx
-//	//检查block中所有的tx是否包含relay TX
-//	//返回两种，新加入到分区的和已被确认的relaytx
-//	blockExec.logger.Error("CheckCommitedBlock and check checkpoint")
-//	//var receivetxs []tp.TX
-//	if block.Data.Txs != nil {
-//		for i := 0; i < len(block.Data.Txs); i++ {
-//
-//			data := block.Data.Txs[i]
-//			encodeStr := hex.EncodeToString(data)
-//
-//			temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
-//
-//			var t tp.TX
-//			json.Unmarshal(temptx, &t)
-//
-//			if t.Txtype == "tx" {
-//				continue
-//			}else if t.Txtype == "checkpoint" {
-//				continue
-//			}
-//			//else if t.Receiver == block.Shard && t.Txtype == "relaytx" {
-//			//	receivetxs = append(receivetxs, t)
-//			//}
-//			//由于addtx不进入共识流程，在这里就不需要再判断
-//			/*else if t.Txtype == "addtx" {
-//				blockExec.RemoveFromRelaytxDB(t)
-//				//continue
-//
-//			}*/
-//			//在共识过程就将relaytx加入list之中
-//			// } else if t.Txtype == "relaytx" {
-//			// 	if t.Sender == block.Shard {
-//			// 		t.Operate = 1
-//			// 		sendtxs = append(sendtxs, t)
-//			// 		blockExec.Add2RelaytxDB(t)
-//			// 	}
-//		}
-//		myline.Count = 0
-//	}
-//	return receivetxs
-//}
-
-//func (blockExec *BlockExecutor) Add2RelaytxDB(tx tp.TX) {
-//	//fmt.Println("Add2RelaytxDB")
-//	blockExec.mempool.AddRelaytxDB(tx)
-//}
-//func (blockExec *BlockExecutor) RemoveFromRelaytxDB(tx tp.TX) {
-//	//fmt.Println("RemoveFromRelaytxDB")
-//	blockExec.mempool.RemoveRelaytxDB(tx)
-//}
-//func (blockExec *BlockExecutor) UpdateRelaytxDB() []tp.TX {
-//	resendTxs := blockExec.mempool.UpdaterDB()
-//	return resendTxs
-//}
 func (blockExec *BlockExecutor) SearchPackageExist(pack tp.Package) bool {
 	return blockExec.mempool.SearchPackageExist(pack)
 }
@@ -436,11 +411,6 @@ func (blockExec *BlockExecutor) UpdatecmDB() []*tp.CrossMessages {
 	return resendMessages
 }
 
-//func (blockExec *BlockExecutor) GetAllTxs() []tp.TX {
-//	cpTxs := blockExec.mempool.GetAllTxs()
-//	return cpTxs
-//}
-
 func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages) {
 	blockExec.logger.Error("SendCrossMessages")
 	var shard_send [][]*tp.CrossMessages
@@ -463,9 +433,15 @@ func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages)
 		}
 	}
 }
-func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.CrossMessages) {
 
+func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.CrossMessages) {
+	shardFilters := blockExec.mempool.GetShardFilters()
 	if num > 0 {
+		des := tx_package[0].DesZone
+		if _, ok := shardFilters[des]; ok {
+			// TODO 是否暂时停止发送cm
+			// 暂时不发送该交易
+		}
 		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
 	}
 }
@@ -482,7 +458,6 @@ func GetTotal() int {
 }
 
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
-	//todo:需要随机选择一个节点
 	rand.Seed(time.Now().UnixNano())
 	name := "tt" + DesZone + "s" + strconv.Itoa(rand.Intn(GetTotal())+1) + ":26657"
 	// name := DesZone + "S1" + ":26657"
@@ -498,7 +473,6 @@ func (blockExec *BlockExecutor) SendTxAsync(endpoint string, tx_data tp.TX) {
 }
 
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
-
 	res, _ := json.Marshal(tx_package)
 	rawParamsJSON := json.RawMessage(res)
 	//第一层打包结束
@@ -526,7 +500,6 @@ func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Co
 		Params:  rawParamsJSON,
 	})
 	if err1 != nil {
-		fmt.Println("发送err", err1)
 		c := myline.ReStart1(string(index+65), rnd)
 		c.WriteJSON(rpctypes.RPCRequest{
 			JSONRPC: "2.0",
@@ -623,12 +596,6 @@ func (blockExec *BlockExecutor) Commit(
 	} else {
 		timeCost = time.Now().Sub(tp.ConsensusBegin).Seconds()
 	}
-
-	// 更新健康指数
-	newscore := blockExec.mempool.CalculateHealthScore(int(block.NumTxs), block.Data.Txs.Size(), state.ConsensusParams.Block.MaxBytes)
-	blockExec.logger.Info("Calculate Health Score",
-		"newscore", newscore,
-	)
 
 	blockExec.logger.Info(
 		"Committed state",

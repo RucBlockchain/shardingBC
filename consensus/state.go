@@ -848,7 +848,7 @@ func (cs *ConsensusState) enterNewRound(height int64, round int) {
 	//}
 
 	// 执行成功 将该交易放到优先打包列表中
-  // fmt.Println("new round, Validators.size = ", cs.Validators.Size())
+	// fmt.Println("new round, Validators.size = ", cs.Validators.Size())
 	// for i := 0; i < cs.Validators.Size(); i++ {
 	// 	_, val := cs.Validators.GetByIndex(i)
 	// 	fmt.Println(val.Address.String(), " = ", val.VotingPower)
@@ -1549,6 +1549,27 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 	// 触发notebook的更新
 	cs.notebook.Trigger()
 
+	// 尝试恢复为该区块生存的聚合签名
+	voteSet := cs.Votes.Prevotes(cs.CommitRound)
+	var ids = make([]int64, 0, len(voteSet.PartHashSigs))
+	var sigs = make([][]byte, 0, len(voteSet.PartHashSigs))
+	for i := 0; i < len(voteSet.PartHashSigs); i++ {
+		ids = append(ids, voteSet.PartHashSigs[i].Id)
+		sigs = append(sigs, voteSet.PartHashSigs[i].PeerCrossSig)
+	}
+	//引入聚合签名接口
+	var threshold int // 系统参数 外部获取
+	if s, found := syscall.Getenv("THRESHOLD"); found {
+		threshold, _ = strconv.Atoi(s)
+	} else {
+		threshold = 3
+	}
+
+	HashMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
+	if err == nil {
+		cs.state.HashSignature = HashMerkleSig
+	}
+
 	//	go
 	cs.finalizeCommit(height)
 }
@@ -2154,11 +2175,6 @@ func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, heade
 		} else {
 			// 生成两个门限签名的子签名 - 跨片交易的merkle tree root & 当前block header的hash
 			err := cs.privValidator.SigCrossMerkleRoot(cs.ProposalBlock.CrossMerkleRoot, cs.ProposalBlock.Header.Hash(), vote)
-
-			// [DEBUG] log for DEBUG
-			cs.Logger.Debug(fmt.Sprintf("[SIGN] signature: %v, varify: %v",
-				vote.PartBlockSig.PeerCrossSig,
-				cs.privValidator.GetPubKey().VerifyBytes(cs.ProposalBlock.Header.Hash(), vote.PartBlockSig.PeerCrossSig)))
 			if err != nil {
 				cs.Logger.Error("generate cross traction signature error, ", err)
 				vote.BlockID.Hash = nil //因为签名出错，可能是自身的密钥有问题，投反对票

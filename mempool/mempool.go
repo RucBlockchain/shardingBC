@@ -146,7 +146,6 @@ func PrintLog(ID [sha256.Size]byte) bool {
 }
 
 //logtype 1表示tx 2表示cm
-
 func (mem *Mempool) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, logtype int) {
 	if logtype == 1 && (mem.Plog == 1 || mem.Plog == 2) { //打印tx
 		if PrintLog(tx_id) {
@@ -277,6 +276,11 @@ type Mempool struct {
 	// 繁忙指数 [0, 1] 影响打包时的大小和跨片交易的比例
 	// 1.0为正常状态
 	BusyScore float64
+
+	// 延迟列表 - 每一个元素是一个分片名字，打包时会跳过涉及列表里的交易
+	// 每一项元素是string类型
+	// 如果收到交易就执行不进行addtx 那么无法完成同步
+	ShardFilters *clist.CList
 }
 
 //--------------------------------------------
@@ -315,6 +319,7 @@ func NewMempool(
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
 		Plog:          0,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
 		BusyScore:     1.0,
+		ShardFilters:  clist.New(),
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -337,14 +342,47 @@ func newcmDB() CrossMessagesDB {
 	return cmdb
 }
 
+func (mem Mempool) GetShardFilters() map[string]struct{} {
+	var shardf map[string]struct{}
+
+	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
+		shard := e.Value.(string)
+		shardf[shard] = struct{}{}
+	}
+
+	return shardf
+}
+
+func (mem *Mempool) UpdateShardFliters(addlist, removeList []string) {
+	for _, shardname := range addlist {
+		mem.ShardFilters.PushBack(shardname)
+	}
+
+	// 建立索引 方便快速删除元素
+	var shardf map[string]*clist.CElement
+
+	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
+		shard := e.Value.(string)
+		shardf[shard] = e
+	}
+	for _, shardname := range removeList {
+		if find, ok := shardf[shardname]; ok {
+			mem.ShardFilters.Remove(find)
+		}
+	}
+}
+
+func (mem Mempool) GetBusyScore() float64 {
+	return mem.BusyScore
+}
+
 // 每一轮共识结束完成后调用该函数来更新下一轮的健康指数
 // 该指数会决定下一轮打包策略
 // 同时节点也会根据健康值决定是否向拓扑链报告
-func (mem *Mempool) CalculateHealthScore(validTxs int, LastBlockSize, LastBlockMaxSize int64) float64 {
+func (mem *Mempool) CalculateBusyScore(validTxs int, LastBlockSize, LastBlockMaxSize int64) float64 {
 	// 根据上一轮共识处理的交易数和当前mempool的交易比例做比较
 	// 不使用上一轮共识时间的原因是各节点之间的共识耗时并不一致，用处理的交易数和
 	// 当前mempool里的交易数的比例来反映共识的快慢
-	// TODO 设定计算逻辑
 	var isfull = false //上一轮打包是否过满 0.8*最大打包大小
 
 	if LastBlockSize >= ElasticBytes(LastBlockMaxSize, mem.BusyScore)*2/3 {
@@ -679,7 +717,6 @@ func (mem *Mempool) ModifyCrossMessagelist(cm *tp.CrossMessages) {
 	mem.RemoveCrossMessagesDB(cm)
 }
 func (mem *Mempool) CheckCrossMessage(cm *tp.CrossMessages) error {
-	//TODO:CheckMessages还未完善
 	return mem.CheckCrossMessageWithInfo(cm)
 }
 func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) {
@@ -759,7 +796,6 @@ func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [3
 	mem.RlDB = append(mem.RlDB, rl)
 }
 
-//todo
 func (mem *Mempool) SearchRelationTable(Height int64) []tp.Package {
 	var packlist []tp.Package
 	for i := 0; i < len(mem.RlDB); i++ {
@@ -1294,7 +1330,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	var totalGas int64
 
 	// 区块最大容量受BusyScore影响，[0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
-	if mem.BusyScore < 1.0 {
+	if mem.BusyScore < 0.9 {
 		fmt.Println("[health] 亚健康状态, ", mem.BusyScore)
 	}
 	maxBytes = ElasticBytes(maxBytes, mem.BusyScore)
@@ -1303,10 +1339,12 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	defer mem.proxyMtx.Unlock()
 	//mem.logger.Error("reap txs")
 	for atomic.LoadInt32(&mem.rechecking) > 0 {
-		// TODO: Something better?
 		time.Sleep(time.Millisecond * 10)
 	}
 
+	// 将mem.ShardFilters变更为map方便查找
+	shardFilters := mem.GetShardFilters()
+	fmt.Println("[filter] ", shardFilters)
 	// TODO: we will get a performance boost if we have a good estimate of avg
 	// size per tx, and set the initial capacity based off of that.
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
@@ -1316,27 +1354,19 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		//取交易
 		memTx := e.Value.(*mempoolTx)
 
-		// TODO 根据健康指数调整打包策略
-
 		// Check total size requirement
 		// 删除对应的txlist的relay_out交易
-		// TODO OPT 换一下移除时机？
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
 			t := time.Now()
 			mem.LogPrint("tReapMem1", txKey(memTx.tx), t.UnixNano(), 2)
-			//fmt.Printf("[tx_phase] index:tReapMem1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
-			if cm.SrcZone == getShard() {
-				//fmt.Println("移除回执")
-				var txs types.Txs
-				txs = append(txs, memTx.tx)
-				mem.removeTxs(txs)
-				continue
-			}
+
 			if res := cm.Decompression(); !res {
 				mem.logger.Error("cross message decompression failed.")
-				return nil
+				continue
 			}
+			// 如果跨片交易的目标分片已经忙碌了 是否还要处理该cm
+
 			//添加映射关系
 			//对txlist进行遍历，将relay_in的tx加入区块之中
 			var txlist []*tp.TX
@@ -1368,7 +1398,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 
 			//在这里如果交易通过核验，那么就可以确定要取该交易。那么此时，我们需要在这里对交易进行判断,加入映射表之中
-			//TODO:映射表的完善
 			mem.AddRelationTable(cm, height, txKey(memTx.tx))
 			totalBytes += int64(len(total_data)) + aminoOverhead
 
@@ -1393,6 +1422,11 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			t := time.Now()
 			tmp_tx, _ := tp.NewTX(memTx.tx)
 			mem.LogPrint("tReapMem1", tmp_tx.ID, t.UnixNano(), 1)
+
+			if _, ok := shardFilters[tmp_tx.Receiver]; ok {
+				// 该交易目标分片涉及忙碌分片 暂时跳过放后处理
+				continue
+			}
 
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
@@ -1440,7 +1474,6 @@ func (mem *Mempool) ReapMaxTxs(max int) types.Txs {
 	}
 
 	for atomic.LoadInt32(&mem.rechecking) > 0 {
-		// TODO: Something better?
 		time.Sleep(time.Millisecond * 10)
 	}
 	txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max))

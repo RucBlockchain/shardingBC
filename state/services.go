@@ -49,7 +49,11 @@ type Mempool interface {
 
 	TxsAvailable() <-chan struct{}
 	EnableTxsAvailable()
-	CalculateHealthScore(int, int64, int64) float64
+
+	CalculateBusyScore(int, int64, int64) float64
+	GetBusyScore() float64
+	GetShardFilters() map[string]struct{}
+	UpdateShardFliters([]string, []string)
 }
 
 // MockMempool is an empty implementation of a Mempool, useful for testing.
@@ -107,8 +111,20 @@ func (MockMempool) ReapDeliverTx() types.Tx {
 	return nil
 }
 
-func (MockMempool) CalculateHealthScore(int, int64, int64) float64 {
+func (MockMempool) CalculateBusyScore(int, int64, int64) float64 {
 	return 0
+}
+
+func (MockMempool) GetBusyScore() float64 {
+	return 0
+}
+
+func (MockMempool) GetShardFilters() map[string]struct{} {
+	return nil
+}
+
+func (MockMempool) UpdateShardFliters([]string, []string) {
+
 }
 
 //------------------------------------------------------
