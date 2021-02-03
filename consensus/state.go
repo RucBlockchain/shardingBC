@@ -1409,7 +1409,7 @@ func JudgeCrossMessage(cm *tp.CrossMessages) bool {
 	return true
 }
 func (cs *ConsensusState) ParseTxTime(tx *tp.TX, phase string) {
-	if tx.Txtype == "DeliverTx" {
+	if tx.Txtype == tp.DeliverTx || tx.Txtype == tp.ShardConfigTx {
 		return
 	}
 	t := time.Now()
@@ -1640,7 +1640,7 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	fail.Fail() // XXX
 
 	// 更新state中SpTxBuf
-	if len(cs.ProposalBlock.Txs) == 1 {
+	if len(cs.state.SpTxBuf) > 0 && len(cs.ProposalBlock.Txs) == 1 {
 		if bytes.Equal(cs.ProposalBlock.Txs[0], cs.state.SpTxBuf[0]) {
 			cs.state.SpTxBuf = cs.state.SpTxBuf[1:]
 		}

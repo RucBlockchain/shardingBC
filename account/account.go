@@ -16,13 +16,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/tendermint/tendermint/crypto"
-	"github.com/tendermint/tendermint/crypto/bls"
-	"github.com/tendermint/tendermint/types"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/tendermint/tendermint/crypto"
+	"github.com/tendermint/tendermint/crypto/bls"
+	"github.com/tendermint/tendermint/types"
 
 	dbm "github.com/tendermint/tendermint/libs/db"
 	"github.com/tendermint/tendermint/libs/log"
@@ -188,9 +189,9 @@ func (accountLog *AccountLog) Save() {
 
 // 快照数据结构
 type Snapshot struct {
-	Version int64             // 版本
-	Content map[string]string // 内容
-	ValSet  *types.ValidatorSet // 当前快照的val集合
+	Version    int64               // 版本
+	Content    map[string]string   // 内容
+	ValSet     *types.ValidatorSet // 当前快照的val集合
 	NextValSet *types.ValidatorSet
 }
 
@@ -217,6 +218,7 @@ var SnapshotHash string
 var SnapshotVersion = ""
 
 var SnapshotOpen = false
+
 // 获取db和logger句柄
 func InitAccountDB(db1 dbm.DB, logger1 log.Logger) {
 	db = db1
@@ -252,10 +254,15 @@ func _parseTx(tx []byte) *AccountLog {
 		// logger.Error("交易解析失败")
 		return nil
 	}
-	if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" || txArgs.TxType == "DeliverTx" || txArgs.TxType == "configtx" {
+	if txArgs.TxType != "tx" {
 		accountLog.TxType = txArgs.TxType
 		return accountLog
 	}
+
+	// if txArgs.TxType == "addtx" || txArgs.TxType == "checkpoint" || txArgs.TxType == "DeliverTx" || txArgs.TxType == "configtx" {
+	// 	accountLog.TxType = txArgs.TxType
+	// 	return accountLog
+	// }
 	args := strings.Split(string(txArgs.Content), "_")
 	// fmt.Println(args)
 	if len(args) != 4 { //因为添加时间戳参数，所以个数应该是4个
@@ -341,11 +348,12 @@ func _byte2digit(digitByte []byte) int {
 func _digit2byte(num int) []byte {
 	return []byte(strconv.Itoa(num))
 }
-func GenerateValidator(set types.ValidatorSet){
+func GenerateValidator(set types.ValidatorSet) {
 
 }
+
 // 生成快照 v1.0版本
-func GenerateSnapshot(version int64,set *types.ValidatorSet,nextset *types.ValidatorSet) {
+func GenerateSnapshot(version int64, set *types.ValidatorSet, nextset *types.ValidatorSet) {
 	newSnapshot := Snapshot{}
 	newSnapshot.Version = version
 	// 快照内容，仅供测试
@@ -356,52 +364,54 @@ func GenerateSnapshot(version int64,set *types.ValidatorSet,nextset *types.Valid
 }
 
 type Vals struct {
-
 	Validators [][]byte //vals的公钥集合
-	Proposer []byte// pro的公钥
+	Proposer   []byte   // pro的公钥
 
 }
+
 //生成Validator集合每一个公钥byte
-func GeneratePubkey(Validators []*types.Validator,Proposer *types.Validator) Vals{
+func GeneratePubkey(Validators []*types.Validator, Proposer *types.Validator) Vals {
 	var vals Vals
-	for i:=0;i<len(Validators);i++{
-		vals.Validators = append(vals.Validators, Validators[i].PubKey.Bytes())//得到每个vals的byte
+	for i := 0; i < len(Validators); i++ {
+		vals.Validators = append(vals.Validators, Validators[i].PubKey.Bytes()) //得到每个vals的byte
 	}
 	vals.Proposer = Proposer.PubKey.Bytes()
 	return vals
 }
+
 //反序列化返回每个vals的集合
-func ParsePubSet(vals Vals)([]crypto.PubKey,crypto.PubKey){
+func ParsePubSet(vals Vals) ([]crypto.PubKey, crypto.PubKey) {
 	var Validators []crypto.PubKey
-	for i:=0;i<len(vals.Validators);i++{
-		newpub,err:=bls.GetPubkeyFromByte2(vals.Validators[i])
+	for i := 0; i < len(vals.Validators); i++ {
+		newpub, err := bls.GetPubkeyFromByte2(vals.Validators[i])
 		Validators = append(Validators, newpub)
-		if err!=nil{
+		if err != nil {
 			logger.Error("反序列化失败")
 		}
 	}
 	var Proposer crypto.PubKey
-	newpub,err:=bls.GetPubkeyFromByte2(vals.Proposer)
-	if err!=nil{
+	newpub, err := bls.GetPubkeyFromByte2(vals.Proposer)
+	if err != nil {
 		logger.Error("Proposer反序列化失败")
 	}
-	Proposer =newpub
-	return Validators,Proposer
+	Proposer = newpub
+	return Validators, Proposer
 }
-func TogetherParseSet(set []byte,pub []byte)*types.ValidatorSet{
+func TogetherParseSet(set []byte, pub []byte) *types.ValidatorSet {
 	var myVal *types.ValidatorSet
-	json.Unmarshal(set,&myVal)
+	json.Unmarshal(set, &myVal)
 	var vals Vals
-	json.Unmarshal(pub,&vals)
-	v1,v2:=ParsePubSet(vals)
-	for i:=0;i<len(myVal.Validators);i++{
+	json.Unmarshal(pub, &vals)
+	v1, v2 := ParsePubSet(vals)
+	for i := 0; i < len(myVal.Validators); i++ {
 		myVal.Validators[i].PubKey = v1[i]
 	}
 	myVal.Proposer.PubKey = v2
 	return myVal
 }
+
 // 生成快照 v2.0版本
-func GenerateSnapshotFast(version int64,set *types.ValidatorSet,nextset *types.ValidatorSet) {
+func GenerateSnapshotFast(version int64, set *types.ValidatorSet, nextset *types.ValidatorSet) {
 
 	// 如果当前快照不存在，则初始化
 	if snapshot.Content == nil {
@@ -427,7 +437,7 @@ func GenerateSnapshotFast(version int64,set *types.ValidatorSet,nextset *types.V
 }
 
 // 生成快照 v3.0版本
-func GenerateSnapshotWithSecurity(version int64,set *types.ValidatorSet,nextset *types.ValidatorSet) {
+func GenerateSnapshotWithSecurity(version int64, set *types.ValidatorSet, nextset *types.ValidatorSet) {
 	// 如果当前快照不存在，则初始化
 	if snapshot.Content == nil {
 		snapshot.Content = make(map[string]string)
@@ -636,6 +646,7 @@ func SetSnapshotopen(Open bool) {
 	SetSnapshotVersion("v2.0")
 
 }
+
 // 保存增量缓存
 func SetSnapshotCache(key string, amount int, incr bool) {
 	if key == "" {

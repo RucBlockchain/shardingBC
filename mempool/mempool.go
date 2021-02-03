@@ -343,7 +343,7 @@ func newcmDB() CrossMessagesDB {
 }
 
 func (mem Mempool) GetShardFilters() map[string]struct{} {
-	var shardf map[string]struct{}
+	shardf := make(map[string]struct{})
 
 	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
 		shard := e.Value.(string)
@@ -354,12 +354,13 @@ func (mem Mempool) GetShardFilters() map[string]struct{} {
 }
 
 func (mem *Mempool) UpdateShardFliters(addlist, removeList []string) {
+	fmt.Println(addlist, removeList)
 	for _, shardname := range addlist {
 		mem.ShardFilters.PushBack(shardname)
 	}
 
 	// 建立索引 方便快速删除元素
-	var shardf map[string]*clist.CElement
+	shardf := make(map[string]*clist.CElement)
 
 	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
 		shard := e.Value.(string)
@@ -384,6 +385,8 @@ func (mem *Mempool) CalculateBusyScore(validTxs int, LastBlockSize, LastBlockMax
 	// 不使用上一轮共识时间的原因是各节点之间的共识耗时并不一致，用处理的交易数和
 	// 当前mempool里的交易数的比例来反映共识的快慢
 	var isfull = false //上一轮打包是否过满 0.8*最大打包大小
+
+	fmt.Println("shardfilter: ", mem.GetShardFilters())
 
 	if LastBlockSize >= ElasticBytes(LastBlockMaxSize, mem.BusyScore)*2/3 {
 		// 打包大小超过总大小的2/3
@@ -1344,7 +1347,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 	// 将mem.ShardFilters变更为map方便查找
 	shardFilters := mem.GetShardFilters()
-	fmt.Println("[filter] ", shardFilters)
 	// TODO: we will get a performance boost if we have a good estimate of avg
 	// size per tx, and set the initial capacity based off of that.
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))

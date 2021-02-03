@@ -5,6 +5,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/btcsuite/websocket"
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
@@ -12,11 +19,6 @@ import (
 	tp "github.com/tendermint/tendermint/identypes"
 	"github.com/tendermint/tendermint/libs/log"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
-	"net/http"
-	"net/url"
-	"os"
-	"strings"
-	"time"
 )
 
 var logger = log.NewNopLogger()
@@ -34,12 +36,14 @@ func init() {
 
 func main() {
 	var addListstr, removeListstr string
+	randSource := rand.NewSource(time.Now().UnixNano())
+	newRand := rand.New(randSource)
 
 	flagSet := flag.NewFlagSet("sendtx", flag.ExitOnError)
 
 	//初始化数值
-	flagSet.StringVar(&addListstr, "a", "0", "addlist")
-	flagSet.StringVar(&removeListstr, "r", "1", "removelist")
+	flagSet.StringVar(&addListstr, "a", "", "addlist")
+	flagSet.StringVar(&removeListstr, "r", "", "removelist")
 	flagSet.Usage = func() {
 		fmt.Println(`no usage!`)
 		fmt.Println("Flags:")
@@ -65,25 +69,33 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
 	addlist := strings.Split(addListstr, ",")
 	for _, shard := range addlist {
+		if shard == "" {
+			continue
+		}
 		content := fmt.Sprintf(
-			"%v_%v_%v",
+			"%v_%v_%v_%v",
 			shard,
 			0.1,
 			1,
+			newRand.Int63(),
 		)
 		tx := generateNormalTx("0", content)
 		sendBuf = append(sendBuf, tx)
 	}
-
 	removelist := strings.Split(removeListstr, ",")
 	for _, shard := range removelist {
+		if shard == "" {
+			continue
+		}
 		content := fmt.Sprintf(
-			"%v_%v_%v",
+			"%v_%v_%v_%v",
 			shard,
 			0.1,
 			0,
+			newRand.Int63(),
 		)
 		tx := generateNormalTx("0", content)
 		sendBuf = append(sendBuf, tx)
