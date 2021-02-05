@@ -412,7 +412,6 @@ func (blockExec *BlockExecutor) UpdatecmDB() []*tp.CrossMessages {
 }
 
 func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages) {
-	blockExec.logger.Error("SendCrossMessages")
 	var shard_send [][]*tp.CrossMessages
 	//暂定有100个分片
 	shard_send = make([][]*tp.CrossMessages, 100)
@@ -439,8 +438,8 @@ func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.Cros
 	if num > 0 {
 		des := tx_package[0].DesZone
 		if _, ok := shardFilters[des]; ok {
-			// TODO 是否暂时停止发送cm
 			// 暂时不发送该交易
+			return
 		}
 		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
 	}
@@ -671,7 +670,6 @@ func execBlockOnProxyApp(
 		if err := proxyAppConn.Error(); err != nil {
 			return nil, err
 		}
-
 		/*
 		 * @Author: zyj
 		 * @Desc: update state
@@ -841,6 +839,7 @@ func updateState(
 		LastHeightConsensusParamsChanged: lastHeightParamsChanged,
 		LastResultsHash:                  abciResponses.ResultsHash(),
 		AppHash:                          nil,
+		HashSignature:                    state.HashSignature,
 	}, nil
 }
 

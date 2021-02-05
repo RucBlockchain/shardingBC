@@ -5,6 +5,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"strconv"
+	"syscall"
+
 	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/crypto"
 	"github.com/tendermint/tendermint/crypto/tmhash"
@@ -12,9 +16,6 @@ import (
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/kyber/v3/util/random"
 	"golang.org/x/exp/rand"
-	"io"
-	"strconv"
-	"syscall"
 )
 
 //-------------------------------------
@@ -178,6 +179,7 @@ func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	}
 	pub := bn256_suite.G2().Point()
 	if err := pub.UnmarshalBinary(pubKey); err != nil {
+		fmt.Println("公钥还原失败, ", err)
 		return false
 	}
 
@@ -185,6 +187,7 @@ func (pubKey PubKeyBLS) VerifyBytes(msg []byte, sig []byte) bool {
 	if err := bls.Verify(bn256_suite, pub, msg, sig); err == nil {
 		return true
 	} else {
+		fmt.Println("bls验证出错,", err)
 		return false
 	}
 }
@@ -210,6 +213,7 @@ func GetPubkeyFromByte2(data []byte) (PubKeyBLS, error) {
 	cdc.MustUnmarshalBinaryBare(data, &pub)
 	return pub, nil
 }
+
 //分割字符串得到相应的内容,默认容器名为：1_0 分片名_分片的index
 func parseId() int64 {
 	v, _ := syscall.Getenv("TASKID")

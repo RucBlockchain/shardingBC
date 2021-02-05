@@ -1461,8 +1461,6 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		var err error
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
-			//fmt.Println(ids)
-			//fmt.Println(sigs)
 			cs.Logger.Error("Aggregate error", err)
 			return err
 		}
@@ -1567,7 +1565,7 @@ func (cs *ConsensusState) tryFinalizeCommit(height int64) {
 
 	HashMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 	if err == nil {
-		cs.state.HashSignature = HashMerkleSig
+		cs.state.SetHashSignature(HashMerkleSig)
 	}
 
 	//	go
