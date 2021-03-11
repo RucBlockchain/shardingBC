@@ -224,6 +224,11 @@ func txKey(tx types.Tx) [sha256.Size]byte {
 	return sha256.Sum256(tx)
 }
 
+type shardfilter struct {
+	Name    string
+	Upttime int64
+}
+
 // Mempool is an ordered in-memory pool for transactions before they are proposed in a consensus
 // round. Transaction validity is checked using the CheckTx abci message before the transaction is
 // added to the pool. The Mempool uses a concurrent list structure for storing transactions that
@@ -280,6 +285,7 @@ type Mempool struct {
 	// 延迟列表 - 每一个元素是一个分片名字，打包时会跳过涉及列表里的交易
 	// 每一项元素是string类型
 	// 如果收到交易就执行不进行addtx 那么无法完成同步
+	// 每一个Celement的结构为shardfilter
 	ShardFilters *clist.CList
 }
 
@@ -342,33 +348,73 @@ func newcmDB() CrossMessagesDB {
 	return cmdb
 }
 
-func (mem Mempool) GetShardFilters() map[string]struct{} {
+func (mem *Mempool) autoremove() {
+	removeList := []string{}
+	current := time.Now()
+	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
+		shard := e.Value.(*shardfilter)
+		uptTime := time.Unix(shard.Upttime, 0)
+		if current.Sub(uptTime) > 30*time.Second {
+			// 该filter长时间未收到拓扑链的更新 可以移除
+			removeList = append(removeList, shard.Name)
+		}
+	}
+
+	if len(removeList) > 0 {
+		mem.UpdateShardFliters([]string{}, removeList)
+	}
+}
+
+func (mem *Mempool) GetShardFilters() map[string]struct{} {
+	mem.autoremove()
 	shardf := make(map[string]struct{})
 
 	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
-		shard := e.Value.(string)
-		shardf[shard] = struct{}{}
+		shard := e.Value.(*shardfilter)
+		shardf[shard.Name] = struct{}{}
 	}
 
 	return shardf
 }
 
+// ShardFilters 更新入口
 func (mem *Mempool) UpdateShardFliters(addlist, removeList []string) {
-	fmt.Println(addlist, removeList)
-	for _, shardname := range addlist {
-		mem.ShardFilters.PushBack(shardname)
-	}
-
-	// 建立索引 方便快速删除元素
+	// 建立索引 方便快速定位元素
 	shardf := make(map[string]*clist.CElement)
 
 	for e := mem.ShardFilters.Front(); e != nil; e = e.Next() {
-		shard := e.Value.(string)
-		shardf[shard] = e
+		shard := e.Value.(*shardfilter)
+		shardf[shard.Name] = e
 	}
-	for _, shardname := range removeList {
-		if find, ok := shardf[shardname]; ok {
-			mem.ShardFilters.Remove(find)
+
+	current := time.Now().Unix()
+	if len(addlist) > 0 {
+		for _, shardname := range addlist {
+			if find, ok := shardf[shardname]; ok {
+				old := find.Value.(*shardfilter)
+				// 对于旧记录只更新Upttime
+				if old.Upttime < current {
+					old.Upttime = current
+				}
+			} else {
+				// 需要新增记录
+				shard := &shardfilter{
+					Name:    shardname,
+					Upttime: time.Now().Unix(),
+				}
+				e := mem.ShardFilters.PushBack(shard)
+
+				// 同时要更新索引 防止同一个区块里面会有多个同分片的调整tx
+				shardf[shardname] = e
+			}
+		}
+	}
+
+	if len(removeList) > 0 {
+		for _, shardname := range removeList {
+			if find, ok := shardf[shardname]; ok {
+				mem.ShardFilters.Remove(find)
+			}
 		}
 	}
 }
@@ -399,7 +445,7 @@ func (mem *Mempool) CalculateBusyScore(validTxs int, LastBlockSize, LastBlockMax
 		// 2/3
 		// 整个mempool压力太大了
 		// f(x) = -2x + 2; [0.75, 1] -> [0.5, 0]
-		fmt.Println("[health] ©")
+		fmt.Println("[health] 压力太大了")
 		// newscore = -2*float64(mem.txs.Len())/float64(mem.config.Size) + 2.0
 		newscore = 0.1
 	} else {

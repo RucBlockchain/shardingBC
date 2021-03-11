@@ -97,9 +97,9 @@ func GenerateDelayReport(busyScore float64, height int64, blockhash []byte, sign
 		Txtype:      ReportTx,
 		Sender:      getShard(),
 		Receiver:    "topo",
-		ID:          [32]byte{},
+		ID:          sha256.Sum256([]byte(content)),
 		Content:     content,
-		TxSignature: string(sign),
+		TxSignature: fmt.Sprintf("%X", sign),
 		Operate:     0,
 		Height:      int(height),
 	}

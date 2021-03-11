@@ -215,6 +215,19 @@ func (c *HTTP) broadcastTX(route string, cms []tp.TX) {
 	}
 }
 
+// SendTxsAsync 异步发送交易
+func (c *HTTP) SendTxsAsync(txs [][]byte) error {
+	for i := 0; i < len(txs); i++ {
+		data := txs[i]
+		result := new(ResultBroadcastTx)
+		_, err := c.rpc.Call("broadcast_tx_async", map[string]interface{}{"tx": data}, result)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // func (c *HTTP) Status() (*ctypes.ResultStatus, error) {
 // 	result := new(ctypes.ResultStatus)
 // 	_, err := c.rpc.Call("status", map[string]interface{}{}, result)

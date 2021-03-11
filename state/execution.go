@@ -237,6 +237,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 			if tptx.Txtype != tp.ShardConfigTx {
 				continue
 			}
+			fmt.Println("ready to update filter")
 			parts := strings.Split(tptx.Content, "_")
 			shardname := parts[0]
 			if parts[2] == "1" {
@@ -305,8 +306,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	if newscore < 0.25 {
 		// 尝试向拓扑链报告自身状态
 		report := tp.GenerateDelayReport(newscore, block.Height, block.Hash(), state.HashSignature)
-		//blockExec.SendTxAsync("", report)
-		fmt.Println("向拓扑链报告状态: ", report)
+		blockExec.ReportStatus(report.Data())
 	}
 
 	// Update evpool with the block and state.
@@ -469,6 +469,12 @@ func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.Cro
 func (blockExec *BlockExecutor) SendTxAsync(endpoint string, tx_data tp.TX) {
 	client := *myclient.NewHTTP(endpoint, "/websocket")
 	client.BroadcastTxAsync([]tp.TX{tx_data})
+}
+
+func (blockExec *BlockExecutor) ReportStatus(tx []byte) {
+	// endpoint确定某个值 10.43.0.201
+	client := *myclient.NewHTTP("10.43.0.201:26657", "/websocket")
+	client.SendTxsAsync([][]byte{tx})
 }
 
 func (blockExec *BlockExecutor) Send_Message(index int, rnd int, c *websocket.Conn, tx_package []tp.TX) {
