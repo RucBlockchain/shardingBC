@@ -16,11 +16,12 @@ type Config struct {
 	Dir            string
 	InitialCluster string
 }
-func NewConfig(Name string,Dir string,Init string)*Config{
-	Cfg:=&Config{
-		Name:Name,
-		Dir:Dir,
-		InitialCluster:Init,
+
+func NewConfig(Name string, Dir string, Init string) *Config {
+	Cfg := &Config{
+		Name:           Name,
+		Dir:            Dir,
+		InitialCluster: Init,
 	}
 	return Cfg
 }
@@ -45,20 +46,20 @@ func (Svr *Server) Start() error {
 	}
 	return nil
 }
-func (Svr *Server)Stop(){
+func (Svr *Server) Stop() {
 	Svr.Etcd.Close()
 }
 func (Svr *Server) Modify(c *Config) {
 
 	Svr.cfg = embed.NewConfig()
 	lpurl, _ := url.Parse("http://0.0.0.0:2380")
-	apurl, _ := url.Parse("http://"+c.Name+":2380")
+	apurl, _ := url.Parse("http://" + c.Name + ":2380")
 	lcurl, _ := url.Parse("http://0.0.0.0:2379")
-	acurl, _ := url.Parse("http://"+c.Name+":2379")
-	Svr.cfg.LPUrls= []url.URL{*lpurl}
-	Svr.cfg.LCUrls= []url.URL{*lcurl}
-	Svr.cfg.APUrls=[]url.URL{*apurl}
-	Svr.cfg.ACUrls=[]url.URL{*acurl}
+	acurl, _ := url.Parse("http://" + c.Name + ":2379")
+	Svr.cfg.LPUrls = []url.URL{*lpurl}
+	Svr.cfg.LCUrls = []url.URL{*lcurl}
+	Svr.cfg.APUrls = []url.URL{*apurl}
+	Svr.cfg.ACUrls = []url.URL{*acurl}
 	Svr.cfg.Name = c.Name
 	Svr.cfg.Dir = c.Dir + ".etcd"
 	Svr.cfg.InitialCluster = c.InitialCluster

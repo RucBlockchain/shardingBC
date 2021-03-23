@@ -28,9 +28,9 @@ func calculateStatistics(
 	duration int,
 	plustx int64,
 ) (*statistics, error) {
-		//fmt.Println(timeStart)
-	timesub,_:=time.ParseDuration("-1s")
-		timeStart=timeStart.Add(timesub)
+	//fmt.Println(timeStart)
+	timesub, _ := time.ParseDuration("-1s")
+	timeStart = timeStart.Add(timesub)
 	//timeStart=timeStart.Add(time.Second)
 	timeEnd := timeStart.Add(time.Duration(duration) * time.Second)
 	stats := &statistics{
@@ -81,8 +81,6 @@ func calculateStatistics(
 		//fmt.Println("start",timeStart)
 		//fmt.Println("end",timeEnd)
 
-
-
 		sec := secondsSinceTimeStart(timeStart, blockMeta.Header.Time)
 
 		// increase number of blocks for that second
@@ -93,7 +91,7 @@ func calculateStatistics(
 
 		logger.Debug(fmt.Sprintf("%d txs at block height %d", blockMeta.Header.NumTxs, blockMeta.Header.Height))
 	}
-	numTxsPerSec[0]+=plustx
+	numTxsPerSec[0] += plustx
 	//fmt.Println("sum:",sum)
 	//time1 := t1.Sub(t2).Seconds()
 	//tps := sum / time1

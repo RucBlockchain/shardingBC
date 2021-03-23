@@ -139,7 +139,7 @@ func VerifyTreePath(item []byte, path string, roothash []byte) bool {
 	}
 
 	hashVal := leafHash(item)
-	for i, key := range (keys) {
+	for i, key := range keys {
 		if directs[i] == PathLeft {
 			hashVal = innerHash(hashVal, key)
 		} else if directs[i] == PathRight {

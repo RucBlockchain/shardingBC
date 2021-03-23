@@ -179,7 +179,6 @@ func (r *ABCIRecorder) ABCIQueryWithOptions(path string, data cmn.HexBytes, opts
 
 func (r *ABCIRecorder) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
 
-
 	res, err := r.Client.BroadcastTxCommit(tx)
 	r.addCall(Call{
 		Name:     "broadcast_tx_commit",

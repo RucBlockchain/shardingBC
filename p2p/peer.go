@@ -117,6 +117,7 @@ type peer struct {
 }
 
 type PeerOption func(*peer)
+
 // peerConn 是传递参数。 它拥有了net.Conn成员变量
 // 为什么会专门设置一个peerConn结构呢， 为啥不直接使用net.Conn
 // 因为peer既可能是一个客户端的连接也可能是一个服务端的连接。

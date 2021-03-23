@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 )
+
 const (
 	protoHTTP  = "http"
 	protoHTTPS = "https"
@@ -21,6 +22,7 @@ const (
 	protoWS    = "ws"
 	protoTCP   = "tcp"
 )
+
 type RPCFunc struct {
 	f        reflect.Value  // underlying rpc function
 	args     []reflect.Type // type of each function arg
@@ -38,10 +40,10 @@ type HTTP struct {
 	rpc    *JSONRPCClient
 }
 type ResultBroadcastTx struct {
-	Code uint32       `json:"code"`
-	Data []byte       `json:"data"`
-	Log  string       `json:"log"`
-	Hash []byte       `json:"hash"`
+	Code uint32 `json:"code"`
+	Data []byte `json:"data"`
+	Log  string `json:"log"`
+	Hash []byte `json:"hash"`
 }
 type RPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -55,8 +57,9 @@ type jsonrpcid interface {
 	isJSONRPCID()
 }
 type JSONRPCStringID string
+
 func (JSONRPCStringID) isJSONRPCID() {}
-func Send(funcMap map[string]*RPCFunc,cdc *amino.Codec){
+func Send(funcMap map[string]*RPCFunc, cdc *amino.Codec) {
 
 }
 func (c *JSONRPCClient) Codec() *amino.Codec {
@@ -125,8 +128,8 @@ func NewHTTP(remote, wsEndpoint string) *HTTP {
 	rc.SetCodec(cdc)
 
 	return &HTTP{
-		rpc:      rc,
-		remote:   remote,
+		rpc:    rc,
+		remote: remote,
 	}
 }
 func (c *JSONRPCClient) Call(method string, params map[string]interface{}, result interface{}) (interface{}, error) {

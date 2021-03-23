@@ -155,7 +155,7 @@ func NewMConnectionWithConfig(conn net.Conn, chDescs []*ChannelDescriptor, onRec
 	}
 
 	mconn := &MConnection{
-		conn:          conn,
+		conn: conn,
 		//buf是将con封装成bufio的读写，方便了类似文件IO的形式进行tcp进行读写操作
 		bufConnReader: bufio.NewReaderSize(conn, minReadBufferSize),
 		bufConnWriter: bufio.NewWriterSize(conn, minWriteBufferSize),
@@ -163,8 +163,8 @@ func NewMConnectionWithConfig(conn net.Conn, chDescs []*ChannelDescriptor, onRec
 		recvMonitor:   flow.New(0, 0),
 		send:          make(chan struct{}, 1),
 		pong:          make(chan struct{}, 1),
-		onReceive:     onReceive,//当读取到数据之后，进行回调
-		onError:       onError,//当发生错误时，回调
+		onReceive:     onReceive, //当读取到数据之后，进行回调
+		onError:       onError,   //当发生错误时，回调
 		config:        config,
 		created:       time.Now(),
 	}
@@ -399,7 +399,7 @@ FOR_LOOP:
 		var err error
 	SELECTION:
 		select {
-		case <-c.flushTimer.Ch://周期性写入flush
+		case <-c.flushTimer.Ch: //周期性写入flush
 			// NOTE: flushTimer.Set() must be called every time
 			// something is written to .bufConnWriter.
 			c.flush()
@@ -407,7 +407,7 @@ FOR_LOOP:
 			for _, channel := range c.channels {
 				channel.updateStats()
 			}
-		case <-c.pingTimer.C://周期性向TCP连接写入ping信息
+		case <-c.pingTimer.C: //周期性向TCP连接写入ping信息
 			c.Logger.Debug("Send Ping")
 			_n, err = cdc.MarshalBinaryLengthPrefixedWriter(c.bufConnWriter, PacketPing{})
 			if err != nil {
@@ -429,7 +429,7 @@ FOR_LOOP:
 			} else {
 				c.stopPongTimer()
 			}
-		case <-c.pong://进行pong回复，这不是周期性写入，是因为收到了对方ping信息，这个通道是在RecvRoutine函数进行
+		case <-c.pong: //进行pong回复，这不是周期性写入，是因为收到了对方ping信息，这个通道是在RecvRoutine函数进行
 			c.Logger.Debug("Send Pong")
 			_n, err = cdc.MarshalBinaryLengthPrefixedWriter(c.bufConnWriter, PacketPong{})
 			if err != nil {
@@ -442,7 +442,7 @@ FOR_LOOP:
 		case <-c.send:
 			// Send some PacketMsgs
 			//大致流程就是从Channel的缓存区去数据，构造PacketMsg，写入TCP连接中。
-			eof := c.sendSomePacketMsgs()//进行包发送
+			eof := c.sendSomePacketMsgs() //进行包发送
 			if !eof {
 				// Keep sendRoutine awake.
 				select {
@@ -709,11 +709,11 @@ type Channel struct {
 	//通道成员
 	conn          *MConnection
 	desc          ChannelDescriptor
-	sendQueue     chan []byte//发送队列
-	sendQueueSize int32 // atomic.
-	recving       []byte//接收缓冲区
-	sending       []byte//发送缓冲区
-	recentlySent  int64 // exponential moving average
+	sendQueue     chan []byte //发送队列
+	sendQueueSize int32       // atomic.
+	recving       []byte      //接收缓冲区
+	sending       []byte      //发送缓冲区
+	recentlySent  int64       // exponential moving average
 
 	maxPacketMsgPayloadSize int
 

@@ -28,21 +28,23 @@ var (
 	testPartSize = 65536
 	nTxsPerBlock = 10
 )
-type node struct{
-	target map[string] []string
-}
-func newline2() *line.Line{
 
-	endpoints:=&node{
-		target:make(map[string][]string,16),
+type node struct {
+	target map[string][]string
+}
+
+func newline2() *line.Line {
+
+	endpoints := &node{
+		target: make(map[string][]string, 16),
 	}
 
-	endpoints.target["A"]=[]string{"192.168.5.56:26657","192.168.5.56:36657","192.168.5.56:46657","192.168.5.56:56657"}
-	endpoints.target["B"]=[]string{"192.168.5.57:26657","192.168.5.57:36657","192.168.5.57:46657","192.168.5.57:56657"}
-	endpoints.target["C"]=[]string{"192.168.5.58:26657","192.168.5.58:36657","192.168.5.58:46657","192.168.5.58:56657"}
-	endpoints.target["D"]=[]string{"192.168.5.60:26657","192.168.5.60:36657","192.168.5.60:46657","192.168.5.60:56657"}
+	endpoints.target["A"] = []string{"192.168.5.56:26657", "192.168.5.56:36657", "192.168.5.56:46657", "192.168.5.56:56657"}
+	endpoints.target["B"] = []string{"192.168.5.57:26657", "192.168.5.57:36657", "192.168.5.57:46657", "192.168.5.57:56657"}
+	endpoints.target["C"] = []string{"192.168.5.58:26657", "192.168.5.58:36657", "192.168.5.58:46657", "192.168.5.58:56657"}
+	endpoints.target["D"] = []string{"192.168.5.60:26657", "192.168.5.60:36657", "192.168.5.60:46657", "192.168.5.60:56657"}
 
-	l:=line.NewLine(endpoints.target)
+	l := line.NewLine(endpoints.target)
 	return l
 }
 func TestApplyBlock(t *testing.T) {
@@ -51,7 +53,7 @@ func TestApplyBlock(t *testing.T) {
 	err := proxyApp.Start()
 	require.Nil(t, err)
 	defer proxyApp.Stop()
-	l:=newline2()
+	l := newline2()
 	state, stateDB := state(1, 1)
 
 	blockExec := NewBlockExecutor(stateDB, log.TestingLogger(), proxyApp.Consensus(),
@@ -61,7 +63,7 @@ func TestApplyBlock(t *testing.T) {
 	blockID := types.BlockID{block.Hash(), block.MakePartSet(testPartSize).Header()}
 
 	//nolint:ineffassign
-	state, err = blockExec.ApplyBlock(l,state, blockID, block,false)
+	state, err = blockExec.ApplyBlock(l, state, blockID, block, false)
 	require.Nil(t, err)
 
 	// TODO check state and mempool

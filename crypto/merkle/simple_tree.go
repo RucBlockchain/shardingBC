@@ -58,7 +58,7 @@ func (smt *SimpleMerkleTree) GetPathByIndex(ith int) (string, error) {
 func (smt *SimpleMerkleTree) getPathByHash(item []byte) (string, error) {
 	// finc the leafnode
 	var node *SimpleProofNode
-	for _, leaf := range (smt.Leaves) {
+	for _, leaf := range smt.Leaves {
 		if bytes.Equal(item, leaf.Hash) == true {
 			node = leaf
 			break

@@ -408,7 +408,7 @@ func applyBlock(stateDB dbm.DB, st sm.State, blk *types.Block, proxyApp proxy.Ap
 	blockExec := sm.NewBlockExecutor(stateDB, log.TestingLogger(), proxyApp.Consensus(), mempool, evpool)
 
 	blkID := types.BlockID{blk.Hash(), blk.MakePartSet(testPartSize).Header()}
-	newState, err := blockExec.ApplyBlock(st, blkID, blk,false)
+	newState, err := blockExec.ApplyBlock(st, blkID, blk, false)
 	if err != nil {
 		panic(err)
 	}

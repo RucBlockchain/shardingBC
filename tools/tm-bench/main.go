@@ -98,14 +98,14 @@ Examples:
 	}
 
 	var (
-		endpoints     = strings.Split(flagSet.Arg(0), ",")
-		clients []*tmrpc.HTTP
+		endpoints   = strings.Split(flagSet.Arg(0), ",")
+		clients     []*tmrpc.HTTP
 		initHeights []int64
 	)
 	//创建一组分片leader小组链接
-	clients = make([]*tmrpc.HTTP,len(endpoints))
+	clients = make([]*tmrpc.HTTP, len(endpoints))
 	initHeights = make([]int64, len(endpoints))
-	for i:=0;i<len(endpoints);i++{
+	for i := 0; i < len(endpoints); i++ {
 		clients[i] = tmrpc.NewHTTP(endpoints[i], "/websocket")
 		initHeights[i] = latestBlockHeight(clients[i])
 		// fmt.Println("获取区块高度",initHeights[i])
@@ -114,9 +114,9 @@ Examples:
 	//logger.Info("Latest block height", "h", initialHeight)
 	//开始创建client,发送交易
 	var transacters []*transacter
-	var rawdata map[string] Stas
+	var rawdata map[string]Stas
 	allSahrd := strings.Split(allshard, ",")
-	transacters,rawdata = startTransacters(//初始化交易者
+	transacters, rawdata = startTransacters( //初始化交易者
 		endpoints,
 		connections,
 		txsRate,
@@ -157,13 +157,13 @@ Examples:
 	logger.Debug("Time all transacters stopped", "t", time.Now())
 	var totaltxs int64
 	var crosstxs int64
-	totaltxs=0
-	crosstxs=0
+	totaltxs = 0
+	crosstxs = 0
 	var realtxs int64
-	realtxs=0
-	for _,v:=range rawdata{
-		totaltxs +=int64(v.cnt)
-		crosstxs+=int64(v.relaycnt)
+	realtxs = 0
+	for _, v := range rawdata {
+		totaltxs += int64(v.cnt)
+		crosstxs += int64(v.relaycnt)
 	}
 
 	for i, _ := range endpoints {
@@ -180,16 +180,16 @@ Examples:
 		}
 		//在这里打印统计结果，说明已经统计完全，可以进行公式计算
 		//计算totaltxs 与 crosstxs
-		realtxs +=stats.TxsThroughput.Sum()
+		realtxs += stats.TxsThroughput.Sum()
 		// fmt.Println("交易数量",stats.TxsThroughput.Sum(),i)
 		//printStatistics(stats, outputFormat)
 	}
 	var TPS float64
-	TPS = float64(realtxs * totaltxs) / float64(totaltxs + crosstxs)
+	TPS = float64(realtxs*totaltxs) / float64(totaltxs+crosstxs)
 
 	var Crossrate float64
 	Crossrate = float64(crosstxs) / float64(totaltxs)
-	fmt.Println(TPS/float64(durationInt),Crossrate)
+	fmt.Println(TPS/float64(durationInt), Crossrate)
 }
 
 func latestBlockHeight(client tmrpc.Client) int64 {
@@ -211,11 +211,10 @@ func countCrashes(crashes []bool) int {
 	return count
 }
 
-
-func CompareData(a int,b int) int {
-	if a<=b{
+func CompareData(a int, b int) int {
+	if a <= b {
 		return a
-	}else {
+	} else {
 		return b
 	}
 }
@@ -224,21 +223,21 @@ func startTransacters(
 	endpoints []string,
 	connections,
 	txsRate int,
-	T       int,//发送交易持续时间
+	T int, //发送交易持续时间
 	txSize int,
 	allshard []string,
 	relayrate int,
 	broadcastTxMethod string,
-	datafile string) ([]*transacter, map[string] Stas){
+	datafile string) ([]*transacter, map[string]Stas) {
 	transacters := make([]*transacter, len(endpoints))
 
-	count, data := CreateTx(txsRate*T, len(allshard), datafile)//传入allshard还是shardcount？
+	count, data := CreateTx(txsRate*T, len(allshard), datafile) //传入allshard还是shardcount？
 	iwg := sync.WaitGroup{}
 	iwg.Add(len(endpoints))
 	//使用sync.WaitGroup来创建与endpoints大小相同的线程
-	for i, e := range endpoints {//为什么每个端口的transacter的shard都相同？
+	for i, e := range endpoints { //为什么每个端口的transacter的shard都相同？
 		flag := 0
-		t := newTransacter(e, connections, CompareData(len(count[allshard[i]])/T,len(count[allshard[i]])), txSize, allshard[i], allshard, relayrate, count[allshard[i]], flag, broadcastTxMethod,T)//这一句是与每个端口间建立一个transacter
+		t := newTransacter(e, connections, CompareData(len(count[allshard[i]])/T, len(count[allshard[i]])), txSize, allshard[i], allshard, relayrate, count[allshard[i]], flag, broadcastTxMethod, T) //这一句是与每个端口间建立一个transacter
 		t.SetLogger(logger)
 		go func(i int) {
 			defer iwg.Done()
@@ -250,7 +249,7 @@ func startTransacters(
 		}(i)
 	}
 	iwg.Wait()
-	return transacters,data
+	return transacters, data
 }
 func printErrorAndExit(err string) {
 	fmt.Fprintln(os.Stderr, err)

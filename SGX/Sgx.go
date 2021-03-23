@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-func GetCredibleTimeStamp()time.Time{
-	CredibleTimeStamp:=time.Now()
+func GetCredibleTimeStamp() time.Time {
+	CredibleTimeStamp := time.Now()
 	return CredibleTimeStamp
 }
-func GetCredibleRand(ShardCount int)int{
-	r:=rand.New(rand.NewSource(time.Now().UnixNano()))
+func GetCredibleRand(ShardCount int) int {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	time.Sleep(time.Millisecond)
-	rnd:=r.Intn(ShardCount)
+	rnd := r.Intn(ShardCount)
 	return rnd
 }

@@ -7,11 +7,11 @@ import (
 	cs "github.com/tendermint/tendermint/consensus"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/rpc/client"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"strconv"
 	"time"
-	"io/ioutil"
 )
 
 type Reconfiguration struct {
@@ -28,7 +28,7 @@ type Reconfiguration struct {
 	Client     client.HTTP
 	logger     log.Logger
 
-	Count      []int
+	Count []int
 }
 
 //type ReConfigurationConfig struct{
@@ -47,8 +47,9 @@ type Nodeinfo struct {
 	NodeName   string
 	PeerId     string
 	// ChainId    string
-	Neighbor   []int
+	Neighbor []int
 }
+
 // type ChainInfo struct {
 // 	ChainName string
 // 	ChainId   string
@@ -71,9 +72,10 @@ func NewReconfiguration(cs *cs.ConsensusState, l log.Logger, config *config.ReCo
 		logger:     l,
 	}
 	Re.SendNodes = make([][]Nodeinfo, Re.ShardCount)
-	Re.ReadNode()//读取数据
+	Re.ReadNode() //读取数据
 	return Re
 }
+
 type JsonStruct struct {
 }
 
@@ -94,23 +96,23 @@ func (jst *JsonStruct) Load(filename string, v interface{}) {
 		return
 	}
 }
-func (Re *Reconfiguration)ReadNode(){
-	Re.Nodesinfo = make([][]Nodeinfo,Re.ShardCount)
-	for i:=0;i<len(Re.Nodesinfo);i++{
-		Re.Nodesinfo[i]=make([]Nodeinfo,Re.NodeCount)
+func (Re *Reconfiguration) ReadNode() {
+	Re.Nodesinfo = make([][]Nodeinfo, Re.ShardCount)
+	for i := 0; i < len(Re.Nodesinfo); i++ {
+		Re.Nodesinfo[i] = make([]Nodeinfo, Re.NodeCount)
 	}
 	JsonParse := NewJsonStruct()
 	v := []Nodeinfo{}
 	JsonParse.Load("config/data.json", &v)
-	for i:=0;i<len(v);i++{
-		ShardIndex,_:= strconv.Atoi(v[i].Coordinate)
-		Shard,_:=strconv.Atoi(v[i].ShardName)
-		Re.Nodesinfo[Shard][ShardIndex]=v[i]
+	for i := 0; i < len(v); i++ {
+		ShardIndex, _ := strconv.Atoi(v[i].Coordinate)
+		Shard, _ := strconv.Atoi(v[i].ShardName)
+		Re.Nodesinfo[Shard][ShardIndex] = v[i]
 	}
 }
 func (Re *Reconfiguration) PeriodReconfiguration() {
 	//定时器实现
-	time.Sleep(time.Second*3)
+	time.Sleep(time.Second * 3)
 	Re.Client = *client.NewHTTP("localhost:26657", "/websocket")
 	for {
 		select {
@@ -183,6 +185,7 @@ func (Re *Reconfiguration) GenerateCredibleFillArea(Shard int) []int {
 
 	return FillArea
 }
+
 // func NewChain(Shard int) []*ChainInfo {
 // 	var ChainInfos []*ChainInfo
 // 	for i := 0; i < Shard; i++ {
@@ -223,7 +226,7 @@ func (Re *Reconfiguration) SendReconfiguration() {
 	//发送交易到区块
 	Re.logger.Info("Sending Reconfiguration")
 	Re.Txs = make([][]Tx, Re.ShardCount)
-	res, _:=json.Marshal(Re.Nodesinfo)
+	res, _ := json.Marshal(Re.Nodesinfo)
 
 	go Re.Client.BroadcastTxAsync(res)
 	//for i := 0; i < Re.ShardCount; i++ {
@@ -263,6 +266,7 @@ func GenerateCoordinate(ndecimal string) string {
 	}
 	return ndecimal
 }
+
 // func (Re *Reconfiguration) GetNodeInfo() [][]Nodeinfo {
 // 	var Nodesinfo [][]Nodeinfo
 // 	Nodesinfo = make([][]Nodeinfo, Re.ShardCount)
@@ -335,6 +339,7 @@ func (Re *Reconfiguration) GetNeighborName(x string, m int) []int {
 	}
 	return NameList
 }
+
 //watchshard的作用是，看看哪一个分片还没被填满并且不能填到自身分片。
 func WatchShard(BelongShard int, FullShard []int, Shard int) bool {
 	for i := 0; i < len(FullShard); i++ {
@@ -370,6 +375,7 @@ func (Re *Reconfiguration) BelongShard(ShardCount int, FullShard []int, i int) i
 	Re.Count[BelongShard]++
 	return BelongShard
 }
+
 //看看前面的所有分片是否已经满了
 func (Re *Reconfiguration) WatchError() bool {
 	for i := 0; i < Re.ShardCount-1; i++ {
@@ -379,6 +385,7 @@ func (Re *Reconfiguration) WatchError() bool {
 	}
 	return false
 }
+
 //
 func (Re *Reconfiguration) JudgeElement(TargetShard int, TargetNodeIndex int, Shard int, NodesInfo [][]Nodeinfo) bool {
 	for i := 0; i < len(NodesInfo[Shard]); i++ {
@@ -394,7 +401,7 @@ func (Re *Reconfiguration) ReFill(Shard int, NodesInfo [][]Nodeinfo) (int, int) 
 	flag := 0
 	//选出目标节点进行更换
 	for {
-		if flag == 1{
+		if flag == 1 {
 			return TargetShard, Re.FillArea[TargetShard][TargetNodeIndex]
 		}
 		time.Sleep(time.Millisecond * 5)
@@ -406,25 +413,20 @@ func (Re *Reconfiguration) ReFill(Shard int, NodesInfo [][]Nodeinfo) (int, int) 
 
 			count := 0
 			for {
-				if count==len(Re.FillArea[TargetShard]){
+				if count == len(Re.FillArea[TargetShard]) {
 					break
 				}
 				time.Sleep(time.Millisecond * 5)
 				rand.Seed(time.Now().UnixNano())
 				TargetNodeIndex = rand.Intn(len(Re.FillArea[TargetShard]))
 				if Re.JudgeElement(TargetShard, TargetNodeIndex, Shard, NodesInfo) {
-					flag=1
+					flag = 1
 					break
 				}
 
 			}
 		}
 	}
-
-
-
-
-
 
 }
 func AddFullShard(FillArea [][]int) []int {
@@ -511,10 +513,9 @@ func (Re *Reconfiguration) FillReconfiguration() {
 
 			}
 
-
 		}
 	}
-	Re.Count=make([]int, Re.ShardCount)
+	Re.Count = make([]int, Re.ShardCount)
 	Re.logger.Info("Done Fill")
 }
 

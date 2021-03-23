@@ -36,13 +36,13 @@ func getShard() string {
 }
 func ParseConfig() (*cfg.Config, error) {
 	conf := cfg.DefaultConfig()
-	conf.Instrumentation.Shard=0
+	conf.Instrumentation.Shard = 0
 	err := viper.Unmarshal(conf)
 	if err != nil {
 		return nil, err
 	}
-	myline.Shard=conf.Instrumentation.Shard
-	myline.Shard_name=getShard()
+	myline.Shard = conf.Instrumentation.Shard
+	myline.Shard_name = getShard()
 
 	conf.SetRoot(conf.RootDir)
 	cfg.EnsureRoot(conf.RootDir)

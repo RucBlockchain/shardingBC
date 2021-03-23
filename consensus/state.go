@@ -17,7 +17,7 @@ import (
 	//	"io"
 	"encoding/hex"
 	"encoding/json"
-
+	jsoniter "github.com/json-iterator/go"
 	//"strconv"
 
 	//	"strings"
@@ -1512,7 +1512,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 }
 func ParsePackages(data []byte) []tp.Package {
 	var packs []tp.Package
-	err := json.Unmarshal(data, &packs)
+	err := jsoniter.Unmarshal(data, &packs)
 	if len(packs) == 0 {
 		return nil
 	}
@@ -1984,7 +1984,7 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 				encodeStr := hex.EncodeToString(data)
 				temptx, _ := hex.DecodeString(encodeStr) //得到真实的tx记录
 				var t tp.TX
-				json.Unmarshal(temptx, &t)
+				jsoniter.Unmarshal(temptx, &t)
 				if t.Txtype == "checkpoint" {
 					allCms := cs.blockExec.GetAllCrossMessages()
 					added = compareRelaylist(t, allCms)
@@ -2109,7 +2109,7 @@ func compareRelaylist(t tp.TX, allCms []*tp.CrossMessages) (result bool) {
 	var contentByte []byte
 	for i := 0; i < len(allCms); i++ {
 		//得到本身的CrossMessages的数据
-		marshalTx, _ := json.Marshal(allCms[i])
+		marshalTx, _ := jsoniter.Marshal(allCms[i])
 		contentByte = append(contentByte, marshalTx...)
 	}
 

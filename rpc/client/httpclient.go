@@ -89,7 +89,6 @@ func (c *HTTP) ABCIQueryWithOptions(path string, data cmn.HexBytes, opts ABCIQue
 
 func (c *HTTP) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
 
-
 	result := new(ctypes.ResultBroadcastTxCommit)
 	_, err := c.rpc.Call("broadcast_tx_commit", map[string]interface{}{"tx": tx}, result)
 	if err != nil {

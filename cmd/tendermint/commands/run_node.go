@@ -43,7 +43,7 @@ func AddNodeFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("consensus.create_empty_blocks", config.Consensus.CreateEmptyBlocks, "Set this to false to only produce blocks when there are txs or when the AppHash changes")
 	//---------
 	// snapshot flags
-	cmd.Flags().Bool("snapshot",config.Snapshot,"set snapshot")
+	cmd.Flags().Bool("snapshot", config.Snapshot, "set snapshot")
 	//---------
 }
 

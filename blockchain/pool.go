@@ -111,7 +111,7 @@ func (pool *BlockPool) makeRequestersRoutine() {
 	 * @Desc: pool启动时即同步快照和当前版本，height=-1
 	 * @Date: 19.11.24
 	 */
-	if account.SnapshotVersion != "" && account.SnapshotOpen == true{
+	if account.SnapshotVersion != "" && account.SnapshotOpen == true {
 		pool.Logger.Error("新节点加入，请求同步快照")
 		for {
 			if len(pool.peers) > 0 {

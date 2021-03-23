@@ -20,7 +20,7 @@ func TestNewTX(t *testing.T) {
 		"\"Sender\": \"sender1\", " +
 		"\"Receiver\": \"receiver\", " +
 		"\"Content\": \"content\", " +
-		"\"TxSigature\": \"sig\"}" )
+		"\"TxSigature\": \"sig\"}")
 
 	tx, err := identypes.NewTX(tx_bytes)
 
@@ -40,7 +40,7 @@ func TestContent2PubKey(t *testing.T) {
 	pub_r := priv_r.PublicKey
 	t.Log("receiver(str):;;;", pub2string(pub_r), ";;;")
 	t.Log("receiver:", pub_r)
-	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_12.5";
+	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_12.5"
 	t.Log("tx_content: ", tx_content)
 
 	s, err := identypes.Content2PubKey(tx_content)
@@ -59,7 +59,7 @@ func TestTX_VerifySig(t *testing.T) {
 	pub_r := priv_r.PublicKey
 	//t.Log("receiver(str):;;;", pub2string(pub_r), ";;;")
 	//t.Log("receiver:", pub_r)
-	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_12.5";
+	tx_content := pub2string(pub_s) + "_" + pub2string(pub_r) + "_12.5"
 	t.Log("tx_content: ", tx_content)
 
 	s, err := identypes.Content2PubKey(tx_content)
@@ -77,7 +77,7 @@ func TestTX_VerifySig(t *testing.T) {
 		"\"Sender\": \"sender\", " +
 		"\"Receiver\": \"receiver\", " +
 		"\"Content\": \"" + tx_content + "\", " +
-		"\"TxSignature\": \"" + sig + "\"}"    )
+		"\"TxSignature\": \"" + sig + "\"}")
 
 	tx, err := identypes.NewTX(tx_bytes)
 	assert.Nil(t, err)

@@ -351,7 +351,7 @@ func (r *PEXReactor) ReceiveAddrs(addrs []*p2p.NetAddress, src Peer) error {
 		// waiting.
 		for _, seedAddr := range r.seedAddrs {
 			if seedAddr.Equals(srcAddr) {
-				r. ensurePeers()
+				r.ensurePeers()
 			}
 		}
 	}

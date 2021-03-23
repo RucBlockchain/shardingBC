@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-
 	// it is ok to use math/rand here: we do not need a cryptographically secure random
 	// number generator here and we can run the tests a bit faster
 	"math/rand"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
-
 
 	"github.com/tendermint/tendermint/libs/log"
 	rpctypes "github.com/tendermint/tendermint/rpc/lib/types"
@@ -53,7 +51,7 @@ type transacter struct {
 	Tcount int
 }
 
-func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count [][]byte, flag int, broadcastTxMethod string,T int) *transacter {
+func newTransacter(target string, connections, rate int, size int, shard string, allshard []string, relayrate int, count [][]byte, flag int, broadcastTxMethod string, T int) *transacter {
 	return &transacter{
 		Target:            target,
 		Rate:              rate,
@@ -68,7 +66,7 @@ func newTransacter(target string, connections, rate int, size int, shard string,
 		conns:             make([]*websocket.Conn, connections),
 		connsBroken:       make([]bool, connections),
 		logger:            log.NewNopLogger(),
-		Tcount: 			T,
+		Tcount:            T,
 	}
 }
 
@@ -105,7 +103,7 @@ func (t *transacter) Start() error {
 	t.endingWg.Add(2 * t.Connections)
 	for i := 0; i < t.Connections; i++ {
 		//这里的flag是干吗的
-		go t.sendLoop(i, t.flag,true)
+		go t.sendLoop(i, t.flag, true)
 		go t.receiveLoop(i)
 	}
 
@@ -147,7 +145,7 @@ func (t *transacter) receiveLoop(connIndex int) {
 
 // sendLoop generates transactions at a given rate.
 // 为什么index这个参数在这个函数中没有使用
-func (t *transacter) sendLoop(connIndex int, index int,init bool) {
+func (t *transacter) sendLoop(connIndex int, index int, init bool) {
 	count := 1
 	started := false
 	// Close the starting waitgroup, in the event that this fails to start
@@ -169,8 +167,8 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 		return err
 	})
 	logger := t.logger.With("addr", c.RemoteAddr())
-	var txNumber = 0 //用来表示已经取到了
-	leftNum := len(t.count) - t.Rate * t.Tcount //剩余交易总数
+	var txNumber = 0                          //用来表示已经取到了
+	leftNum := len(t.count) - t.Rate*t.Tcount //剩余交易总数
 	//fmt.Println("每秒发送交易的数量",t.Rate)
 	//fmt.Println("该片的数量",len(t.count))
 	//fmt.Println("剩余的交易数",leftNum)
@@ -196,8 +194,8 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 
 			now := time.Now()
 
-			max := func(a,b int) int{
-				if a < b{
+			max := func(a, b int) int {
+				if a < b {
 					return b
 				}
 				return a
@@ -205,19 +203,19 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 			//得到循环次数，把txcount/T的余数放在
 			var cir int
 			//fmt.Println("剩余数量为",leftNum)
-			if  leftNum > 0 {
-				cir = t.Rate + max(leftNum/t.Tcount,1)
-				leftNum-=max(leftNum/t.Tcount,1)
-			}else {
+			if leftNum > 0 {
+				cir = t.Rate + max(leftNum/t.Tcount, 1)
+				leftNum -= max(leftNum/t.Tcount, 1)
+			} else {
 				cir = t.Rate
 			}
 
 			//rate是每秒发送消息的数量
-			for i := 0; i < cir; i++ {//由于一段时间内某个分片的交易不一定能整除持续时间，需要对循环的退出条件进行修改
+			for i := 0; i < cir; i++ { //由于一段时间内某个分片的交易不一定能整除持续时间，需要对循环的退出条件进行修改
 				var ntx []byte
 				//ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)//生成一个交易t.count[i]
 
-				if txNumber >= len(t.count){
+				if txNumber >= len(t.count) {
 					//fmt.Printf("[%v] txnumBer: %v, cir: %v, rate: %v, left: %v\n", i, txNumber, cir,t.Rate, leftNum)
 					break
 				}
@@ -231,7 +229,7 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 					fmt.Printf("failed to encode params: %v\n", err)
 					os.Exit(1)
 				}
-				rawParamsJSON := json.RawMessage(paramsJSON)//把交易转换成
+				rawParamsJSON := json.RawMessage(paramsJSON) //把交易转换成
 
 				c.SetWriteDeadline(now.Add(sendTimeout))
 				err = c.WriteJSON(rpctypes.RPCRequest{
@@ -260,7 +258,7 @@ func (t *transacter) sendLoop(connIndex int, index int,init bool) {
 				txNumber++
 			}
 			//fmt.Printf("第%v秒",count)
-			count+=1
+			count += 1
 			//fmt.Println("本次循环的数量已经到了",txNumber)
 			timeToSend := time.Since(startTime)
 			logger.Info(fmt.Sprintf("sent %d transactions", numTxSent), "took", timeToSend)

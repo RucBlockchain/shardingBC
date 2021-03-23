@@ -386,7 +386,7 @@ func (a *addrBook) GetSelectionWithBias(biasTowardsNewAddrs int) []*p2p.NetAddre
 	defer a.mtx.Unlock()
 
 	bookSize := a.size()
-	fmt.Println("addrbook的size是：",bookSize)
+	fmt.Println("addrbook的size是：", bookSize)
 	if bookSize <= 0 {
 		if bookSize < 0 {
 			panic(fmt.Sprintf("Addrbook size %d (new: %d + old: %d) is less than 0", a.nNew+a.nOld, a.nNew, a.nOld))

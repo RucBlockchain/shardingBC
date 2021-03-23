@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"container/list"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 
 	"github.com/tendermint/tendermint/checkdb"
@@ -35,7 +34,10 @@ import (
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
 	//"github.com/tendermint/tendermint/state"
+	jsonite "github.com/json-iterator/go"
 )
+
+var json = jsonite.ConfigCompatibleWithStandardLibrary
 
 // PreCheckFunc is an optional filter executed before CheckTx and rejects
 // transaction if false is returned. An example would be to ensure that a
@@ -898,7 +900,6 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 			}
 			//fmt.Println(string(cm))
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
-			//cmid,_:=json.Marshal(CmID(cm)
 
 			checkdb.Save([]byte(CmID(cm)), cm) //存储
 			//fmt.Println("存储", "CrossMerkleRoot root", cm.CrossMerkleRoot, "height", cm.Height, "id", []byte(CmID(cm)),"packages",cm.Packages,"Srczone",cm.SrcZone,"Deszone",cm.DesZone)

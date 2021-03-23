@@ -106,10 +106,10 @@ func TestSimpleTree(t *testing.T) {
 	}
 
 	smt := SimpleTreeFromByteSlices(items)
-	for i, leaf := range (smt.Leaves) {
+	for i, leaf := range smt.Leaves {
 		assert.Equal(t, leaf.Hash, leafHash(items[i]))
 	}
-	for _, leaf := range (smt.Leaves) {
+	for _, leaf := range smt.Leaves {
 		node := leaf
 
 		for node != smt.Root {

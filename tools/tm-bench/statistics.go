@@ -28,7 +28,7 @@ func calculateStatistics(
 	duration int,
 	plustx int64,
 ) (*statistics, error) {
-		//fmt.Println(timeStart)
+	//fmt.Println(timeStart)
 	// timesub,_:=time.ParseDuration("-1s")
 	// 	timeStart=timeStart.Add(timesub)
 	//timeStart=timeStart.Add(time.Second)
@@ -63,7 +63,6 @@ func calculateStatistics(
 		if blockMeta.Header.Time.After(timeEnd) {
 			continue
 		}
-
 
 		sec := secondsSinceTimeStart(timeStart, blockMeta.Header.Time)
 

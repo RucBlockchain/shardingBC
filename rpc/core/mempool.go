@@ -82,7 +82,7 @@ func CmID(cm *tp.CrossMessages) string {
 
 func CheckDB(tx types.Tx) error {
 	if cm := ParseData(tx); cm != nil {
-		if cm.SrcZone==getShard(){
+		if cm.SrcZone == getShard() {
 			//收到状态数据库的回执f
 			//fmt.Println("收到回执并且执行删除",cm.Packages)
 			mempool.ModifyCrossMessagelist(cm)
@@ -106,11 +106,11 @@ func CheckDB(tx types.Tx) error {
 		//fmt.Println("查询id", []byte(cmid))
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
-			name := dbtx.SrcZone + "S"+cm.SrcIndex+":26657"
-		//	fmt.Println("发送",name)
-		//	fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot",
-		//	dbtx.CrossMerkleRoot,"SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
-		//)
+			name := dbtx.SrcZone + "S" + cm.SrcIndex + ":26657"
+			//	fmt.Println("发送",name)
+			//	fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot",
+			//	dbtx.CrossMerkleRoot,"SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
+			//)
 			tx_package := []*tp.CrossMessages{}
 			tx_package = append(tx_package, dbtx)
 			for i := 0; i < len(tx_package); i++ {
@@ -128,14 +128,14 @@ func CheckDB(tx types.Tx) error {
 
 	return nil
 }
-func ParseData(data types.Tx) (*tp.CrossMessages) {
+func ParseData(data types.Tx) *tp.CrossMessages {
 	cm := new(tp.CrossMessages)
 	err := json.Unmarshal(data, &cm)
 
 	if err != nil {
 		fmt.Println("ParseData Wrong")
 	}
-	if cm.Height==0 && cm.Txlist==nil{
+	if cm.Height == 0 && cm.Txlist == nil {
 		return nil
 	} else {
 		return cm

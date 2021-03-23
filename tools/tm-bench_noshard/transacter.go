@@ -149,7 +149,6 @@ func (t *transacter) sendLoop(connIndex int) {
 	}()
 	c := t.conns[connIndex]
 
-
 	c.SetPingHandler(func(message string) error {
 		err := c.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(sendTimeout))
 		if err == websocket.ErrCloseSent {
@@ -373,13 +372,13 @@ func updateTx(txNumber int, send_shard []string, shard string) []byte {
 	//		Content:  []string{content}}
 	//	res, _ = json.Marshal(tx)
 	//} else {
-		tx := &TX{
-			Txtype:   "tx",
-			Sender:   "",
-			Receiver: "",
-			ID:       sha256.Sum256([]byte(content)),
-			Content:  []string{content}}
-		res, _ = json.Marshal(tx)
+	tx := &TX{
+		Txtype:   "tx",
+		Sender:   "",
+		Receiver: "",
+		ID:       sha256.Sum256([]byte(content)),
+		Content:  []string{content}}
+	res, _ = json.Marshal(tx)
 	//}
 
 	return res

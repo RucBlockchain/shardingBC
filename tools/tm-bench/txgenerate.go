@@ -11,35 +11,36 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
+	tp "github.com/tendermint/tendermint/identypes"
 	"io"
 	"log"
 	"math/big"
 	"os"
 	"strconv"
 	"time"
-	tp "github.com/tendermint/tendermint/identypes"
 )
-var Count map[string] *ecdsa.PrivateKey
 
+var Count map[string]*ecdsa.PrivateKey
 
 type Stas struct {
-	cnt int //交易总数
-	relaycnt int //跨片数量
-	relayrate	float64 //跨片比例
+	cnt       int     //交易总数
+	relaycnt  int     //跨片数量
+	relayrate float64 //跨片比例
 }
+
 //allshard 统计string的长度，分片数量是多少 现实情况 跨片 本片交易融合在一起
 //-t * -T
-
 
 type ecdsaSignature struct {
 	X, Y *big.Int
 }
-func (s Stas) GetRelayrate() float64 {//得到一个分片的跨片比例
+
+func (s Stas) GetRelayrate() float64 { //得到一个分片的跨片比例
 	return float64(s.relaycnt) / float64(s.cnt)
 }
-func toShard(pubKey string, shdCnt int) string {//把传入的公钥字符串转换为大整数后对shdCnt取模
+func toShard(pubKey string, shdCnt int) string { //把传入的公钥字符串转换为大整数后对shdCnt取模
 	sender, err := new(big.Int).SetString(pubKey, 16)
-	if !err{
+	if !err {
 		log.Fatalln("When getting the big int of sender", err)
 	}
 	shd := big.NewInt(int64(shdCnt))
@@ -55,6 +56,7 @@ func pub2string(pub ecdsa.PublicKey) string {
 
 	return hex.EncodeToString(b)
 }
+
 //文件
 func createCount(name string) *ecdsa.PrivateKey {
 
@@ -77,11 +79,11 @@ func bigint2str(r, s big.Int) string {
 }
 
 //从数据集中取出钱txcount条交易，有shardcount个分片
-func CreateTx(txcount int,shardcount int, datafile string) (map[string] [][]byte, map[string] Stas){
-	var txs map[string] [][]byte
-	txs = make(map[string] [][]byte,txcount)
-	var txdata map[string] Stas
-	txdata = make(map[string] Stas,shardcount)
+func CreateTx(txcount int, shardcount int, datafile string) (map[string][][]byte, map[string]Stas) {
+	var txs map[string][][]byte
+	txs = make(map[string][][]byte, txcount)
+	var txdata map[string]Stas
+	txdata = make(map[string]Stas, shardcount)
 	for i := 0; i < shardcount; i++ {
 		txdata[strconv.Itoa(i)] = Stas{
 			cnt:       0,
@@ -89,21 +91,21 @@ func CreateTx(txcount int,shardcount int, datafile string) (map[string] [][]byte
 			relayrate: 0,
 		}
 	}
-	cnt := 0  //用于记录有多少个交易产生
+	cnt := 0 //用于记录有多少个交易产生
 	//open file
 	//Count应该开多大还需要确定
-	Count=make(map[string] *ecdsa.PrivateKey,100000)
+	Count = make(map[string]*ecdsa.PrivateKey, 100000)
 	csvfile, err := os.Open(datafile)
 	if err != nil {
 		log.Fatalln("Couldn't open the csv file", err)
 	}
-	defer csvfile.Close()	//这句意思是在return前关闭文件
+	defer csvfile.Close() //这句意思是在return前关闭文件
 
 	// parse the file
 	r := csv.NewReader(csvfile)
 
 	// Iterate through the records
-	count:=0
+	count := 0
 
 	for {
 		// Read each record from csv
@@ -111,37 +113,37 @@ func CreateTx(txcount int,shardcount int, datafile string) (map[string] [][]byte
 		if err == io.EOF {
 			break
 		}
-		if count==0{
-			count+=1
+		if count == 0 {
+			count += 1
 			continue
 		}
-		count+=1
+		count += 1
 		if err != nil {
 			log.Fatal(err)
 		}
 		from := record[1]
 		//to := record[5]
-		if Count[record[1]]==nil{
-			Count[record[1]]=createCount(record[4])
+		if Count[record[1]] == nil {
+			Count[record[1]] = createCount(record[4])
 		}
-		if Count[record[2]]==nil{
-			Count[record[2]]=createCount(record[5])
+		if Count[record[2]] == nil {
+			Count[record[2]] = createCount(record[5])
 		}
-		record[1]=pub2string(Count[record[1]].PublicKey)
-		record[2]=pub2string(Count[record[2]].PublicKey)
+		record[1] = pub2string(Count[record[1]].PublicKey)
+		record[2] = pub2string(Count[record[2]].PublicKey)
 		//merge to one string of content
 		var content bytes.Buffer
-		var idx = [3]int {1,2,3}
+		var idx = [3]int{1, 2, 3}
 		for k, i := range idx {
 			content.WriteString(record[i])
 			if k != 3 {
 				content.WriteString("_")
 			}
 		}
-		tx_content:=content.String()+strconv.FormatInt(time.Now().UnixNano(), 10)
+		tx_content := content.String() + strconv.FormatInt(time.Now().UnixNano(), 10)
 		tr, ts, _ := ecdsa.Sign(crand.Reader, Count[from], digest(tx_content))
 		sig := bigint2str(*tr, *ts)
-		id:=sha256.Sum256([]byte(tx_content))
+		id := sha256.Sum256([]byte(tx_content))
 
 		//assign every attribute of Tx
 		var temp tp.TX
@@ -150,9 +152,9 @@ func CreateTx(txcount int,shardcount int, datafile string) (map[string] [][]byte
 		temp.Content = tx_content
 		temp.ID = id
 		temp.TxSignature = sig
-		if temp.Sender == temp.Receiver{
+		if temp.Sender == temp.Receiver {
 			temp.Txtype = "tx"
-		}else {
+		} else {
 			temp.Txtype = "relaytx"
 		}
 
@@ -168,12 +170,11 @@ func CreateTx(txcount int,shardcount int, datafile string) (map[string] [][]byte
 		}
 		txdata[temp.Sender] = num
 
-
 		//txs = append(txs, temp)
 		cnt++
 		if cnt == txcount {
 			break
 		}
 	}
-	return txs,txdata
+	return txs, txdata
 }

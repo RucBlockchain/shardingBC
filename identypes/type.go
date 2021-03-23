@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	jsonite "github.com/json-iterator/go"
 	"github.com/tendermint/tendermint/libs/log"
 )
 
@@ -33,6 +33,7 @@ var (
 	identypesLogger = logger.With("module", "identypes")
 	ConsensusBegin  = time.Now()
 	CurrentHeight   int64
+	json            = jsonite.ConfigCompatibleWithStandardLibrary
 )
 
 /*
