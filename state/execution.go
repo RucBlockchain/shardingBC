@@ -305,8 +305,8 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 	// TODO 配置信息（阈值、拓扑链endpoint）
 	if newscore < 0.25 {
 		// 尝试向拓扑链报告自身状态
-		report := tp.GenerateDelayReport(newscore, block.Height, block.Hash(), state.HashSignature)
-		blockExec.ReportStatus(report.Data())
+		// report := tp.GenerateDelayReport(newscore, block.Height, block.Hash(), state.HashSignature)
+		// blockExec.ReportStatus(report.Data())
 	}
 
 	// Update evpool with the block and state.

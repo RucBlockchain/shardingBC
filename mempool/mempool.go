@@ -323,7 +323,7 @@ func NewMempool(
 		metrics:       NopMetrics(),
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:          0,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
+		Plog:          2,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
 		BusyScore:     1.0,
 		ShardFilters:  clist.New(),
 	}
@@ -1379,10 +1379,10 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	var totalGas int64
 
 	// 区块最大容量受BusyScore影响，[0, 1] <-> [0.5*maxBytes, 1.0*maxBytes]
-	if mem.BusyScore < 0.9 {
-		fmt.Println("[health] 亚健康状态, ", mem.BusyScore)
-	}
-	maxBytes = ElasticBytes(maxBytes, mem.BusyScore)
+	// if mem.BusyScore < 0.9 {
+	// 	fmt.Println("[health] 亚健康状态, ", mem.BusyScore)
+	// }
+	// maxBytes = ElasticBytes(maxBytes, mem.BusyScore)
 
 	mem.proxyMtx.Lock()
 	defer mem.proxyMtx.Unlock()
@@ -1392,7 +1392,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 	}
 
 	// 将mem.ShardFilters变更为map方便查找
-	shardFilters := mem.GetShardFilters()
+	// shardFilters := mem.GetShardFilters()
 	// TODO: we will get a performance boost if we have a good estimate of avg
 	// size per tx, and set the initial capacity based off of that.
 	// txs := make([]types.Tx, 0, cmn.MinInt(mem.txs.Len(), max/mem.avgTxSize))
@@ -1471,10 +1471,10 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			tmp_tx, _ := tp.NewTX(memTx.tx)
 			mem.LogPrint("tReapMem1", tmp_tx.ID, t.UnixNano(), 1)
 
-			if _, ok := shardFilters[tmp_tx.Receiver]; ok {
-				// 该交易目标分片涉及忙碌分片 暂时跳过放后处理
-				continue
-			}
+			// if _, ok := shardFilters[tmp_tx.Receiver]; ok {
+			// 	// 该交易目标分片涉及忙碌分片 暂时跳过放后处理
+			// 	continue
+			// }
 
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
