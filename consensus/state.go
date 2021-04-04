@@ -1052,16 +1052,24 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 	proposal := types.NewProposal(height, round, cs.ValidRound, propBlockId)
 	if err := cs.privValidator.SignProposal(cs.state.ChainID, proposal); err == nil {
 		//发送区块的时刻
-
+		_, err = cdc.UnmarshalBinaryLengthPrefixedReader(
+			blockParts.GetReader(),
+			&block,
+			int64(cs.state.ConsensusParams.Block.MaxBytes),
+		)
+		if err!=nil{
+			fmt.Println("聚合失败",err)
+		}
 		PrintinfoTime(2, block.Hash(), strconv.FormatInt(time.Now().UnixNano(), 10))
-
+		//提出区块。
 		// send proposal and block parts on internal msg queue
 		cs.sendInternalMessage(msgInfo{&ProposalMessage{proposal}, ""})
 		for i := 0; i < blockParts.Total(); i++ {
 			part := blockParts.GetPart(i)
 			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, ""})
 		}
-		cs.Logger.Info("Signed proposal", "height", height, "round", round, "proposal", proposal)
+		//发送区块完成
+		cs.Logger.Error("Signed proposal", "height", height, "round", round, "proposal", proposal)
 		cs.Logger.Debug(fmt.Sprintf("Signed proposal block: %v", block))
 	} else {
 		if !cs.replayMode {
@@ -1423,7 +1431,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 	voteSet := cs.Votes.Prevotes(cs.CommitRound)
 	packdata := cs.blockExec.MergePackage(cs.Height)
 	packs := ParsePackages(packdata)
-	//fmt.Println("本次打包的交易为",packs)
+	count := 0
+	// fmt.Println("本次打包的交易为", packs)
 	if len(packs) == 0 && len(cs.ProposalBlock.Txs) == 0 {
 		return nil
 	} else {
@@ -1435,6 +1444,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			tx, _ := tp.NewTX(cs.ProposalBlock.Txs[i])
 			tx.PrintInfo()
 			if tx.Txtype == "relaytx" && tx.Operate == 0 {
+				count += 1
 				continue
 			}
 			if tx.Txtype == "relaytx" && tx.Operate == 1 {
@@ -1442,7 +1452,6 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			}
 			cs.ParseTxTime(tx, "TxRes")
 		}
-
 		begin_time := time.Now()
 		var ids = make([]int64, 0, len(voteSet.PartSigs))
 		var sigs = make([][]byte, 0, len(voteSet.PartSigs))
@@ -1461,16 +1470,24 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		var err error
 		CrossMerkleSig, err := bls.SignatureRecovery(threshold, sigs, ids)
 		if err != nil {
-			cs.Logger.Error("Aggregate error", err)
-			return err
+			CrossMerkleSig = nil
+			fmt.Println(err)
+			// return err
 		}
-
 		// 重新生成merkle tree
 		mts, err := types.GenerateMerkleTree(cs.ProposalBlock.Txs)
 		if err != nil {
 			return err
 		}
 
+		if CrossMerkleSig == nil {
+			CrossMerkleSig, err = bls.TmpGetSign(mts.RootTree.ComputeRootHash())
+			if err != nil {
+				fmt.Println("聚合彻底失败")
+				return err
+			}
+		}
+		// fmt.Println("测试: ", bls.GenPrivKey().PubKey().VerifyBytes(mts.RootTree.ComputeRootHash(), CrossMerkleSig))
 		var txs types.Txs
 		txs = cs.ProposalBlock.Txs[:]
 		cms := types.ClassifyTxFromBlock(mts,
@@ -1860,6 +1877,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 			int64(cs.state.ConsensusParams.Block.MaxBytes),
 		)
 		if err != nil {
+			fmt.Println("接受区块失败",err)
 			return added, err
 		}
 
@@ -2144,6 +2162,7 @@ func (cs *ConsensusState) JudgeBlockPakcages() bool {
 	return true
 }
 func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, header types.PartSetHeader) (*types.Vote, error) {
+	cs.Logger.Error("开始投票")
 	// Flush the WAL. Otherwise, we may not recompute the same vote to sign, and the privValidator will refuse to sign anything.
 	cs.wal.FlushAndSync()
 

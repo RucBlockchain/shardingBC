@@ -146,29 +146,31 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 	//异步解决
 	//fmt.Println("收到tx",string(tx))
 	//if cm:=ParseData(tx);cm!=nil{//处理CrossMessage流程
-	////TODO:需要完善此接口函数
-	//	mempool.CheckCrossMessage(tx)//check这个消息如果通过则放入mempool之中
-	//}else{//处理Tx流程
-	//状态数据库先不检验
-	//if Checkdbtest(tx) {
-	//	return nil, errors.New("状态数据库直接返回")
+	//	fmt.Println("接受的时间",time.Now(),"ID",cm.ID,"time",cm.Timestamp)
+	//////TODO:需要完善此接口函数
+	////	mempool.CheckCrossMessage(tx)//check这个消息如果通过则放入mempool之中
+	////}else{//处理Tx流程
+	////状态数据库先不检验
+	////if Checkdbtest(tx) {
+	////	return nil, errors.New("状态数据库直接返回")
 	//}
-	//err := CheckDB(tx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	// err := CheckDB(tx)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	err := mempool.CheckTx(tx, nil)
-
+	
 	if err != nil {
-		if err == errors.New("不合法交易") {
+		//状态数据库返回会导致err！=nil
 			if cm := ParseData(tx); cm != nil {
+				//fmt.Println("错误",err)
 				//fmt.Println("交易cm不合法", cm)
 			} else {
 				//tx1, _ := tp.NewTX(tx)
 
 				//fmt.Println("交易tx不合法", tx1)
 			}
-		}
+
 
 		return nil, err
 	}

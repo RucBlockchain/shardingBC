@@ -12,6 +12,7 @@ import (
 )
 
 type CrossMessages struct {
+	ID              [32]byte
 	Txlist          [][]byte  // [][]byte
 	Sig             []byte    //转出方所有节点对该交易包的merkle_root进行门限签名
 	Pubkeys         []byte    //只有一把公钥
@@ -23,7 +24,7 @@ type CrossMessages struct {
 	Packages        []Package //应该回复删除什么包
 	ConfirmPackSigs []byte    //对于这些包的签名
 	SrcIndex        string
-
+	Timestamp            int64
 	// 压缩相关的字段
 	// CompressedData 和 Txlist两者在任意时刻有且只有一个会存放有数据
 	CompressedData []byte // txlist压缩后的数据存放在这里
@@ -42,6 +43,7 @@ type Package struct {
 	SrcZone         string
 	DesZone         string
 	SrcIndex        string
+	Timestamp       int64
 }
 
 func GetIndex() string {
@@ -143,7 +145,8 @@ func NewCrossMessage(txs [][]byte,
 	crossMerkleRoot []byte,
 	treepath string,
 	srcZone, DesZone string,
-	Height int64) *CrossMessages {
+	Height int64,
+	t int64) *CrossMessages {
 	cm := &CrossMessages{
 		Txlist:          txs,
 		Sig:             make([]byte, len(signature)),
@@ -158,6 +161,7 @@ func NewCrossMessage(txs [][]byte,
 		ConfirmPackSigs: nil,
 		CompressedData:  nil,
 		IsCompressed:    false,
+		Timestamp:t,
 	}
 	copy(cm.Sig, signature)
 	copy(cm.Pubkeys, pubkey)

@@ -107,7 +107,7 @@ Examples:
 		client        = tmrpc.NewHTTP(endpoints[0], "/websocket")
 		initialHeight = latestBlockHeight(client)
 	)
-
+	//fmt.Println("初始高度",initialHeight)
 	logger.Info("Latest block height", "h", initialHeight)
 	//开始创建client,发送交易
 	var transacters []*transacter

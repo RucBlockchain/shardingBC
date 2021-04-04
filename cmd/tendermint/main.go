@@ -1,9 +1,12 @@
 package main
 
 import (
-	"github.com/tendermint/tendermint/libs/cli"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+
+	"github.com/tendermint/tendermint/libs/cli"
 
 	cmd "github.com/tendermint/tendermint/cmd/tendermint/commands"
 	cfg "github.com/tendermint/tendermint/config"
@@ -37,6 +40,8 @@ func main() {
 	// DefaultNewNode function
 	nodeFunc := nm.DefaultNewNode
 
+	// for debug
+	go http.ListenAndServe("0.0.0.0:9999", nil)
 	// 设置快照版本 暂时无法从外部参数修改
 	//account.SetSnapshotVersion("v2.0")
 	// Create & start node

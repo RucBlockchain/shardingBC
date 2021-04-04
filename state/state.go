@@ -182,7 +182,7 @@ func (state State) MakeBlock(
 	} else {
 		fmt.Errorf("can't generate cross merkle tree, err: %v", err)
 	}
-
+	fmt.Println("制造区块完成")
 	return block, block.MakePartSet(types.BlockPartSizeBytes)
 }
 

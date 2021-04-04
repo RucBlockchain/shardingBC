@@ -173,12 +173,14 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 		txs = state.SpTxBuf[:1]
 	} else {
 		txs = blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas, height)
+		fmt.Println("打包交易成功")
 	}
 
 	Packages := blockExec.mempool.SearchRelationTable(height)
+	fmt.Println("打包relation映射表完成")
 	//将相关的txs进行排序
 	txs = types.HandleSortTx(txs)
-
+	fmt.Println("排序完成")
 	return state.MakeBlock(height, txs, commit, evidence, proposerAddr, Packages)
 }
 
@@ -458,7 +460,9 @@ func GetTotal() int {
 
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
 	rand.Seed(time.Now().UnixNano())
-	name := "tt" + DesZone + "s" + strconv.Itoa(rand.Intn(GetTotal())+1) + ":26657"
+	name := "10.43." + DesZone + ".101" /*+strconv.Itoa(rand.Intn(GetTotal())+1)*/ + ":26657"
+	tx_package[0].Timestamp = time.Now().UnixNano()
+	//fmt.Println("发送的地点",name," 时间为：",time.Now(),"ID:",tx_package[0].ID,"time",tx_package[0].Timestamp)
 	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
 	client := *myclient.NewHTTP(name, "/websocket")

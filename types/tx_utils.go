@@ -1,10 +1,13 @@
 package types
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/identypes"
+	"github.com/tendermint/tendermint/types/time"
 	"sort"
 )
 
@@ -137,7 +140,18 @@ func GenerateMerkleTree(txs Txs) (*merkle.TxMerkleTree, error) {
 		ShardTrees: shardtrees,
 	}, nil
 }
-
+//压缩获取id
+func Getbyteid(cm *identypes.CrossMessages)[]byte{
+	data,err:=json.Marshal(cm)
+	if err!=nil {
+		fmt.Println("反序列化CM出错")
+		return nil
+	}
+	return data
+}
+func CmKey(cm []byte) [sha256.Size]byte {
+	return sha256.Sum256(cm)
+}
 // 在调用该函数前，需处理好tx的operate数值修改
 func ClassifyTxFromBlock(mts *merkle.TxMerkleTree,
 	txs Txs,
@@ -175,7 +189,8 @@ func ClassifyTxFromBlock(mts *merkle.TxMerkleTree,
 			signature,
 			pubkey,
 			mts.RootTree.ComputeRootHash(),
-			treepath, cShard, shard, height)
+			treepath, cShard, shard, height,time.Now().UnixNano())
+		cm.ID = CmKey(Getbyteid(cm))
 		cms = append(cms, cm)
 	}
 	return cms

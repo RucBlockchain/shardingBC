@@ -153,6 +153,8 @@ func (mem *Mempool) LogPrint(phase string, tx_id [sha256.Size]byte, t int64, log
 		}
 	} else if logtype == 2 && (mem.Plog == 2) { //打印cm
 		fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t, 10))
+	} else if logtype == 2 && (mem.Plog == 3) { //只打印cm
+		fmt.Printf("[tx_phase] index:%s id:%X time:%s\n", phase, tx_id, strconv.FormatInt(t, 10))
 	}
 
 }
@@ -323,7 +325,7 @@ func NewMempool(
 		metrics:       NopMetrics(),
 		cmDB:          newcmDB(),
 		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:          2,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印
+		Plog:          3,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印 3表示只打印cm
 		BusyScore:     1.0,
 		ShardFilters:  clist.New(),
 	}
@@ -525,6 +527,7 @@ func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 		//fmt.Println("收到要删除的包",packs[j])
 		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
 			if mem.cmDB.CrossMessages[i].Content.Height == packs[j].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[j].CrossMerkleRoot) {
+				mem.LogPrint("tCMlife", mem.cmDB.CrossMessages[i].Content.ID, time.Now().UnixNano()-mem.cmDB.CrossMessages[i].Content.Timestamp, 2) //完整的时间线
 				mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
 				i--
 
@@ -545,9 +548,9 @@ func (mem *Mempool) UpdatecmDB() []*tp.CrossMessages {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
 				mem.cmDB.CrossMessages[i].Height += 1 //增加高度
 				//考虑如何进行合理分化
-			} else if mem.cmDB.CrossMessages[i].Height == 10 {
+			} else if mem.cmDB.CrossMessages[i].Height == 20 {
 				scm = append(scm, mem.cmDB.CrossMessages[i].Content)
-				mem.cmDB.CrossMessages[i].Height = 0
+				mem.cmDB.CrossMessages[i].Height = 1
 			} else {
 				mem.cmDB.CrossMessages[i].Height = mem.cmDB.CrossMessages[i].Height + 1
 			}
@@ -694,6 +697,8 @@ func (mem *Mempool) CmsWaitChan() <-chan struct{} {
 // CONTRACT: Either cb will get called, or err returned.
 func (mem *Mempool) CheckDB(tx types.Tx) string {
 	if cm := ParseData(tx); cm != nil {
+		//fmt.Println("交易为",)
+		//fmt.Println("接受的时间",time.Now(),"ID",cm.ID,"time",cm.Timestamp)
 		if cm.SrcZone == getShard() {
 			//收到状态数据库的回执f
 			//fmt.Println("收到回执", string(tx))
@@ -730,6 +735,7 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 	status := mem.CheckDB(tx)
 	if status == "回执" {
+
 		//fmt.Println("回执同步")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID}, true)
 	} else if status == "" {
@@ -750,12 +756,13 @@ func (mem *Mempool) SearchPackageExist(pack tp.Package) bool {
 func (mem *Mempool) SyncRelationTable(pack tp.Package, height int64) {
 	var rl RelationTable
 	rl = RelationTable{
-		CsHeight: height,
-		CmHeight: pack.Height,
-		CmHash:   pack.CrossMerkleRoot,
-		CmID:     pack.CmID,
-		SrcZone:  pack.SrcZone,
-		DesZone:  pack.DesZone,
+		CsHeight:  height,
+		CmHeight:  pack.Height,
+		CmHash:    pack.CrossMerkleRoot,
+		CmID:      pack.CmID,
+		SrcZone:   pack.SrcZone,
+		DesZone:   pack.DesZone,
+		Timestamp: pack.Timestamp,
 	}
 	rl.RlID = RlID(rl)
 	mem.RlDB = append(mem.RlDB, rl)
@@ -788,7 +795,6 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 	//fmt.Println("聚合签名与解压完成")
 	//mem.logger.Error("修改cmdb完成")
 	//交易合法性检验
-	tmp_tx, _ := json.Marshal(cm)
 	for i := 0; i < len(cm.Txlist); i++ {
 		//fmt.Println("交易合法性验证")
 		accountLog := account.NewAccountLog(cm.Txlist[i])
@@ -797,7 +803,7 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 			return errors.New("[CheckCrossMessageWithInfo] 在cm这里交易解析失败")
 		}
 		accountLog.Logtype = mem.Plog
-		mem.LogPrint("tCheckCM", txKey(tmp_tx), time.Now().UnixNano(), 2)
+
 		//fmt.Printf("[tx_phase] index:tCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 		checkRes := accountLog.Check() //开始打印日志 sha256.Sum256()
 		//fmt.Println("交易合法验证通过")
@@ -806,6 +812,8 @@ func (mem *Mempool) CheckCrossMessageWithInfo(cm *tp.CrossMessages) (err error) 
 			return errors.New("不合法的交易")
 		}
 	}
+	//所有检测完才发布
+	mem.LogPrint("tCheckCM", cm.ID, time.Now().UnixNano(), 2)
 	//mem.logger.Error("交易合法性检验通过")
 	//删除对应的CrossList内容
 	//fmt.Println("完成验证")
@@ -823,19 +831,21 @@ type RelationTable struct {
 	SrcZone        string
 	DesZone        string
 	SrcIndex       string
+	Timestamp      int64
 }
 
 func (mem *Mempool) AddRelationTable(cm *tp.CrossMessages, height int64, cmID [32]byte) {
 	//打包区块的高度Cs.Height|Cm.Height|Cm.Hash|Cm.ID
 
 	rl := RelationTable{
-		CsHeight: height,
-		CmHeight: cm.Height,
-		CmHash:   cm.CrossMerkleRoot,
-		CmID:     cmID,
-		SrcZone:  cm.SrcZone,
-		DesZone:  cm.DesZone,
-		SrcIndex: cm.SrcIndex,
+		CsHeight:  height,
+		CmHeight:  cm.Height,
+		CmHash:    cm.CrossMerkleRoot,
+		CmID:      cm.ID,
+		SrcZone:   cm.SrcZone,
+		DesZone:   cm.DesZone,
+		SrcIndex:  cm.SrcIndex,
+		Timestamp: cm.Timestamp,
 	}
 
 	rl.RlID = RlID(rl)
@@ -856,6 +866,7 @@ func (mem *Mempool) SearchRelationTable(Height int64) []tp.Package {
 				SrcZone:         mem.RlDB[i].SrcZone,
 				DesZone:         mem.RlDB[i].DesZone,
 				SrcIndex:        mem.RlDB[i].SrcIndex,
+				Timestamp:       mem.RlDB[i].Timestamp,
 			}
 			packlist = append(packlist, pack)
 		}
@@ -895,6 +906,7 @@ func (mem *Mempool) RemoveRelationTable(rlid string) {
 				Height:          mem.RlDB[i].CmHeight,
 				Packages:        tp.ParsePackages(mem.RlDB[i].Packages),
 				ConfirmPackSigs: mem.RlDB[i].ComfirmPackSig,
+				Timestamp:       mem.RlDB[i].Timestamp,
 			}
 			//fmt.Println(string(cm))
 			mem.RlDB = append(mem.RlDB[:i], mem.RlDB[i+1:]...)
@@ -963,14 +975,14 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	}
 
 	// author: manabo 根据健康值决定是否拒绝该交易
-	if mem.BusyScore <= 0.25 && mem.Size() > mem.config.Size*4/5 {
-		// mem.Size() > mem.config.Size*2/3 为临时方案 目前BusyScore方案有缺陷 可能mempool为空后才会解除此限制
-		if tmptx, err := tp.NewTX(tx); err == nil {
-			if tmptx.Txtype == tp.AddTx || tmptx.Txtype == tp.RelayTx {
-				return ErrShardUnHealth
-			}
-		}
-	}
+	// if mem.BusyScore <= 0.25 && mem.Size() > mem.config.Size*4/5 {
+	// 	// mem.Size() > mem.config.Size*2/3 为临时方案 目前BusyScore方案有缺陷 可能mempool为空后才会解除此限制
+	// 	if tmptx, err := tp.NewTX(tx); err == nil {
+	// 		if tmptx.Txtype == tp.AddTx || tmptx.Txtype == tp.RelayTx {
+	// 			return ErrShardUnHealth
+	// 		}
+	// 	}
+	// }
 
 	// The size of the corresponding amino-encoded TxMessage
 	// can't be larger than the maxMsgSize, otherwise we can't
@@ -985,51 +997,7 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 			return ErrPreCheck{err}
 		}
 	}
-	if cm := ParseData(tx); cm != nil {
-		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
-			t := time.Now()
-			mem.LogPrint("tPreCheck1CM", txKey(tx), t.UnixNano(), 2)
-			//fmt.Printf("[tx_phase] index:tPreCheck1CM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
-		} else { //说明来自其他节点的同步
-			t := time.Now()
-			mem.LogPrint("tPreCheckCM", txKey(tx), t.UnixNano(), 2)
-			//fmt.Printf("[tx_phase] index:tPreCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
-		}
-		//mem.logger.Error("接受到Cm消息")
-		if !checkdb {
-			begin_time := time.Now()
-			if result := mem.CheckCrossMessage(cm); result != nil {
-				return result
-			}
-			end_time := time.Now()
-			phase40 := end_time.Sub(begin_time)
-			mem.LogPrint("periodCheck", txKey(tx), phase40.Nanoseconds(), 2)
-			//fmt.Printf("[tx_phase] index:periodCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(phase40.Nanoseconds(), 10))
-			mem.LogPrint("tPostCheck", txKey(tx), time.Now().UnixNano(), 2)
-			//fmt.Printf("[tx_phase] index:tPostCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
-		}
-	} else {
-		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
-			t := time.Now()
-			tmp_tx, _ := tp.NewTX(tx)
-			mem.LogPrint("tPreCheck1TX", tmp_tx.ID, t.UnixNano(), 1)
 
-		} else { //说明来自其他节点的同步
-			t := time.Now()
-			tmp_tx, _ := tp.NewTX(tx)
-			mem.LogPrint("tPreCheckTX", tmp_tx.ID, t.UnixNano(), 1)
-		}
-		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
-		if accountLog == nil {
-			return errors.New("[CheckTxWithInfo] 交易解析失败")
-		}
-		accountLog.Logtype = mem.Plog
-		checkRes := accountLog.Check()
-
-		if !checkRes {
-			return errors.New("不合法的交易")
-		}
-	}
 	//mem.logger.Error("交易合法性检验通过")
 	// CACHE
 	if !mem.cache.Push(tx) {
@@ -1056,7 +1024,54 @@ func (mem *Mempool) CheckTxWithInfo(tx types.Tx, cb func(*abci.Response), txInfo
 	 * @Date: 19.11.10
 	 */
 	//检验cm的合法性
+	if cm := ParseData(tx); cm != nil {
+		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
+			t := time.Now()
+			mem.LogPrint("tPreCheck1CM", cm.ID, t.UnixNano(), 2)
+			mem.LogPrint("tSend1CM", cm.ID, t.UnixNano()-cm.Timestamp, 2)
+			//fmt.Printf("[tx_phase] index:tPreCheck1CM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
+		} else { //说明来自其他节点的同步
+			t := time.Now()
+			mem.LogPrint("tPreCheckCM", cm.ID, t.UnixNano(), 2)
+			mem.LogPrint("tSendCM", cm.ID, t.UnixNano()-cm.Timestamp, 2)
+			//fmt.Printf("[tx_phase] index:tPreCheckCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(t.UnixNano(), 10))
+		}
+		//mem.logger.Error("接受到Cm消息")
+		if !checkdb {
+			begin_time := time.Now()
+			if result := mem.CheckCrossMessage(cm); result != nil {
+				return result
+			}
+			end_time := time.Now()
+			phase40 := end_time.Sub(begin_time)
+			mem.LogPrint("periodCheck", cm.ID, phase40.Nanoseconds(), 2)
+			//fmt.Printf("[tx_phase] index:periodCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(phase40.Nanoseconds(), 10))
+			mem.LogPrint("tPostCheck", cm.ID, time.Now().UnixNano(), 2)
+			//fmt.Printf("[tx_phase] index:tPostCheck id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
+		}
+	} else {
+		if txInfo.PeerID == UnknownPeerID { //说明是第一次接受
+			t := time.Now()
+			tmp_tx, _ := tp.NewTX(tx)
+			mem.LogPrint("tPreCheck1TX", tmp_tx.ID, t.UnixNano(), 1)
 
+		} else { //说明来自其他节点的同步
+			t := time.Now()
+			tmp_tx, _ := tp.NewTX(tx)
+			mem.LogPrint("tPreCheckTX", tmp_tx.ID, t.UnixNano(), 1)
+		}
+		accountLog := account.NewAccountLog(tx) //判断是否是leader再输出
+		if accountLog == nil {
+			return errors.New("[CheckTxWithInfo] 交易解析失败")
+		}
+		accountLog.Logtype = mem.Plog
+		checkRes := accountLog.Check()
+
+		if !checkRes {
+			return errors.New("不合法的交易")
+		}
+	}
+	//应该在检验cache以后，在进行
 	//对addtx进行检验，如果是已经加入则直接返回
 	// WAL
 	if mem.wal != nil {
@@ -1190,8 +1205,8 @@ func (mem *Mempool) resCbFirstTime(tx []byte, peerID uint16, res *abci.Response)
 			// mem.insertTx(memTx)
 			etime := time.Now()
 			if cm := ParseData(memTx.tx); cm != nil {
-				mem.LogPrint("periodAddCM", txKey(memTx.tx), etime.Sub(btime).Nanoseconds(), 2)
-				mem.LogPrint("tInsideMemCM", txKey(memTx.tx), time.Now().UnixNano(), 2)
+				mem.LogPrint("periodAddCM", cm.ID, etime.Sub(btime).Nanoseconds(), 2)
+				mem.LogPrint("tInsideMemCM", cm.ID, time.Now().UnixNano(), 2)
 				//fmt.Printf("[tx_phase] index:periodAddCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(etime.Sub(btime).Nanoseconds(), 10))
 				//fmt.Printf("[tx_phase] index:tInsideMemCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 			} else {
@@ -1407,7 +1422,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		parse_time := time.Now()                   //解析时间
 		if cm := ParseData1(memTx.tx); cm != nil { //拿到交易，并且是cm类型的
 			t := time.Now()
-			mem.LogPrint("tReapMem1", txKey(memTx.tx), t.UnixNano(), 2)
+			mem.LogPrint("tReapMem1", cm.ID, t.UnixNano(), 2)
 
 			if res := cm.Decompression(); !res {
 				mem.logger.Error("cross message decompression failed.")
@@ -1417,7 +1432,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 			//添加映射关系
 			//对txlist进行遍历，将relay_in的tx加入区块之中
-			var txlist []*tp.TX
+			//var txlist []*tp.TX
 			var byte_txlist []types.Tx
 			for i := 0; i < len(cm.Txlist); i++ {
 				tmp_tx, err := tp.NewTX(cm.Txlist[i])
@@ -1434,20 +1449,21 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 				return nil
 			}
 
-			total_data, err := json.Marshal(txlist)
-			if err != nil {
-				mem.logger.Error("reap 聚合交易解析错误")
-				return nil
-			}
-			aminoOverhead := types.ComputeAminoOverhead(total_data, 1)
-			if maxBytes > -1 && totalBytes+int64(len(total_data))+aminoOverhead > maxBytes {
-				//fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(total_data))+aminoOverhead, "因此打包失败")
+			//total_data, err := json.Marshal(txlist)
+			//if err != nil {
+			//	mem.logger.Error("reap 聚合交易解析错误")
+			//	return nil
+			//}
+			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
+			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes-1500000 {
+				fmt.Println("交易最大容量为1：",totalBytes,"高度为",height)
+				fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(memTx.tx))+aminoOverhead, "因此打包失败")
 				return txs
 			}
 
 			//在这里如果交易通过核验，那么就可以确定要取该交易。那么此时，我们需要在这里对交易进行判断,加入映射表之中
-			mem.AddRelationTable(cm, height, txKey(memTx.tx))
-			totalBytes += int64(len(total_data)) + aminoOverhead
+			mem.AddRelationTable(cm, height, cm.ID)
+			totalBytes += int64(len(memTx.tx)) + aminoOverhead
 
 			// Check total gas requirement.
 			// If maxGas is negative, skip this check.
@@ -1460,8 +1476,8 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			totalGas = newTotalGas
 
 			parseend_time := time.Now()
-			mem.LogPrint("pickCM", txKey(memTx.tx), parseend_time.Sub(parse_time).Nanoseconds(), 2)
-			mem.LogPrint("tReapMemDone1", txKey(memTx.tx), time.Now().UnixNano(), 2)
+			mem.LogPrint("pickCM", cm.ID, parseend_time.Sub(parse_time).Nanoseconds(), 2)
+			mem.LogPrint("tReapMemDone1", cm.ID, time.Now().UnixNano(), 2)
 			//fmt.Printf("[tx_phase] index:pickCM id:%X time:%s\n", CmID(cm), strconv.FormatInt(parseend_time.Sub(parse_time).Nanoseconds(), 10))
 			//fmt.Printf("[tx_phase] index:tReapMemDone1 id:%X time:%s\n", CmID(cm), strconv.FormatInt(time.Now().UnixNano(), 10))
 
@@ -1477,7 +1493,9 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			// }
 
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
-			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes {
+			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes-1500000 {
+				fmt.Println("交易最大容量为2：",totalBytes,"高度为",height)
+				fmt.Println("区块最大容量为2：", maxBytes, "本次要打包交易的容量为", totalBytes+int64(len(memTx.tx))+aminoOverhead, "因此打包失败")
 				return txs
 			}
 
@@ -1492,6 +1510,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			}
 			totalGas = newTotalGas
 			tmp_tx, err := tp.NewTX(memTx.tx)
+
 			if err != nil {
 				mem.logger.Error("Unmarshall tp.TX error, err: ", err)
 			}
@@ -1505,7 +1524,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		}
 
 	}
-
+	fmt.Println("交易最大容量为：",totalBytes,"高度为",height)
 	return txs
 }
 

@@ -102,7 +102,7 @@ func (t *transacter) Start() error {
 	}
 
 	t.startingWg.Wait()
-	time.Sleep(1 * time.Second)
+	// time.Sleep(1 * time.Second)
 	t.startingWg.Add(t.Connections)
 	t.endingWg.Add(2 * t.Connections)
 	for i := 0; i < t.Connections; i++ {
@@ -233,8 +233,6 @@ func (t *transacter) sendLoop(connIndex int, index int, init bool) {
 				var ntx []byte
 
 				ntx = t.updateTx(txNumber, send_shard, t.shard, t.relayrate, t.Rate)
-
-				//fmt.Println(string(ntx))
 				paramsJSON, err := json.Marshal(map[string]interface{}{"tx": ntx})
 				if err != nil {
 					fmt.Printf("failed to encode params: %v\n", err)
