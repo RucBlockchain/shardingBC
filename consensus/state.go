@@ -1500,7 +1500,8 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			// return err
 		}
 		// 重新生成merkle tree
-		mts, err := types.GenerateMerkleTree(cs.ProposalBlock.Txs)
+		//版本1
+		mts, err := types.GenerateMerkleTreebySingle(cs.ProposalBlock.Txs)
 		if err != nil {
 			return err
 		}
@@ -1520,6 +1521,7 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 			CrossMerkleSig,
 			bls.GetShardPubkey(),
 			cs.Height)
+
 		for i := 0; i < len(cms); i++ {
 			//存入realylist之中
 			cms[i].Packages = packs

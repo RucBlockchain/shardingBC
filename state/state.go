@@ -178,7 +178,8 @@ func (state State) MakeBlock(
 	//解压
 
 	// 生成cross merkle root value
-	if rootTree, err := types.GenerateMerkleTree(txs); err == nil {
+	// 版本1测试
+	if rootTree, err := types.GenerateMerkleTreebySingle(txs); err == nil {
 		block.CrossMerkleRoot = rootTree.RootTree.ComputeRootHash()
 	} else {
 		fmt.Errorf("can't generate cross merkle tree, err: %v", err)
