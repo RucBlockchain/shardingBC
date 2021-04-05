@@ -19,13 +19,15 @@ import (
 )
 
 const (
-	SepTxContent  = "_"
-	ConfigTx      = "configtx"
-	DeliverTx     = "DeliverTx"
-	RelayTx       = "relaytx"
-	AddTx         = "tx"
-	ShardConfigTx = "ShardConfigTx" // 拓扑链向各个分片发送的调整信息 交易格式{分片}_{当前繁忙值}_{增加1\删除0}
-	ReportTx      = "ReportTx"      // 向拓扑链报告自身处于忙碌状态
+	SepTxContent         = "_"
+	ConfigTx             = "configtx"
+	DeliverTx            = "DeliverTx"
+	RelayTx              = "relaytx"
+	AddTx                = "tx"
+	ShardConfigTx        = "ShardConfigTx"        // 拓扑链向各个分片发送的调整信息 交易格式{分片}_{当前繁忙值}_{增加1\删除0}
+	ReportTx             = "ReportTx"             // 向拓扑链报告自身处于忙碌状态
+	CrossSendStrikeTx    = "CrossSendStrikeTx"    // 模拟Leader罢工实验,Cross-1发送阶段(Leader遗忘发送),交易格式为 _{签名}_遗忘比率_时间
+	CrossReceiveStrikeTx = "CrossReceiveStrikeTx" // 模拟Leader罢工实验,Cross-2阶段(Leader遗忘接收),交易格式为 _{签名}_遗忘比率_时间
 )
 
 var (

@@ -9,7 +9,8 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-
+	"math/rand"
+	"time"
 	"github.com/pkg/errors"
 	"github.com/tendermint/go-amino"
 	tp "github.com/tendermint/tendermint/identypes"
@@ -184,20 +185,38 @@ func unmarshalResponseBytes(cdc *amino.Codec, responseBytes []byte, result inter
 	}
 	return result, nil
 }
+func CheckSendSeed(rate int)bool{
 
+	rand.Seed(time.Now().UnixNano())
+	if rand.Intn(100) >= rate{
+
+		return true
+	}else{
+		fmt.Println("CheckSendSeed选择遗忘")
+		return false
+	}
+}
 //对所有的交易包进行发送传入
-func (c *HTTP) broadcastCrossMessages(route string, cms []*tp.CrossMessages) {
+func (c *HTTP) broadcastCrossMessages(route string, cms []*tp.CrossMessages,rate int,SendRightNow bool) {
 
 	for i := 0; i < len(cms); i++ {
-		data, _ := json.Marshal(cms[i])
-		result := new(ResultBroadcastTx)
-		go c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
+		if SendRightNow{
+			data, _ := json.Marshal(cms[i])
+			result := new(ResultBroadcastTx)
+			go c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
+		}else{
+			if CheckSendSeed(rate){
+				data, _ := json.Marshal(cms[i])
+				result := new(ResultBroadcastTx)
+				go c.rpc.Call(route, map[string]interface{}{"tx": data}, result)
+			}
+		}
 	}
 }
 
 //传入tx数组进行broadcast
-func (c *HTTP) BroadcastCrossMessageAsync(cms []*tp.CrossMessages) {
-	go c.broadcastCrossMessages("broadcast_tx_async", cms)
+func (c *HTTP) BroadcastCrossMessageAsync(cms []*tp.CrossMessages,rate int,SendRightNow bool) {
+	go c.broadcastCrossMessages("broadcast_tx_async", cms,rate,SendRightNow)
 }
 
 func (c *HTTP) BroadcastTxAsync(txs []tp.TX) {

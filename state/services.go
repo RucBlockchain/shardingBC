@@ -2,7 +2,6 @@ package state
 
 import (
 	"crypto/sha256"
-
 	abci "github.com/tendermint/tendermint/abci/types"
 	tp "github.com/tendermint/tendermint/identypes"
 	"github.com/tendermint/tendermint/mempool"
@@ -46,7 +45,11 @@ type Mempool interface {
 	Update(int64, types.Txs, mempool.PreCheckFunc, mempool.PostCheckFunc) error
 	Flush()
 	FlushAppConn() error
-
+	GetCrossSendStrike()int
+	GetCrossReceiveStrike()int
+	SetCrossSendStrike(rate int)
+	SetCrossReceiveStrike(rate int)
+	CheckSendSeed()bool
 	TxsAvailable() <-chan struct{}
 	EnableTxsAvailable()
 
@@ -96,6 +99,27 @@ func (MockMempool) ModifyRelationTable(packages []byte, cfs []byte, height int64
 func (MockMempool) SearchPackageExist(tp tp.Package) bool {
 
 	return true
+}
+func (MockMempool) GetCrossSendStrike() int {
+
+	return 0
+}
+func (MockMempool) GetCrossReceiveStrike() int {
+
+	return 0
+}
+
+func (MockMempool) SetCrossSendStrike(rate int){
+
+
+}
+func (MockMempool) CheckSendSeed()bool{
+	return true
+
+}
+func (MockMempool) SetCrossReceiveStrike(rate int){
+
+
 }
 func (MockMempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {}
 func (MockMempool) UpdatecmDB() []*tp.CrossMessages {

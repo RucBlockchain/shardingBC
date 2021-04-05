@@ -224,6 +224,7 @@ func NewConsensusState(
 // Public interface
 
 // SetLogger implements Service.
+
 func (cs *ConsensusState) SetLogger(l log.Logger) {
 	cs.BaseService.Logger = l
 	cs.timeoutTicker.SetLogger(l)
@@ -1057,8 +1058,8 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 			&block,
 			int64(cs.state.ConsensusParams.Block.MaxBytes),
 		)
-		if err!=nil{
-			fmt.Println("聚合失败",err)
+		if err != nil {
+			fmt.Println("聚合失败", err)
 		}
 		PrintinfoTime(2, block.Hash(), strconv.FormatInt(time.Now().UnixNano(), 10))
 		//提出区块。
@@ -1069,7 +1070,7 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 			cs.sendInternalMessage(msgInfo{&BlockPartMessage{cs.Height, cs.Round, part}, ""})
 		}
 		//发送区块完成
-		cs.Logger.Error("Signed proposal", "height", height, "round", round, "proposal", proposal)
+		cs.Logger.Debug("Signed proposal", "height", height, "round", round, "proposal", proposal)
 		cs.Logger.Debug(fmt.Sprintf("Signed proposal block: %v", block))
 	} else {
 		if !cs.replayMode {
@@ -1442,6 +1443,30 @@ func (cs *ConsensusState) tryAddAggragate2Block() error {
 		}
 		for i := 0; i < len(cs.ProposalBlock.Txs); i++ { //将每条交易时间打印出来
 			tx, _ := tp.NewTX(cs.ProposalBlock.Txs[i])
+
+			// 修改遗忘比率
+			// 发送遗忘比率
+
+			if tx.Txtype == "CrossSendStrikeTx" {
+				//解析
+				args := strings.Split(string(tx.Content), "_") //解析出交易内容
+				rate, err := strconv.Atoi(args[2])
+				if err != nil {
+					fmt.Println("解析错误")
+				}
+				cs.blockExec.SetCrossSendStrike(rate)
+				cs.Logger.Error("修改发送遗忘比率", rate)
+			}
+			// 接收遗忘比率
+			if tx.Txtype == "CrossReceiveStrikeTx" {
+				args := strings.Split(string(tx.Content), "_") //解析出交易内容
+				rate, err := strconv.Atoi(args[2])
+				if err != nil {
+					fmt.Println("解析错误")
+				}
+				cs.blockExec.SetCrossReceiveStrike(rate)
+				cs.Logger.Error("修改接收遗忘比率", rate)
+			}
 			tx.PrintInfo()
 			if tx.Txtype == "relaytx" && tx.Operate == 0 {
 				count += 1
@@ -1877,7 +1902,7 @@ func (cs *ConsensusState) addProposalBlockPart(msg *BlockPartMessage, peerID p2p
 			int64(cs.state.ConsensusParams.Block.MaxBytes),
 		)
 		if err != nil {
-			fmt.Println("接受区块失败",err)
+			fmt.Println("接受区块失败", err)
 			return added, err
 		}
 
@@ -2162,7 +2187,6 @@ func (cs *ConsensusState) JudgeBlockPakcages() bool {
 	return true
 }
 func (cs *ConsensusState) signVote(type_ types.SignedMsgType, hash []byte, header types.PartSetHeader) (*types.Vote, error) {
-	cs.Logger.Error("开始投票")
 	// Flush the WAL. Otherwise, we may not recompute the same vote to sign, and the privValidator will refuse to sign anything.
 	cs.wal.FlushAndSync()
 

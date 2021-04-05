@@ -12,8 +12,10 @@ import (
 )
 
 // TODO
+// 跨片的交易集只
 // 考虑片内交易
 // 片内交易是由到本片的交易和目的地为空的交易合一起
+
 func ClassifyTx(txs Txs) map[string]Txs {
 	// TODO string类型转换为枚举型
 	buckets := make(map[string]Txs)

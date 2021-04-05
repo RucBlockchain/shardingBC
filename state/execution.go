@@ -173,14 +173,11 @@ func (blockExec *BlockExecutor) CreateProposalBlock(
 		txs = state.SpTxBuf[:1]
 	} else {
 		txs = blockExec.mempool.ReapMaxBytesMaxGas(maxDataBytes, maxGas, height)
-		fmt.Println("打包交易成功")
 	}
 
 	Packages := blockExec.mempool.SearchRelationTable(height)
-	fmt.Println("打包relation映射表完成")
 	//将相关的txs进行排序
 	txs = types.HandleSortTx(txs)
-	fmt.Println("排序完成")
 	return state.MakeBlock(height, txs, commit, evidence, proposerAddr, Packages)
 }
 
@@ -412,7 +409,24 @@ func (blockExec *BlockExecutor) UpdatecmDB() []*tp.CrossMessages {
 	resendMessages := blockExec.mempool.UpdatecmDB()
 	return resendMessages
 }
+func (blockExec *BlockExecutor) GetCrossSendStrike() int {
+	CrossSendStrike := blockExec.mempool.GetCrossSendStrike()
+	return CrossSendStrike
+}
+func (blockExec *BlockExecutor) GetCrossReceiveStrike() int {
+	CrossReceiveStrike := blockExec.mempool.GetCrossReceiveStrike()
+	return CrossReceiveStrike
+}
+func (blockExec *BlockExecutor) SetCrossSendStrike(rate int) {
+	blockExec.mempool.SetCrossSendStrike(rate)
 
+}
+func (blockExec *BlockExecutor) SetCrossReceiveStrike(rate int) {
+	blockExec.mempool.SetCrossReceiveStrike(rate)
+}
+func (blockExec *BlockExecutor) CheckSendSeed() bool {
+	return blockExec.mempool.CheckSendSeed()
+}
 func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages) {
 	var shard_send [][]*tp.CrossMessages
 	//暂定有100个分片
@@ -438,13 +452,24 @@ func (blockExec *BlockExecutor) SendRelayTxs(resendMessages []*tp.CrossMessages)
 func (blockExec *BlockExecutor) SendCrossMessages(num int, tx_package []*tp.CrossMessages) {
 	shardFilters := blockExec.mempool.GetShardFilters()
 	if num > 0 {
-		des := tx_package[0].DesZone
-		if _, ok := shardFilters[des]; ok {
-			// 暂时不发送该交易
-			return
+		if num != 8080 {
+			des := tx_package[0].DesZone
+			if _, ok := shardFilters[des]; ok {
+				// 暂时不发送该交易
+				return
+			}
+			blockExec.SendMessage(tx_package[0].DesZone, tx_package, false)
+		} else {
+			des := tx_package[0].DesZone
+			if _, ok := shardFilters[des]; ok {
+				// 暂时不发送该交易
+				return
+			}
+			blockExec.SendMessage(tx_package[0].DesZone, tx_package, true)
 		}
-		blockExec.SendMessage(tx_package[0].DesZone, tx_package)
+
 	}
+
 }
 
 // sending tx to shard x
@@ -458,16 +483,18 @@ func GetTotal() int {
 	return count
 }
 
-func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages) {
+func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages, SendRightNow bool) {
 	rand.Seed(time.Now().UnixNano())
 	name := "10.43." + DesZone + ".101" /*+strconv.Itoa(rand.Intn(GetTotal())+1)*/ + ":26657"
 	tx_package[0].Timestamp = time.Now().UnixNano()
+	//大量的不发送任务
+
 	//fmt.Println("发送的地点",name," 时间为：",time.Now(),"ID:",tx_package[0].ID,"time",tx_package[0].Timestamp)
 	// name := DesZone + "S1" + ":26657"
 	// name := getIP() + ":26657"
 	client := *myclient.NewHTTP(name, "/websocket")
 	//fmt.Println("发送","height",tx_package[0].Height,"SrcZone",tx_package[0].SrcZone,"DesZone",tx_package[0].DesZone)
-	go client.BroadcastCrossMessageAsync(tx_package)
+	go client.BroadcastCrossMessageAsync(tx_package, blockExec.GetCrossSendStrike(), SendRightNow)
 }
 
 func (blockExec *BlockExecutor) SendTxAsync(endpoint string, tx_data tp.TX) {

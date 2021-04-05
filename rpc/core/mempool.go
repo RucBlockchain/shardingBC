@@ -116,7 +116,7 @@ func CheckDB(tx types.Tx) error {
 			for i := 0; i < len(tx_package); i++ {
 				client := *myclient.NewHTTP(name, "/websocket")
 
-				go client.BroadcastCrossMessageAsync(tx_package)
+				go client.BroadcastCrossMessageAsync(tx_package,mempool.CrossSendStrike,false)
 			}
 			//fmt.Println("状态数据库返回")
 			return errors.New("状态数据库返回")
@@ -158,25 +158,38 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 	// if err != nil {
 	// 	return nil, err
 	// }
-	err := mempool.CheckTx(tx, nil)
-	
-	if err != nil {
-		//状态数据库返回会导致err！=nil
-			if cm := ParseData(tx); cm != nil {
-				//fmt.Println("错误",err)
-				//fmt.Println("交易cm不合法", cm)
-			} else {
-				//tx1, _ := tp.NewTX(tx)
+	if consensusState.IsLeader(){
+		if cm:=ParseData(tx);cm!=nil{
+			if mempool.CheckReceiveSeed(){
 
-				//fmt.Println("交易tx不合法", tx1)
+				err := mempool.CheckTx(tx, nil)
+				if err != nil {
+					//状态数据库返回会导致err！=nil
+					if cm := ParseData(tx); cm != nil {
+						//fmt.Println("错误",err)
+						//fmt.Println("交易cm不合法", cm)
+					}
+					return nil, err
+				}
+
+				return &ctypes.ResultBroadcastTx{Hash: tx.Hash()}, nil
+			}else{
+				return nil, fmt.Errorf("遗忘丢失")
 			}
+		}else{
+			err := mempool.CheckTx(tx, nil)
+			return nil,err
+		}
 
-
-		return nil, err
+	}else{
+		return nil, fmt.Errorf("不是leader")
 	}
+
+	
+
 	//}
 
-	return &ctypes.ResultBroadcastTx{Hash: tx.Hash()}, nil
+
 }
 
 // Returns with the response from CheckTx. Does not wait for DeliverTx result.

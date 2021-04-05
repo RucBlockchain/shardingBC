@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 
 	"github.com/tendermint/tendermint/checkdb"
 	myclient "github.com/tendermint/tendermint/client"
@@ -288,7 +289,9 @@ type Mempool struct {
 	// 每一项元素是string类型
 	// 如果收到交易就执行不进行addtx 那么无法完成同步
 	// 每一个Celement的结构为shardfilter
-	ShardFilters *clist.CList
+	ShardFilters       *clist.CList
+	CrossReceiveStrike int //接收遗忘比率
+	CrossSendStrike    int //发送遗忘比率
 }
 
 //--------------------------------------------
@@ -314,20 +317,22 @@ func NewMempool(
 	options ...MempoolOption,
 ) *Mempool {
 	mempool := &Mempool{
-		config:        config,
-		proxyAppConn:  proxyAppConn,
-		txs:           clist.New(),
-		height:        height,
-		rechecking:    0,
-		recheckCursor: nil,
-		recheckEnd:    nil,
-		logger:        log.NewNopLogger(),
-		metrics:       NopMetrics(),
-		cmDB:          newcmDB(),
-		cmChan:        make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:          3,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印 3表示只打印cm
-		BusyScore:     1.0,
-		ShardFilters:  clist.New(),
+		config:             config,
+		proxyAppConn:       proxyAppConn,
+		txs:                clist.New(),
+		height:             height,
+		rechecking:         0,
+		recheckCursor:      nil,
+		recheckEnd:         nil,
+		logger:             log.NewNopLogger(),
+		metrics:            NopMetrics(),
+		cmDB:               newcmDB(),
+		cmChan:             make(chan *tp.CrossMessages, 1), //开启容量为1的通道
+		Plog:               3,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印 3表示只打印cm
+		BusyScore:          1.0,
+		ShardFilters:       clist.New(),
+		CrossSendStrike:    0, //起初都为0
+		CrossReceiveStrike: 0,
 	}
 	if config.CacheSize > 0 {
 		mempool.cache = newMapTxCache(config.CacheSize)
@@ -349,7 +354,42 @@ func newcmDB() CrossMessagesDB {
 	cmdb.CrossMessages = cm
 	return cmdb
 }
+func (mem *Mempool) GetCrossSendStrike() int {
+	return mem.CrossSendStrike
+}
+func (mem *Mempool) GetCrossReceiveStrike() int {
+	return mem.CrossReceiveStrike
+}
+func (mem *Mempool) SetCrossReceiveStrike(rate int) {
+	mem.CrossReceiveStrike = rate
+}
+func (mem *Mempool) SetCrossSendStrike(rate int) {
+	mem.CrossSendStrike = rate
+}
+func (mem *Mempool) CheckSendSeed() bool {
 
+	rand.Seed(time.Now().UnixNano())
+	if rand.Intn(100) >= mem.CrossSendStrike {
+
+		return true
+	} else {
+		fmt.Println("CheckSendSeed选择遗忘")
+		return false
+	}
+}
+
+//是否遗忘
+func (mem *Mempool) CheckReceiveSeed() bool {
+
+	rand.Seed(time.Now().UnixNano())
+	if rand.Intn(100) >= mem.CrossReceiveStrike {
+
+		return true
+	} else {
+		fmt.Println("CheckReceiveSeed选择遗忘")
+		return false
+	}
+}
 func (mem *Mempool) autoremove() {
 	removeList := []string{}
 	current := time.Now()
@@ -434,7 +474,7 @@ func (mem *Mempool) CalculateBusyScore(validTxs int, LastBlockSize, LastBlockMax
 	// 当前mempool里的交易数的比例来反映共识的快慢
 	var isfull = false //上一轮打包是否过满 0.8*最大打包大小
 
-	fmt.Println("shardfilter: ", mem.GetShardFilters())
+	// fmt.Println("shardfilter: ", mem.GetShardFilters())
 
 	if LastBlockSize >= ElasticBytes(LastBlockMaxSize, mem.BusyScore)*2/3 {
 		// 打包大小超过总大小的2/3
@@ -720,7 +760,7 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 			for i := 0; i < len(tx_package); i++ {
 				client := *myclient.NewHTTP(name, "/websocket")
 
-				go client.BroadcastCrossMessageAsync(tx_package)
+				go client.BroadcastCrossMessageAsync(tx_package, mem.CrossSendStrike, false)
 			}
 			//fmt.Println("状态数据库返回")
 			return "状态数据库返回"
@@ -1456,8 +1496,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 			//}
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes-1500000 {
-				fmt.Println("交易最大容量为1：",totalBytes,"高度为",height)
-				fmt.Println("区块最大容量为：", maxBytes, "本次要打包交易的容量为", int64(len(memTx.tx))+aminoOverhead, "因此打包失败")
 				return txs
 			}
 
@@ -1494,8 +1532,6 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 
 			aminoOverhead := types.ComputeAminoOverhead(memTx.tx, 1)
 			if maxBytes > -1 && totalBytes+int64(len(memTx.tx))+aminoOverhead > maxBytes-1500000 {
-				fmt.Println("交易最大容量为2：",totalBytes,"高度为",height)
-				fmt.Println("区块最大容量为2：", maxBytes, "本次要打包交易的容量为", totalBytes+int64(len(memTx.tx))+aminoOverhead, "因此打包失败")
 				return txs
 			}
 
@@ -1524,7 +1560,7 @@ func (mem *Mempool) ReapMaxBytesMaxGas(maxBytes, maxGas int64, height int64) typ
 		}
 
 	}
-	fmt.Println("交易最大容量为：",totalBytes,"高度为",height)
+	// fmt.Println("交易最大容量为：", totalBytes, "高度为", height)
 	return txs
 }
 
@@ -1652,15 +1688,15 @@ func (mem *Mempool) Update(
 func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 	// Build a map for faster lookups.
 	txsMap := make(map[string]struct{}, len(txs))
-
 	for _, tx := range txs {
 		//主要是避免由cm产生的tx
+
 		if DetectTx(tx) {
 			continue
 		}
 		tx1, _ := tp.NewTX(tx)
 		//如果operate=1且relaytx且还是本分片的交易，则是在本次区块产生的时候
-		if tx1.Operate == 1 && tx1.Txtype == "relaytx" && tx1.Sender == getShard() {
+		if tx1.Operate == 1 && (tx1.Txtype == "relaytx") && tx1.Sender == getShard() {
 			tx1.Operate = 0
 			txdata, _ := json.Marshal(tx1)
 			txsMap[string(txdata)] = struct{}{}
@@ -1670,11 +1706,12 @@ func (mem *Mempool) removeTxs(txs types.Txs) []types.Tx {
 	}
 	//A tm-bench A->B op=0
 	txsLeft := make([]types.Tx, 0, mem.txs.Len())
+	//不到这里
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
-
 		// Remove the tx if it's already in a block.
 		if _, ok := txsMap[string(memTx.tx)]; ok {
+
 			// NOTE: we don't remove committed txs from the cache.
 			mem.removeTx(memTx.tx, e, false)
 
