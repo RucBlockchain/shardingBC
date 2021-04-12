@@ -328,7 +328,7 @@ func NewMempool(
 		metrics:            NopMetrics(),
 		cmDB:               newcmDB(),
 		cmChan:             make(chan *tp.CrossMessages, 1), //开启容量为1的通道
-		Plog:               3,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印 3表示只打印cm
+		Plog:               2,                               //0 表示 tx与cm都不打印，1表示只打印tx，2表示全打印 3表示只打印cm
 		BusyScore:          1.0,
 		ShardFilters:       clist.New(),
 		CrossSendStrike:    0, //起初都为0
@@ -369,10 +369,11 @@ func (mem *Mempool) SetCrossSendStrike(rate int) {
 func (mem *Mempool) CheckSendSeed() bool {
 
 	rand.Seed(time.Now().UnixNano())
-	if rand.Intn(100) >= mem.CrossSendStrike {
-
+	rand_num := rand.Intn(100)
+	if rand_num >= mem.CrossSendStrike {
 		return true
 	} else {
+
 		fmt.Println("CheckSendSeed选择遗忘")
 		return false
 	}
@@ -382,7 +383,9 @@ func (mem *Mempool) CheckSendSeed() bool {
 func (mem *Mempool) CheckReceiveSeed() bool {
 
 	rand.Seed(time.Now().UnixNano())
-	if rand.Intn(100) >= mem.CrossReceiveStrike {
+	rand_num := rand.Intn(100)
+
+	if rand_num >= mem.CrossReceiveStrike {
 
 		return true
 	} else {
@@ -567,6 +570,7 @@ func (mem *Mempool) RemoveCrossMessagesDB(tcm *tp.CrossMessages) {
 		//fmt.Println("收到要删除的包",packs[j])
 		for i := 0; i < len(mem.cmDB.CrossMessages); i++ {
 			if mem.cmDB.CrossMessages[i].Content.Height == packs[j].Height && bytes.Equal(mem.cmDB.CrossMessages[i].Content.CrossMerkleRoot, packs[j].CrossMerkleRoot) {
+
 				mem.LogPrint("tCMlife", mem.cmDB.CrossMessages[i].Content.ID, time.Now().UnixNano()-mem.cmDB.CrossMessages[i].Content.Timestamp, 2) //完整的时间线
 				mem.cmDB.CrossMessages = append(mem.cmDB.CrossMessages[:i], mem.cmDB.CrossMessages[i+1:]...)
 				i--
@@ -751,7 +755,7 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 		cmid := CmID(cm)
 		dbtx := checkdb.Search([]byte(cmid))
 		if dbtx != nil {
-			name := "tt" + dbtx.SrcZone + "s" + cm.SrcIndex + ":26657"
+			name := "10.43." + dbtx.SrcZone + "101" /* + cm.SrcIndex */ + ":26657"
 			//	fmt.Println("发送",name)
 			// fmt.Println("回执crossmessage"," 对方的height",dbtx.Height," cmroot", "SrcZone",dbtx.SrcZone,"DesZone",dbtx.DesZone,
 			//)
@@ -775,7 +779,6 @@ func (mem *Mempool) CheckDB(tx types.Tx) string {
 func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 	status := mem.CheckDB(tx)
 	if status == "回执" {
-
 		//fmt.Println("回执同步")
 		return mem.CheckTxWithInfo(tx, cb, TxInfo{PeerID: UnknownPeerID}, true)
 	} else if status == "" {

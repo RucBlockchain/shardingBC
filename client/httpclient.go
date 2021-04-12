@@ -188,11 +188,11 @@ func unmarshalResponseBytes(cdc *amino.Codec, responseBytes []byte, result inter
 func CheckSendSeed(rate int)bool{
 
 	rand.Seed(time.Now().UnixNano())
-	if rand.Intn(100) >= rate{
-
+	rand_num := rand.Intn(100)
+	if rand_num >= rate{
 		return true
 	}else{
-		fmt.Println("CheckSendSeed选择遗忘")
+		fmt.Println("CheckSendSeed1选择遗忘")
 		return false
 	}
 }

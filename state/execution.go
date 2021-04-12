@@ -486,7 +486,7 @@ func GetTotal() int {
 func (blockExec *BlockExecutor) SendMessage(DesZone string, tx_package []*tp.CrossMessages, SendRightNow bool) {
 	rand.Seed(time.Now().UnixNano())
 	name := "10.43." + DesZone + ".101" /*+strconv.Itoa(rand.Intn(GetTotal())+1)*/ + ":26657"
-	tx_package[0].Timestamp = time.Now().UnixNano()
+	//tx_package[0].Timestamp = time.Now().UnixNano()
 	//大量的不发送任务
 
 	//fmt.Println("发送的地点",name," 时间为：",time.Now(),"ID:",tx_package[0].ID,"time",tx_package[0].Timestamp)

@@ -273,7 +273,6 @@ func ClassifyTxFromBlock(mts *merkle.TxMerkleTree,
 			//对shard进行分解
 		args := strings.Split(shard, "_")
 		target = args[1]
-
 		//获取该交易的merkle tree
 		mt := mts.Find(shard)
 
