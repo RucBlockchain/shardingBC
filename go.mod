@@ -35,10 +35,9 @@ require (
 	github.com/tendermint/tmlibs v0.9.0
 	go.dedis.ch/kyber/v3 v3.0.12
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
-	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200908183739-ae8ad444f925
-	golang.org/x/net v0.0.0-20200904194848-62affa334b73
-	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
+	golang.org/x/net v0.7.0
 	google.golang.org/genproto v0.0.0-20200702021140-07506425bd67 // indirect
 	google.golang.org/grpc v1.30.0
 	gopkg.in/ini.v1 v1.61.0 // indirect
